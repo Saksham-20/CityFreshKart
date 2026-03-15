@@ -2,6 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import './index.css';
 import App from './App';
+import { initPWA } from './utils/pwa';
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
@@ -10,16 +11,9 @@ root.render(
   </React.StrictMode>
 );
 
-// Register PWA Service Worker
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker
-      .register('/service-worker.js')
-      .then((registration) => {
-        console.log('CityFreshKart SW registered:', registration.scope);
-      })
-      .catch((error) => {
-        console.log('SW registration failed:', error);
-      });
+// Initialize PWA capabilities
+if (initPWA) {
+  initPWA().catch((error) => {
+    console.log('SW registration failed:', error);
   });
 }

@@ -1,4 +1,4 @@
-import React, { Suspense, lazy } from 'react';
+import React, { Suspense, lazy, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider } from './context/AuthContext';
@@ -10,6 +10,10 @@ import Header from './components/layout/Header';
 import Footer from './components/layout/Footer';
 import AdminLayout from './components/layout/AdminLayout';
 import MobileBottomNav from './components/layout/MobileBottomNav';
+
+// PWA Components
+import InstallPrompt from './components/pwa/InstallPrompt';
+import CartDrawer from './components/cart/CartDrawer';
 
 // Auth Components
 import ProtectedRoute from './components/auth/ProtectedRoute';
@@ -48,12 +52,21 @@ const PageLoader = () => (
 );
 
 function App() {
+  const [cartDrawerOpen, setCartDrawerOpen] = useState(false);
+
   return (
     <Router>
       <AuthProvider>
         <CartProvider>
           <WishlistProvider>
             <Suspense fallback={<PageLoader />}>
+              {/* PWA Components */}
+              <InstallPrompt />
+              <CartDrawer
+                isOpen={cartDrawerOpen}
+                onClose={() => setCartDrawerOpen(false)}
+              />
+              
               <Routes>
                 {/* Auth Routes - No Header */}
                 <Route path="/login" element={<LoginPage />} />

@@ -11,4 +11,5 @@ const useCart = () => {
   return context;
 };
 
+export { useCart };
 export default useCart;

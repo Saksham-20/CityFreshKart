@@ -1,27 +1,40 @@
 {
-  "name": "luxury-ecommerce-client",
-  "version": "1.0.0",
+  "name": "cityfreshkart-client",
+  "version": "2.0.0",
   "private": true,
   "dependencies": {
+    "@radix-ui/react-dialog": "^1.1.1",
+    "@radix-ui/react-dropdown-menu": "^2.1.1",
+    "@radix-ui/react-popover": "^1.0.7",
+    "@radix-ui/react-slot": "^1.0.0",
     "@testing-library/jest-dom": "^5.17.0",
     "@testing-library/react": "^13.4.0",
     "@testing-library/user-event": "^14.5.2",
+    "ajv": "^8.18.0",
     "axios": "^1.12.0",
+    "class-variance-authority": "^0.7.0",
+    "clsx": "^2.0.0",
     "framer-motion": "^10.16.16",
+    "lucide-react": "^0.344.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
+    "react-hook-form": "^7.50.0",
     "react-hot-toast": "^2.4.1",
-    "react-icons": "^4.12.0",
+    "react-icons": "^5.6.0",
     "react-intersection-observer": "^9.5.3",
     "react-router-dom": "^6.20.1",
     "react-scripts": "5.0.1",
-    "web-vitals": "^2.1.4"
+    "tailwind-merge": "^2.3.0",
+    "tailwindcss-animate": "^1.0.7",
+    "web-vitals": "^2.1.4",
+    "zustand": "^4.5.0"
   },
   "scripts": {
     "start": "react-scripts start",
-    "build": "node fix-public-path.js && react-scripts build",
+    "build": "react-scripts build",
     "test": "react-scripts test",
-    "eject": "react-scripts eject"
+    "eject": "react-scripts eject",
+    "test:e2e": "playwright test"
   },
   "eslintConfig": {
     "extends": [
@@ -42,12 +55,17 @@
     ]
   },
   "devDependencies": {
+    "@playwright/test": "^1.40.0",
     "@tailwindcss/aspect-ratio": "^0.4.2",
     "@tailwindcss/forms": "^0.5.10",
     "@tailwindcss/line-clamp": "^0.4.4",
     "@tailwindcss/typography": "^0.5.10",
+    "@types/node": "^20.10.0",
+    "@types/react": "^18.2.37",
+    "@types/react-dom": "^18.2.15",
     "autoprefixer": "^10.4.16",
     "postcss": "^8.4.32",
-    "tailwindcss": "^3.3.6"
+    "tailwindcss": "^3.3.6",
+    "typescript": "^5.3.3"
   }
 }
