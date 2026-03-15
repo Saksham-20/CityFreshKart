@@ -215,7 +215,7 @@ const MobileMenu = () => {
               </h3>
               <div className="space-y-2 text-sm text-gray-600">
                 <p>Call: +91 98765 43210</p>
-                <p>Email: hello@frashcart.in</p>
+                <p>Email: hello@cityfreshkart.in</p>
                 <p>Hours: Mon-Sat 6AM-9PM IST</p>
               </div>
             </div>

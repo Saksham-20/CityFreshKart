@@ -65,7 +65,7 @@ async function setupDatabase() {
 
     // Create default admin user
     const bcrypt = require('bcryptjs');
-    const adminEmail = process.env.ADMIN_EMAIL || 'admin@frashcart.in';
+    const adminEmail = process.env.ADMIN_EMAIL || 'admin@cityfreshkart.in';
     const adminPassword = process.env.ADMIN_PASSWORD || 'admin123';
 
     try {
@@ -83,7 +83,7 @@ async function setupDatabase() {
            VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())`,
           [adminEmail, hashedPassword, 'Admin', 'User', true, true],
         );
-        console.log('✅ Default admin user created (admin@frashcart.in / admin123)');
+        console.log('✅ Default admin user created (admin@cityfreshkart.in / admin123)');
       } else {
         console.log('✅ Admin user already exists');
       }
@@ -115,7 +115,7 @@ async function setupDatabase() {
           );
         }
       }
-      console.log('✅ FrashCart vegetable categories created');
+      console.log('✅ CityFreshKart vegetable categories created');
     } catch (error) {
       console.error('❌ Category creation failed:', error.message);
       // Don't throw, continue
@@ -128,7 +128,7 @@ async function setupDatabase() {
     console.log(`Password: ${adminPassword}`);
     console.log('');
     console.log('📋 Next steps:');
-    console.log('1. Update frontend API URL for your FrashCart deployment');
+    console.log('1. Update frontend API URL for your CityFreshKart deployment');
     console.log('2. Add Cloudinary credentials for image uploads');
     console.log('3. Test your deployment!');
 

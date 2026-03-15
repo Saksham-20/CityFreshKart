@@ -94,7 +94,7 @@ const Header = () => {
                 whileHover={{ scale: 1.03 }}
                 transition={{ duration: 0.15 }}
               >
-                🥦 FrashCart
+                🥦 CityFreshKart
               </motion.span>
             </Link>
 

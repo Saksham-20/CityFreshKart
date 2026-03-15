@@ -1,4 +1,4 @@
--- E-Commerce Shop Database Schema
+-- CityFreshKart Database Schema
 
 -- Enable UUID extension
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";

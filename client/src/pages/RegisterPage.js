@@ -7,7 +7,7 @@ const RegisterPage = () => {
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex flex-col justify-center py-8 px-4 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">E-Commerce Shop</h1>
+          <h1 className="text-4xl font-bold text-gray-900 mb-2">CityFreshKart</h1>
           <p className="text-gray-600 text-lg">Create your account</p>
         </div>
       </div>

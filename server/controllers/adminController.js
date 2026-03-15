@@ -265,12 +265,12 @@ const getSettings = async (req, res) => {
 
     const settings = {
       store: {
-        name: process.env.APP_NAME || 'FrashCart',
+        name: process.env.APP_NAME || 'CityFreshKart',
         description: process.env.APP_DESCRIPTION || 'Farm-fresh vegetables delivered to your doorstep',
-        email: process.env.APP_EMAIL || 'admin@frashcart.in',
+        email: process.env.APP_EMAIL || 'admin@cityfreshkart.in',
         phone: process.env.APP_PHONE || '+91-98765-43210',
         address: {
-          street: process.env.STORE_STREET || '123 FrashCart Lane',
+          street: process.env.STORE_STREET || '123 CityFreshKart Lane',
           city: process.env.STORE_CITY || 'Chandigarh',
           state: process.env.STORE_STATE || 'Chandigarh',
           zipCode: process.env.STORE_ZIP || '160022',

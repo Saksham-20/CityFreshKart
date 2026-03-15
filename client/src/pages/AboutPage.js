@@ -23,7 +23,7 @@ const AboutPage = () => {
   ];
 
   const milestones = [
-    { year: '2023', title: 'FrashCart Founded', description: 'Started with a simple idea — connecting local farmers directly to urban families in Chandigarh' },
+    { year: '2023', title: 'CityFreshKart Founded', description: 'Started with a simple idea — connecting local farmers directly to urban families in Chandigarh' },
     { year: '2023', title: 'First 1,000 Orders', description: 'Reached our first milestone within 3 months of launch' },
     { year: '2024', title: 'Farmer Network', description: 'Expanded to 200+ partner farmers across Punjab, Haryana & Himachal' },
     { year: '2024', title: 'App Launch', description: 'Launched our mobile app for seamless ordering and tracking' },
@@ -42,7 +42,7 @@ const AboutPage = () => {
               transition={{ duration: 0.8 }}
               className="text-3xl md:text-4xl font-bold text-gray-900 mb-4"
             >
-              About FrashCart 🥦
+                About CityFreshKart 🥦
             </motion.h1>
             <motion.p
               initial={{ opacity: 0, y: 30 }}
@@ -71,12 +71,12 @@ const AboutPage = () => {
                 Our Story
               </h2>
               <p className="text-base text-gray-600 mb-4">
-                FrashCart was born in 2023 from a simple frustration — why does it take 3 days
+                CityFreshKart was born in 2023 from a simple frustration — why does it take 3 days
                 for a tomato to travel from a farm 50km away to our kitchen? Along the way, it
                 passes through 4-5 middlemen, losing freshness and doubling in price.
               </p>
               <p className="text-base text-gray-600 mb-6">
-                We decided to cut the noise. FrashCart connects local farmers directly to your
+                We decided to cut the noise. CityFreshKart connects local farmers directly to your
                 doorstep. Our team visits farms every morning, handpicks the best produce, and
                 delivers it to you within hours — not days. Better for you, better for farmers,
                 better for India. 🇮🇳
@@ -209,7 +209,7 @@ const AboutPage = () => {
             viewport={{ once: true }}
             className="text-2xl font-bold text-white mb-4"
           >
-            Join the FrashCart Family 🌿
+            Join the CityFreshKart Family 🌿
           </motion.h2>
           <motion.p
             initial={{ opacity: 0, y: 20 }}

@@ -244,7 +244,7 @@ const HomePage = () => {
             className="text-center mb-12"
           >
             <h2 className="text-2xl font-bold text-gray-900 mb-4">
-              How FrashCart Works
+              How CityFreshKart Works
             </h2>
             <p className="text-lg text-gray-600 max-w-2xl mx-auto">
               From farm to your plate in 3 simple steps

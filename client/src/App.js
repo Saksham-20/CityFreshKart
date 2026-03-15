@@ -42,7 +42,7 @@ const PageLoader = () => (
   <div className="min-h-screen flex items-center justify-center bg-green-50">
     <div className="text-center">
       <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-fresh-green mx-auto mb-4"></div>
-      <p className="text-fresh-green font-semibold text-lg">Loading FrashCart...</p>
+      <p className="text-fresh-green font-semibold text-lg">Loading CityFreshKart...</p>
     </div>
   </div>
 );

@@ -127,7 +127,7 @@ const NotFoundPage = () => {
               Call: +91 98765 43210
             </a>
             <a
-              href="mailto:hello@frashcart.in"
+              href="mailto:hello@cityfreshkart.in"
               className="text-fresh-green hover:text-fresh-green-dark font-semibold flex items-center justify-center group"
             >
               <span className="mr-2">✉️</span>

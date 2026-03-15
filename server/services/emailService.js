@@ -36,9 +36,9 @@ class EmailService {
       }
 
       const mailOptions = {
-        from: `"${process.env.APP_NAME || 'E-Commerce Shop'}" <${process.env.SMTP_USER}>`,
+        from: `"${process.env.APP_NAME || 'CityFreshKart'}" <${process.env.SMTP_USER}>`,
         to: user.email,
-        subject: 'Welcome to E-Commerce Shop!',
+        subject: 'Welcome to CityFreshKart!',
         html: this.getWelcomeEmailTemplate(user),
       };
 
@@ -58,7 +58,7 @@ class EmailService {
       }
 
       const mailOptions = {
-        from: `"${process.env.APP_NAME || 'E-Commerce Shop'}" <${process.env.SMTP_USER}>`,
+        from: `"${process.env.APP_NAME || 'CityFreshKart'}" <${process.env.SMTP_USER}>`,
         to: user.email,
         subject: `Order Confirmation #${order.order_number}`,
         html: this.getOrderConfirmationTemplate(order, user),
@@ -82,7 +82,7 @@ class EmailService {
       const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${resetToken}`;
 
       const mailOptions = {
-        from: `"${process.env.APP_NAME || 'E-Commerce Shop'}" <${process.env.SMTP_USER}>`,
+        from: `"${process.env.APP_NAME || 'CityFreshKart'}" <${process.env.SMTP_USER}>`,
         to: user.email,
         subject: 'Password Reset Request',
         html: this.getPasswordResetTemplate(user, resetUrl),
@@ -104,7 +104,7 @@ class EmailService {
       }
 
       const mailOptions = {
-        from: `"${process.env.APP_NAME || 'E-Commerce Shop'}" <${process.env.SMTP_USER}>`,
+        from: `"${process.env.APP_NAME || 'CityFreshKart'}" <${process.env.SMTP_USER}>`,
         to: user.email,
         subject: `Order Status Update #${order.order_number}`,
         html: this.getOrderStatusUpdateTemplate(order, user, status),
@@ -126,7 +126,7 @@ class EmailService {
       }
 
       const mailOptions = {
-        from: `"${process.env.APP_NAME || 'E-Commerce Shop'}" <${process.env.SMTP_USER}>`,
+        from: `"${process.env.APP_NAME || 'CityFreshKart'}" <${process.env.SMTP_USER}>`,
         to: user.email,
         subject: `Your Order Has Shipped #${order.order_number}`,
         html: this.getShippingConfirmationTemplate(order, user, trackingNumber),
@@ -144,9 +144,9 @@ class EmailService {
   getWelcomeEmailTemplate(user) {
     return `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h2 style="color: #333;">Welcome to E-Commerce Shop!</h2>
+        <h2 style="color: #333;">Welcome to CityFreshKart!</h2>
         <p>Hello ${user.first_name || user.email},</p>
-        <p>Thank you for joining the FrashCart family! We're excited to deliver farm-fresh produce to your doorstep.</p>
+        <p>Thank you for joining the CityFreshKart family! We're excited to deliver farm-fresh produce to your doorstep.</p>
         <p>Here's what you can do:</p>
         <ul>
           <li>Browse our wide range of fresh vegetables and fruits</li>
@@ -156,7 +156,7 @@ class EmailService {
         </ul>
         <p>If you have any questions, feel free to contact our support team.</p>
         <p>Happy shopping!</p>
-        <p>Best regards,<br>The E-Commerce Shop Team</p>
+        <p>Best regards,<br>The CityFreshKart Team</p>
       </div>
     `;
   }
@@ -173,8 +173,8 @@ class EmailService {
         <p><strong>Total Amount:</strong> $${order.total_amount}</p>
         <p>We'll send you another email when your order ships with tracking information.</p>
         <p>If you have any questions, please contact our support team.</p>
-        <p>Thank you for choosing E-Commerce Shop!</p>
-        <p>Best regards,<br>The E-Commerce Shop Team</p>
+        <p>Thank you for choosing CityFreshKart!</p>
+        <p>Best regards,<br>The CityFreshKart Team</p>
       </div>
     `;
   }
@@ -188,7 +188,7 @@ class EmailService {
         <p><a href="${resetUrl}" style="background-color: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Reset Password</a></p>
         <p>If you didn't request this password reset, please ignore this email.</p>
         <p>This link will expire in 1 hour for security reasons.</p>
-        <p>Best regards,<br>The E-Commerce Shop Team</p>
+        <p>Best regards,<br>The CityFreshKart Team</p>
       </div>
     `;
   }
@@ -205,7 +205,7 @@ class EmailService {
         <p><strong>Update Date:</strong> ${new Date().toLocaleDateString()}</p>
         <p>We'll keep you updated on any further changes to your order.</p>
         <p>Thank you for your patience!</p>
-        <p>Best regards,<br>The E-Commerce Shop Team</p>
+        <p>Best regards,<br>The CityFreshKart Team</p>
       </div>
     `;
   }
@@ -222,7 +222,7 @@ class EmailService {
         <p><strong>Shipping Date:</strong> ${new Date().toLocaleDateString()}</p>
         <p>You can track your package using the tracking number above.</p>
         <p>We hope you love your new items!</p>
-        <p>Best regards,<br>The E-Commerce Shop Team</p>
+        <p>Best regards,<br>The CityFreshKart Team</p>
       </div>
     `;
   }

@@ -22,10 +22,10 @@ const indexHtmlContent = `<!DOCTYPE html>
     <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#81D8D0" />
-    <meta name="description" content="Luxury e-commerce website with premium products and exceptional service" />
+    <meta name="description" content="CityFreshKart - Fresh vegetables and fruits delivered quickly to your doorstep" />
     <link rel="apple-touch-icon" href="%PUBLIC_URL%/logo192.png" />
     <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
-    <title>E-Commerce Shop | Premium Products & Exceptional Service</title>
+    <title>CityFreshKart | Fresh Produce Delivered Daily</title>
     
     <!-- Preconnect to Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -45,8 +45,8 @@ fs.writeFileSync('public/index.html', indexHtmlContent);
 
 // Create manifest.json
 const manifestContent = `{
-  "short_name": "E-Commerce Shop",
-  "name": "Luxury E-Commerce Shop",
+  "short_name": "CityFreshKart",
+  "name": "CityFreshKart",
   "icons": [
     {
       "src": "favicon.ico",

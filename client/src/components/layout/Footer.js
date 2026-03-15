@@ -66,7 +66,7 @@ const Footer = () => {
 
   const contactInfo = [
     { icon: FaPhone, text: '+91 98765 43210', href: 'tel:+919876543210' },
-    { icon: FaEnvelope, text: 'hello@frashcart.in', href: 'mailto:hello@frashcart.in' },
+    { icon: FaEnvelope, text: 'hello@cityfreshkart.in', href: 'mailto:hello@cityfreshkart.in' },
     { icon: FaMapMarkerAlt, text: 'Sector 17, Chandigarh, India 160017', href: '#' }
   ];
 
@@ -128,7 +128,7 @@ const Footer = () => {
             >
               <Link to="/" className="inline-block">
                 <h2 className="text-2xl font-bold text-fresh-green mb-4">
-                  🥦 FrashCart
+                  🥦 CityFreshKart
                 </h2>
               </Link>
               <p className="text-gray-400 mb-6 leading-relaxed">
@@ -203,7 +203,7 @@ const Footer = () => {
               viewport={{ once: true }}
               transition={{ duration: 0.6 }}
             >
-              <p>&copy; {currentYear} FrashCart. All rights reserved. 🌿 Made in India</p>
+              <p>&copy; {currentYear} CityFreshKart. All rights reserved. 🌿 Made in India</p>
             </motion.div>
 
             {/* Social Links */}

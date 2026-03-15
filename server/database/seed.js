@@ -63,7 +63,7 @@ async function seedDatabase() {
       },
       {
         code: 'LUXURY50',
-        name: 'FrashCart Savings',
+        name: 'CityFreshKart Savings',
         description: '$50 off orders over $500',
         discount_type: 'fixed',
         discount_value: 50,
@@ -92,10 +92,10 @@ async function seedDatabase() {
     console.log('✅ Sample coupons created');
 
     console.log('🎉 Database seeding completed successfully!');
-    console.log('\n📋 Your FrashCart vegetable delivery store is now ready with:');
+    console.log('\n📋 Your CityFreshKart vegetable delivery store is now ready with:');
     console.log('• Sample users (john.doe@example.com, jane.smith@example.com)');
-    console.log('• Admin user (admin@frashcart.in / admin123)');
-    console.log('• FrashCart vegetable categories');
+    console.log('• Admin user (admin@cityfreshkart.in / admin123)');
+    console.log('• CityFreshKart vegetable categories');
     console.log('• Discount coupons');
     console.log('• Empty product catalog (add products via admin panel)');
     console.log('\n🚀 Start your application:');

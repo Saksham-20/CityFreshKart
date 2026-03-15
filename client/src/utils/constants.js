@@ -47,7 +47,7 @@ export const API_ENDPOINTS = {
 
 // Application Constants
 export const APP_CONSTANTS = {
-  APP_NAME: process.env.REACT_APP_APP_NAME || 'E-Commerce Shop',
+  APP_NAME: process.env.REACT_APP_APP_NAME || 'CityFreshKart',
   APP_VERSION: '1.0.0',
   DEFAULT_CURRENCY: process.env.REACT_APP_DEFAULT_CURRENCY || 'USD',
   DEFAULT_LANGUAGE: process.env.REACT_APP_DEFAULT_LANGUAGE || 'en',

@@ -122,7 +122,7 @@ app.use('*', (req, res) => {
 // Initialize database and start server
 async function startServer() {
   try {
-    console.log('🚀 Starting FrashCart server...');
+    console.log('🚀 Starting CityFreshKart server...');
     console.log('🚀 Environment variables check:');
     console.log('  - NODE_ENV:', process.env.NODE_ENV);
     console.log('  - PORT:', process.env.PORT);
@@ -137,7 +137,7 @@ async function startServer() {
 
     // Start the server
     app.listen(PORT, () => {
-      console.log(`🚀 FrashCart server running on port ${PORT}`);
+      console.log(`🚀 CityFreshKart server running on port ${PORT}`);
       console.log(`📱 Client URL: ${process.env.CLIENT_URL || 'http://localhost:3000'}`);
       console.log(`🔒 Environment: ${process.env.NODE_ENV || 'development'}`);
       console.log('🚀 Server startup completed successfully!');
