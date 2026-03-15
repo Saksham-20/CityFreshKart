@@ -757,7 +757,7 @@ const ProductManager = () => {
                     <p className="text-xs text-gray-500">
                       PNG, JPG, GIF up to 10MB each (Max 6 images)
                     </p>
-                    <p className="text-xs text-tiffany-blue font-medium">
+                    <p className="text-xs text-fresh-green font-medium">
                       {selectedImages.length}/6 images selected
                     </p>
                   </label>
@@ -1015,7 +1015,7 @@ const ProductManager = () => {
                     <p className="text-xs text-gray-500">
                       PNG, JPG, GIF up to 10MB each (Max 6 images total)
                     </p>
-                    <p className="text-xs text-tiffany-blue font-medium">
+                    <p className="text-xs text-fresh-green font-medium">
                       {existingImages.length + selectedImages.length}/6 total images
                     </p>
                   </label>

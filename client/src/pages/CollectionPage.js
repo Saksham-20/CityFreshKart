@@ -42,12 +42,12 @@ const CollectionPage = () => {
           animate={{ opacity: 1, y: 0 }}
           className="text-center mb-12"
         >
-          <h1 className="text-4xl font-serif font-bold text-gray-900 mb-4 capitalize">
-            {slug.replace(/-/g, ' ')} Collection
+          <h1 className="text-4xl font-bold text-gray-900 mb-4 capitalize">
+            {slug.replace(/-/g, ' ')}
           </h1>
           <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-            Discover our curated selection of luxury {slug.replace(/-/g, ' ')} pieces, 
-            crafted with exceptional quality and timeless elegance.
+            Browse our fresh selection of {slug.replace(/-/g, ' ')},
+            sourced directly from local farms.
           </p>
         </motion.div>
 
@@ -67,7 +67,7 @@ const CollectionPage = () => {
             {/* Search and Sort */}
             <div className="mb-6">
               <SearchBar
-                placeholder="Search within collection..."
+                placeholder="Search within category..."
                 onSearch={(query) => setFilters(prev => ({ ...prev, search: query }))}
               />
             </div>
@@ -80,7 +80,7 @@ const CollectionPage = () => {
                 transition={{ duration: 0.5 }}
               >
                 <ProductGrid products={products} />
-                
+
                 {/* Pagination */}
                 {totalPages > 1 && (
                   <div className="mt-12">

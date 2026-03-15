@@ -80,8 +80,8 @@ const LoginForm = ({ onSwitchToRegister }) => {
   return (
     <div className="max-w-md mx-auto">
       <div className="text-center mb-8">
-        <div className="w-16 h-16 bg-tiffany-blue/10 rounded-full flex items-center justify-center mx-auto mb-4">
-          <svg className="w-8 h-8 text-tiffany-blue" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div className="w-16 h-16 bg-fresh-green/10 rounded-full flex items-center justify-center mx-auto mb-4">
+          <svg className="w-8 h-8 text-fresh-green" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
           </svg>
         </div>
@@ -136,14 +136,14 @@ const LoginForm = ({ onSwitchToRegister }) => {
           <label className="flex items-center">
             <input
               type="checkbox"
-              className="h-4 w-4 text-tiffany-blue focus:ring-tiffany-blue border-gray-300 rounded"
+              className="h-4 w-4 text-fresh-green focus:ring-fresh-green border-gray-300 rounded"
             />
             <span className="ml-2 text-sm text-gray-600">Remember me</span>
           </label>
           
           <button
             type="button"
-            className="text-sm text-tiffany-blue hover:text-tiffany-blue/80 font-medium"
+            className="text-sm text-fresh-green hover:text-fresh-green/80 font-medium"
           >
             Forgot password?
           </button>
@@ -151,7 +151,7 @@ const LoginForm = ({ onSwitchToRegister }) => {
         
         <Button
           type="submit"
-          className="w-full h-12 text-base font-semibold bg-tiffany-blue hover:bg-tiffany-blue/90 text-white rounded-lg transition-all duration-200 hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+          className="w-full h-12 text-base font-semibold bg-fresh-green hover:bg-fresh-green/90 text-white rounded-lg transition-all duration-200 hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
           disabled={isLoading}
         >
           {isLoading ? (
@@ -171,7 +171,7 @@ const LoginForm = ({ onSwitchToRegister }) => {
           <button
             type="button"
             onClick={onSwitchToRegister}
-            className="text-tiffany-blue hover:text-tiffany-blue/80 font-semibold"
+            className="text-fresh-green hover:text-fresh-green/80 font-semibold"
           >
             Sign up
           </button>

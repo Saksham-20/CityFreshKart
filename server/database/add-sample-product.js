@@ -45,7 +45,7 @@ async function addSampleProduct() {
         'Exquisite diamond ring crafted with precision and elegance. This stunning piece features a brilliant-cut diamond set in premium white gold, perfect for engagements or special occasions.',
         'Premium diamond ring with brilliant-cut stone',
         2999.99, 3999.99, 'DR-001', 10, $1, true, true,
-        'Diamond Ring - Premium Jewelry Collection',
+        'Fresh Tomatoes - Farm Direct',
         'Beautiful diamond ring with brilliant-cut stone. Perfect for engagements and special occasions.'
       ) RETURNING id
     `, [categoryId]);

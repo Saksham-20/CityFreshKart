@@ -80,7 +80,7 @@ const ProductImages = ({ images = [] }) => {
               onClick={() => setSelectedImage(index)}
               className={`bg-white rounded-lg overflow-hidden border p-1 ${
                 selectedImage === index
-                  ? 'ring-2 ring-tiffany-blue border-tiffany-blue'
+                  ? 'ring-2 ring-fresh-green border-fresh-green'
                   : 'border-gray-200 hover:border-gray-300'
               }`}
             >

@@ -9,6 +9,7 @@ import { WishlistProvider } from './context/WishlistContext';
 import Header from './components/layout/Header';
 import Footer from './components/layout/Footer';
 import AdminLayout from './components/layout/AdminLayout';
+import MobileBottomNav from './components/layout/MobileBottomNav';
 
 // Auth Components
 import ProtectedRoute from './components/auth/ProtectedRoute';
@@ -38,8 +39,11 @@ const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
 
 // Loading component for Suspense fallback
 const PageLoader = () => (
-  <div className="min-h-screen flex items-center justify-center">
-    <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-tiffany-blue"></div>
+  <div className="min-h-screen flex items-center justify-center bg-green-50">
+    <div className="text-center">
+      <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-fresh-green mx-auto mb-4"></div>
+      <p className="text-fresh-green font-semibold text-lg">Loading FrashCart...</p>
+    </div>
   </div>
 );
 
@@ -54,7 +58,7 @@ function App() {
                 {/* Auth Routes - No Header */}
                 <Route path="/login" element={<LoginPage />} />
                 <Route path="/register" element={<RegisterPage />} />
-                
+
                 {/* Admin Routes - No Header */}
                 <Route path="/admin" element={
                   <AdminRoute>
@@ -98,7 +102,7 @@ function App() {
                     </AdminLayout>
                   </AdminRoute>
                 } />
-                
+
                 {/* Main App Routes - With Header */}
                 <Route path="/*" element={
                   <div className="min-h-screen bg-white flex flex-col">
@@ -111,31 +115,22 @@ function App() {
                         <Route path="/products" element={<ProductsPage />} />
                         <Route path="/products/:id" element={<ProductDetailPage />} />
                         <Route path="/collections/:slug" element={<CollectionPage />} />
-                        
-                        {/* Navigation Category Routes */}
-                        <Route path="/high-jewelry" element={<ProductsPage category="high-jewelry" />} />
-                        <Route path="/high-jewelry/:subcategory" element={<ProductsPage category="high-jewelry" />} />
-                        <Route path="/jewelry" element={<ProductsPage category="jewelry" />} />
-                        <Route path="/jewelry/:subcategory" element={<ProductsPage category="jewelry" />} />
-                        <Route path="/love-engagement" element={<ProductsPage category="love-engagement" />} />
-                        <Route path="/love-engagement/:subcategory" element={<ProductsPage category="love-engagement" />} />
-                        <Route path="/fine-watches" element={<ProductsPage category="fine-watches" />} />
-                        <Route path="/fine-watches/:subcategory" element={<ProductsPage category="fine-watches" />} />
-                        <Route path="/accessories" element={<ProductsPage category="accessories" />} />
-                        <Route path="/accessories/:subcategory" element={<ProductsPage category="accessories" />} />
-                        <Route path="/gifts" element={<ProductsPage category="gifts" />} />
-                        <Route path="/gifts/:subcategory" element={<ProductsPage category="gifts" />} />
-                        <Route path="/world-of-tiffany" element={<CollectionPage />} />
-                        <Route path="/world-of-tiffany/:subcategory" element={<CollectionPage />} />
-                        
+
+                        {/* Category Routes */}
+                        <Route path="/vegetables" element={<ProductsPage category="sabzi-greens" />} />
+                        <Route path="/fruits" element={<ProductsPage category="fruits" />} />
+                        <Route path="/root-vegetables" element={<ProductsPage category="root-vegetables" />} />
+                        <Route path="/exotic-herbs" element={<ProductsPage category="exotic-herbs" />} />
+                        <Route path="/daily-essentials" element={<ProductsPage category="daily-essentials" />} />
+
                         {/* Special Pages */}
                         <Route path="/new-arrivals" element={<ProductsPage category="new-arrivals" />} />
                         <Route path="/bestsellers" element={<ProductsPage category="bestsellers" />} />
-                        <Route path="/sale" element={<ProductsPage category="sale" />} />
-                        
+                        <Route path="/offers" element={<ProductsPage category="offers" />} />
+
                         <Route path="/cart" element={<CartPage />} />
                         <Route path="/wishlist" element={<WishlistPage />} />
-                        
+
                         {/* Protected Routes */}
                         <Route path="/checkout" element={
                           <ProtectedRoute>
@@ -157,17 +152,18 @@ function App() {
                             <OrderConfirmationPage />
                           </ProtectedRoute>
                         } />
-                        
+
                         {/* 404 Route */}
                         <Route path="*" element={<NotFoundPage />} />
                       </Routes>
                     </main>
                     <Footer />
+                    <MobileBottomNav />
                   </div>
                 } />
               </Routes>
             </Suspense>
-            
+
             {/* Toast Notifications */}
             <Toaster
               position="top-right"
@@ -180,7 +176,7 @@ function App() {
                 success: {
                   duration: 3000,
                   iconTheme: {
-                    primary: '#81D8D0',
+                    primary: '#16a34a',
                     secondary: '#fff',
                   },
                 },

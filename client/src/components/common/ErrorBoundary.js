@@ -44,13 +44,13 @@ class ErrorBoundary extends React.Component {
             <div className="flex space-x-3">
               <button
                 onClick={() => window.location.reload()}
-                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-tiffany-blue hover:bg-tiffany-blue/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-tiffany-blue"
+                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-fresh-green hover:bg-fresh-green/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-fresh-green"
               >
                 Refresh Page
               </button>
               <button
                 onClick={() => this.setState({ hasError: false, error: null, errorInfo: null })}
-                className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-tiffany-blue"
+                className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-fresh-green"
               >
                 Try Again
               </button>

@@ -1,101 +1,75 @@
 import React from 'react';
 import { useCart } from '../../context/CartContext';
 import { getImageUrl, getPlaceholderImage } from '../../utils/imageUtils';
-// import Button from '../ui/Button';
+import QuantitySelector from '../ui/QuantitySelector';
 
 const CartItem = ({ item }) => {
   const { updateItemQuantity, removeFromCart } = useCart();
 
-  const handleQuantityChange = (newQuantity) => {
-    if (newQuantity < 1) return;
-    updateItemQuantity(item.id, newQuantity);
+  const handleIncrease = () => updateItemQuantity(item.id, item.quantity + 1);
+  const handleDecrease = () => {
+    if (item.quantity <= 1) {
+      removeFromCart(item.id);
+    } else {
+      updateItemQuantity(item.id, item.quantity - 1);
+    }
   };
+  const handleRemove = () => removeFromCart(item.id);
 
-  const handleRemove = () => {
-    console.log('Removing cart item:', item);
-    console.log('Item ID (cart item):', item.id);
-    console.log('Product ID:', item.product_id);
-    console.log('Item type:', typeof item.id);
-    console.log('Full item object keys:', Object.keys(item));
-    console.log('Item values:', Object.values(item));
-    removeFromCart(item.id);
-  };
+  const lineTotal = (item.price * item.quantity).toLocaleString('en-IN', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  });
 
   return (
-    <div className="flex items-center space-x-4 p-4 bg-white rounded-lg shadow-sm border">
+    <div className="flex items-start gap-3 sm:gap-4 p-4 hover:bg-gray-50 transition-colors duration-150">
+      {/* Image */}
       <div className="flex-shrink-0">
         <img
           src={getImageUrl(item.primary_image)}
           alt={item.name}
-          className="w-20 h-20 object-cover rounded-md"
-          onError={(e) => {
-            console.log('Cart image failed to load:', e.target.src);
-            e.target.src = getPlaceholderImage();
-          }}
+          className="w-16 h-16 sm:w-20 sm:h-20 object-cover rounded-xl border border-gray-100"
+          onError={(e) => { e.target.src = getPlaceholderImage(); }}
         />
       </div>
-      
+
+      {/* Name + Qty + Price */}
       <div className="flex-1 min-w-0">
-        <h3 className="text-lg font-medium text-gray-900 truncate">
-          {item.name}
-        </h3>
-        <p className="text-sm text-gray-500 truncate">
-          {item.description}
-        </p>
+        <div className="flex items-start justify-between gap-2">
+          <h3 className="text-sm font-semibold text-gray-900 line-clamp-2 leading-snug">
+            {item.name}
+          </h3>
+          <button
+            onClick={handleRemove}
+            aria-label="Remove item"
+            className="flex-shrink-0 text-gray-300 hover:text-red-500 transition-colors duration-150 p-0.5"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
         {item.variant && (
-          <p className="text-sm text-gray-600">
-            Variant: {item.variant}
-          </p>
+          <p className="text-xs text-gray-500 mt-0.5">{item.variant}</p>
         )}
-      </div>
-      
-      <div className="flex items-center space-x-2">
-        <button
-          onClick={() => handleQuantityChange(item.quantity - 1)}
-          className="w-8 h-8 rounded-full border border-gray-300 flex items-center justify-center hover:bg-gray-50 transition-colors"
-        >
-          <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
-          </svg>
-        </button>
-        
-        <span className="w-12 text-center text-gray-900 font-medium">
-          {item.quantity}
-        </span>
-        
-        <button
-          onClick={() => handleQuantityChange(item.quantity + 1)}
-          className="w-8 h-8 rounded-full border border-gray-300 flex items-center justify-center hover:bg-gray-50 transition-colors"
-        >
-          <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-          </svg>
-        </button>
-      </div>
-      
-      <div className="text-right">
-        <div className="text-lg font-semibold text-gray-900">
-          ₹{(item.price * item.quantity).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-        </div>
-        {item.originalPrice && item.originalPrice > item.price && (
-          <div className="text-sm text-gray-500 line-through">
-            ₹{(item.originalPrice * item.quantity).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+
+        <div className="flex items-center justify-between mt-2 gap-2">
+          <QuantitySelector
+            quantity={item.quantity}
+            onIncrease={handleIncrease}
+            onDecrease={handleDecrease}
+            size="sm"
+          />
+
+          <div className="text-right flex-shrink-0">
+            <div className="text-sm font-bold text-gray-900">₹{lineTotal}</div>
+            <div className="text-[10px] text-gray-400">
+              ₹{item.price.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} each
+            </div>
           </div>
-        )}
-        <div className="text-sm text-gray-600">
-          ₹{item.price.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} each
         </div>
       </div>
-      
-      <button
-        onClick={handleRemove}
-        className="text-red-500 hover:text-red-700 transition-colors p-2"
-        title="Remove item"
-      >
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-        </svg>
-      </button>
     </div>
   );
 };

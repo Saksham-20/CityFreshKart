@@ -20,7 +20,7 @@ const RegisterPage = () => {
 
       <div className="mt-6 text-center">
         <p className="text-sm text-gray-600">
-          <Link to="/" className="text-tiffany-blue hover:text-tiffany-blue/80 font-medium">
+          <Link to="/" className="text-fresh-green hover:text-fresh-green/80 font-medium">
             ← Back to Home
           </Link>
         </p>

@@ -16,7 +16,7 @@ const Loading = ({
 
   const Spinner = () => (
     <motion.div
-      className={`${sizeClasses[size]} border-2 border-gray-200 border-t-tiffany-blue rounded-full`}
+      className={`${sizeClasses[size]} border-2 border-gray-200 border-t-fresh-green rounded-full`}
       animate={{ rotate: 360 }}
       transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
     />
@@ -27,7 +27,7 @@ const Loading = ({
       {[0, 1, 2].map((i) => (
         <motion.div
           key={i}
-          className="w-2 h-2 bg-tiffany-blue rounded-full"
+          className="w-2 h-2 bg-fresh-green rounded-full"
           animate={{
             scale: [1, 1.2, 1],
             opacity: [0.5, 1, 0.5]
@@ -45,7 +45,7 @@ const Loading = ({
 
   const Pulse = () => (
     <motion.div
-      className={`${sizeClasses[size]} bg-tiffany-blue rounded-full`}
+      className={`${sizeClasses[size]} bg-fresh-green rounded-full`}
       animate={{
         scale: [1, 1.2, 1],
         opacity: [1, 0.7, 1]

@@ -1,25 +1,26 @@
 import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router-dom';
 import ProductGrid from '../components/product/ProductGrid';
+import ProductCardSkeleton from '../components/product/ProductCardSkeleton';
 import SearchBar from '../components/common/SearchBar';
 import FilterSidebar from '../components/common/FilterSidebar';
-import Loading from '../components/ui/Loading';
 import api from '../services/api';
 
 const ProductsPage = ({ category: propCategory }) => {
   const { subcategory } = useParams();
-  const category = propCategory || subcategory;
+  const [searchParams] = useSearchParams();
+  const category = propCategory || subcategory || searchParams.get('category') || '';
   const [products, setProducts] = useState([]);
   const [filteredProducts, setFilteredProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [filters, setFilters] = useState({
     category: '',
-    priceRange: [0, 20000000],
+    priceRange: [0, 5000],
     rating: 0,
     sortBy: 'newest'
   });
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState(searchParams.get('search') || '');
   const [showFilters, setShowFilters] = useState(false);
 
   useEffect(() => {
@@ -32,58 +33,34 @@ const ProductsPage = ({ category: propCategory }) => {
 
   const fetchProducts = async () => {
     try {
-      console.log('📄 ProductsPage: Starting fetchProducts');
       setLoading(true);
-      
-      // Build query parameters
-      const queryParams = new URLSearchParams({
-        page: '1',
-        limit: '50'
-      });
-      
-      // Add category filter if provided
+      const queryParams = new URLSearchParams({ page: '1', limit: '50' });
+
       if (category) {
         const categoryMap = {
-          'necklaces': 'necklaces',
-          'earrings': 'earrings',
-          'bangles-bracelets': 'bangles-bracelets',
-          'rings': 'rings',
-          'anklets': 'anklets',
-          'nose-rings': 'nose-rings',
-          'mangalsutras': 'mangalsutras',
-          'temple-jewelry': 'temple-jewelry',
-          'kundan-sets': 'kundan-sets',
-          'polki-sets': 'polki-sets',
-          'meenakari': 'meenakari',
-          'antique-jewelry': 'antique-jewelry'
+          'sabzi-greens': 'sabzi-greens',
+          'fruits': 'fruits',
+          'root-vegetables': 'root-vegetables',
+          'exotic-herbs': 'exotic-herbs',
+          'daily-essentials': 'daily-essentials',
+          'new-arrivals': 'new-arrivals',
+          'bestsellers': 'bestsellers',
+          'offers': 'offers'
         };
-        
         const categorySlug = categoryMap[category];
-        if (categorySlug) {
-          queryParams.append('category', categorySlug);
-        }
+        if (categorySlug) queryParams.append('category', categorySlug);
       }
-      
-      const url = `/products?${queryParams}`;
-      console.log('📄 ProductsPage: Fetching from URL:', url);
-      
-      const response = await api.get(url);
-      console.log('📄 ProductsPage: API Response:', response);
-      
+
+      const response = await api.get(`/products?${queryParams}`);
       if (response.data) {
-        console.log('📄 ProductsPage: Response data:', response.data);
-        // Handle the correct API response format
-        const products = response.data.data?.products || response.data.products || [];
-        console.log('📄 ProductsPage: Extracted products:', products.length);
-        console.log('📄 ProductsPage: First product:', products[0]);
-        setProducts(products);
+        const items = response.data.data?.products || response.data.products || [];
+        setProducts(items);
         setError(null);
       } else {
         throw new Error('Failed to fetch products');
       }
     } catch (err) {
-      setError('Failed to load products');
-      console.error('Error fetching products:', err);
+      setError('Failed to load products. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -91,42 +68,27 @@ const ProductsPage = ({ category: propCategory }) => {
 
   const applyFilters = () => {
     let filtered = [...products];
-    console.log('Starting with products:', products.length);
-    console.log('Initial products:', products);
 
-    // Apply search filter
     if (searchQuery) {
       filtered = filtered.filter(product =>
         product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         (product.description && product.description.toLowerCase().includes(searchQuery.toLowerCase()))
       );
-      console.log('After search filter:', filtered.length);
     }
 
-    // Apply category filter from sidebar (additional to URL category)
     if (filters.category) {
-      console.log('Applying category filter:', filters.category);
       filtered = filtered.filter(product => product.category_name === filters.category);
-      console.log('After category filter:', filtered.length);
     }
 
-    // Apply price range filter
-    console.log('Price range filter:', filters.priceRange);
     filtered = filtered.filter(product => {
       const price = parseFloat(product.price);
-      const inRange = price >= filters.priceRange[0] && price <= filters.priceRange[1];
-      console.log(`Product ${product.name} price ${price} in range ${filters.priceRange[0]}-${filters.priceRange[1]}: ${inRange}`);
-      return inRange;
+      return price >= filters.priceRange[0] && price <= filters.priceRange[1];
     });
-    console.log('After price filter:', filtered.length);
 
-    // Apply rating filter
     if (filters.rating > 0) {
       filtered = filtered.filter(product => (product.average_rating || 0) >= filters.rating);
-      console.log('After rating filter:', filtered.length);
     }
 
-    // Apply sorting
     switch (filters.sortBy) {
       case 'price-low':
         filtered.sort((a, b) => a.price - b.price);
@@ -143,65 +105,57 @@ const ProductsPage = ({ category: propCategory }) => {
         break;
     }
 
-    console.log('Final filtered products:', filtered.length);
     setFilteredProducts(filtered);
   };
 
-  const handleFilterChange = (newFilters) => {
-    setFilters(prev => ({ ...prev, ...newFilters }));
-  };
-
-  const handleSearch = (query) => {
-    setSearchQuery(query);
-  };
-
+  const handleFilterChange = (newFilters) => setFilters(prev => ({ ...prev, ...newFilters }));
+  const handleSearch = (query) => setSearchQuery(query);
   const categories = [...new Set(products.map(p => p.category_name).filter(Boolean))];
 
-  if (loading) {
-    return <Loading />;
-  }
+  const pageTitle = category
+    ? category.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+    : 'All Products';
 
   return (
     <div className="min-h-screen bg-gray-50 pt-20">
       <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6 xl:px-8 py-4 sm:py-6 lg:py-8">
         {/* Header */}
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">
-            {category ? category.replace(/-/g, ' ').toUpperCase() : 'All Products'}
-          </h1>
-          <p className="text-base text-gray-600">
-            {category 
-              ? `Discover our curated collection of ${category.replace(/-/g, ' ')}`
-              : 'Discover our curated collection of premium products'
-            }
+        <div className="mb-5">
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900 mb-1">{pageTitle}</h1>
+          <p className="text-sm text-gray-500">
+            {category
+              ? `Fresh ${category.replace(/-/g, ' ')} delivered daily`
+              : 'Browse our fresh collection of farm produce'}
           </p>
         </div>
 
-        {/* Search and Filter Bar */}
-        <div className="flex flex-col gap-3 mb-4">
-          {/* Search Bar - Full Width on Mobile */}
-          <div className="w-full">
-            <SearchBar 
-              onSearch={handleSearch} 
-              placeholder="Search products..." 
+        {/* Search and Sort Bar */}
+        <div className="flex flex-col sm:flex-row gap-3 mb-5">
+          <div className="flex-1">
+            <SearchBar
+              onSearch={handleSearch}
+              initialValue={searchQuery}
+              placeholder="Search vegetables, fruits..."
               className="w-full"
               size="sm"
             />
           </div>
-          
-          {/* Filter Controls */}
-          <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
+
+          <div className="flex gap-2 flex-shrink-0">
             <button
               onClick={() => setShowFilters(!showFilters)}
-              className="sm:hidden px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50 transition-colors duration-200 text-center"
+              className="xl:hidden flex items-center gap-1.5 px-4 py-2 border border-gray-200 rounded-xl text-sm text-gray-700 hover:bg-gray-50 bg-white transition-colors duration-200"
             >
-              {showFilters ? 'Hide Filters' : 'Show Filters'}
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-.293.707L13 13.414V19a1 1 0 01-.553.894l-4 2A1 1 0 017 21v-7.586L3.293 6.707A1 1 0 013 6V4z" />
+              </svg>
+              {showFilters ? 'Hide' : 'Filter'}
             </button>
-            
+
             <select
               value={filters.sortBy}
               onChange={(e) => handleFilterChange({ sortBy: e.target.value })}
-              className="px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200 w-full sm:min-w-[160px]"
+              className="px-3 py-2 border border-gray-200 rounded-xl text-sm text-gray-700 bg-white focus:ring-2 focus:ring-fresh-green focus:border-fresh-green transition-colors duration-200 min-w-[150px]"
             >
               <option value="newest">Newest First</option>
               <option value="price-low">Price: Low to High</option>
@@ -211,9 +165,9 @@ const ProductsPage = ({ category: propCategory }) => {
           </div>
         </div>
 
-        <div className="flex flex-col xl:flex-row gap-4 lg:gap-6">
+        <div className="flex flex-col xl:flex-row gap-5">
           {/* Filters Sidebar */}
-          <div className={`xl:w-64 ${showFilters ? 'block' : 'hidden xl:block'}`}>
+          <div className={`xl:w-60 ${showFilters ? 'block' : 'hidden xl:block'}`}>
             <FilterSidebar
               filters={filters}
               categories={categories}
@@ -223,17 +177,33 @@ const ProductsPage = ({ category: propCategory }) => {
 
           {/* Products Grid */}
           <div className="flex-1 min-w-0">
-            <div className="mb-4 text-center sm:text-left">
-              <p className="text-sm text-gray-600">
-                Showing {filteredProducts.length} of {products.length} products
-              </p>
-            </div>
-            
-            <ProductGrid
-              products={filteredProducts}
-              loading={loading}
-              error={error}
-            />
+            {!loading && (
+              <div className="mb-3 text-sm text-gray-500">
+                Showing <strong>{filteredProducts.length}</strong> of <strong>{products.length}</strong> products
+              </div>
+            )}
+
+            {loading ? (
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
+                <ProductCardSkeleton count={8} />
+              </div>
+            ) : error ? (
+              <div className="text-center py-16">
+                <p className="text-gray-500 mb-4">{error}</p>
+                <button
+                  onClick={fetchProducts}
+                  className="text-sm text-fresh-green font-medium hover:text-fresh-green-dark"
+                >
+                  Try again
+                </button>
+              </div>
+            ) : (
+              <ProductGrid
+                products={filteredProducts}
+                loading={false}
+                error={null}
+              />
+            )}
           </div>
         </div>
       </div>

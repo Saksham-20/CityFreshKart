@@ -146,12 +146,12 @@ class EmailService {
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <h2 style="color: #333;">Welcome to E-Commerce Shop!</h2>
         <p>Hello ${user.first_name || user.email},</p>
-        <p>Thank you for joining our luxury shopping community! We're excited to have you on board.</p>
+        <p>Thank you for joining the FrashCart family! We're excited to deliver farm-fresh produce to your doorstep.</p>
         <p>Here's what you can do:</p>
         <ul>
-          <li>Browse our exclusive collection of luxury products</li>
+          <li>Browse our wide range of fresh vegetables and fruits</li>
           <li>Create your personal wishlist</li>
-          <li>Enjoy secure shopping with our premium checkout</li>
+          <li>Enjoy same-day delivery — order before 11 AM</li>
           <li>Get personalized recommendations</li>
         </ul>
         <p>If you have any questions, feel free to contact our support team.</p>

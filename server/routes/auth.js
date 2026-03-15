@@ -36,7 +36,7 @@ router.post('/setup-database', async (req, res) => {
       success: true,
       message: 'Database setup and seeding completed successfully!',
       adminCredentials: {
-        email: 'admin@luxury.com',
+        email: 'admin@frashcart.in',
         password: 'admin123',
       },
     });

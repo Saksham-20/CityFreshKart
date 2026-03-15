@@ -126,7 +126,7 @@ const SearchBar = ({
             w-full ${sizeClasses[size]} pl-10 pr-10
             border border-gray-300 rounded-lg
             bg-white text-gray-900 placeholder-gray-500
-            focus:outline-none focus:ring-2 focus:ring-tiffany-blue focus:border-tiffany-blue
+            focus:outline-none focus:ring-2 focus:ring-fresh-green focus:border-fresh-green
             transition-all duration-200
             ${isFocused ? 'shadow-md' : 'shadow-sm'}
             min-w-0
@@ -220,7 +220,7 @@ const SearchBar = ({
           animate={{ opacity: 1 }}
           className="mt-2 text-sm text-gray-500 flex items-center"
         >
-          <div className="w-4 h-4 border-2 border-gray-300 border-t-tiffany-blue rounded-full animate-spin mr-2"></div>
+          <div className="w-4 h-4 border-2 border-gray-300 border-t-fresh-green rounded-full animate-spin mr-2"></div>
           Searching...
         </motion.div>
       )}

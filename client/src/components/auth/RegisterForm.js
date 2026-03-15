@@ -97,8 +97,8 @@ const RegisterForm = ({ onSwitchToLogin }) => {
   return (
     <div className="max-w-md mx-auto">
       <div className="text-center mb-8">
-        <div className="w-16 h-16 bg-tiffany-blue/10 rounded-full flex items-center justify-center mx-auto mb-4">
-          <svg className="w-8 h-8 text-tiffany-blue" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div className="w-16 h-16 bg-fresh-green/10 rounded-full flex items-center justify-center mx-auto mb-4">
+          <svg className="w-8 h-8 text-fresh-green" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
           </svg>
         </div>
@@ -108,7 +108,7 @@ const RegisterForm = ({ onSwitchToLogin }) => {
           <button
             type="button"
             onClick={onSwitchToLogin}
-            className="font-semibold text-tiffany-blue hover:text-tiffany-blue/80 transition-colors"
+            className="font-semibold text-fresh-green hover:text-fresh-green/80 transition-colors"
           >
             sign in to your existing account
           </button>
@@ -215,7 +215,7 @@ const RegisterForm = ({ onSwitchToLogin }) => {
 
             <Button
               type="submit"
-              className="w-full h-12 text-base font-semibold bg-tiffany-blue hover:bg-tiffany-blue/90 text-white rounded-lg transition-all duration-200 hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full h-12 text-base font-semibold bg-fresh-green hover:bg-fresh-green/90 text-white rounded-lg transition-all duration-200 hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
               disabled={loading}
             >
               {loading ? (
@@ -233,14 +233,14 @@ const RegisterForm = ({ onSwitchToLogin }) => {
                 By creating an account, you agree to our{' '}
                 <Link
                   to="/terms"
-                  className="text-tiffany-blue hover:text-tiffany-blue/80 font-semibold"
+                  className="text-fresh-green hover:text-fresh-green/80 font-semibold"
                 >
                   Terms of Service
                 </Link>{' '}
                 and{' '}
                 <Link
                   to="/privacy"
-                  className="text-tiffany-blue hover:text-tiffany-blue/80 font-semibold"
+                  className="text-fresh-green hover:text-fresh-green/80 font-semibold"
                 >
                   Privacy Policy
                 </Link>
@@ -254,7 +254,7 @@ const RegisterForm = ({ onSwitchToLogin }) => {
                   <button
                     type="button"
                     onClick={onSwitchToLogin}
-                    className="text-tiffany-blue hover:text-tiffany-blue/80 font-semibold"
+                    className="text-fresh-green hover:text-fresh-green/80 font-semibold"
                   >
                     Sign in
                   </button>

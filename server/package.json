@@ -1,7 +1,7 @@
 {
-  "name": "luxury-ecommerce-server",
+  "name": "frashcart-server",
   "version": "1.0.0",
-  "description": "Backend server for luxury e-commerce website",
+  "description": "Backend server for FrashCart vegetable delivery platform",
   "main": "index.js",
   "scripts": {
     "start": "node database/setup.js && node database/add-sample-product.js && node index.js",
@@ -40,7 +40,7 @@
   },
   "keywords": [
     "ecommerce",
-    "luxury",
+    "frashcart",
     "nodejs",
     "express",
     "postgresql"

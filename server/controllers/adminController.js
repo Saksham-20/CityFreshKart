@@ -265,16 +265,16 @@ const getSettings = async (req, res) => {
 
     const settings = {
       store: {
-        name: process.env.APP_NAME || 'E-Commerce Shop Store',
-        description: process.env.APP_DESCRIPTION || 'Premium products for discerning customers',
-        email: process.env.APP_EMAIL || 'admin@luxurystore.com',
-        phone: process.env.APP_PHONE || '+1-555-0123',
+        name: process.env.APP_NAME || 'FrashCart',
+        description: process.env.APP_DESCRIPTION || 'Farm-fresh vegetables delivered to your doorstep',
+        email: process.env.APP_EMAIL || 'admin@frashcart.in',
+        phone: process.env.APP_PHONE || '+91-98765-43210',
         address: {
-          street: process.env.STORE_STREET || '123 Luxury Lane',
-          city: process.env.STORE_CITY || 'Beverly Hills',
-          state: process.env.STORE_STATE || 'CA',
-          zipCode: process.env.STORE_ZIP || '90210',
-          country: process.env.STORE_COUNTRY || 'US',
+          street: process.env.STORE_STREET || '123 FrashCart Lane',
+          city: process.env.STORE_CITY || 'Chandigarh',
+          state: process.env.STORE_STATE || 'Chandigarh',
+          zipCode: process.env.STORE_ZIP || '160022',
+          country: process.env.STORE_COUNTRY || 'IN',
         },
       },
       shipping: {
@@ -284,7 +284,7 @@ const getSettings = async (req, res) => {
       },
       payment: {
         acceptedMethods: (process.env.ACCEPTED_PAYMENT_METHODS || 'credit_card,paypal').split(','),
-        currency: process.env.CURRENCY || 'USD',
+        currency: process.env.CURRENCY || 'INR',
         taxRate: parseFloat(process.env.TAX_RATE) || 8.5,
       },
       notifications: {

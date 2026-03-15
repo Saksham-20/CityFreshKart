@@ -32,7 +32,7 @@ async function setupDatabase() {
         FROM information_schema.tables 
         WHERE table_schema = 'public' AND table_name = 'users'
       `);
-      
+
       if (existingTables.rows.length === 0) {
         console.log('🔄 Database appears to be empty, will create tables');
         shouldCreateTables = true;
@@ -65,7 +65,7 @@ async function setupDatabase() {
 
     // Create default admin user
     const bcrypt = require('bcryptjs');
-    const adminEmail = process.env.ADMIN_EMAIL || 'admin@luxury.com';
+    const adminEmail = process.env.ADMIN_EMAIL || 'admin@frashcart.in';
     const adminPassword = process.env.ADMIN_PASSWORD || 'admin123';
 
     try {
@@ -83,7 +83,7 @@ async function setupDatabase() {
            VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())`,
           [adminEmail, hashedPassword, 'Admin', 'User', true, true],
         );
-        console.log('✅ Default admin user created (admin@luxury.com / admin123)');
+        console.log('✅ Default admin user created (admin@frashcart.in / admin123)');
       } else {
         console.log('✅ Admin user already exists');
       }
@@ -95,11 +95,11 @@ async function setupDatabase() {
     // Create default categories
     try {
       const categories = [
-        { name: 'Rings', slug: 'rings', description: 'Beautiful rings for every occasion' },
-        { name: 'Necklaces', slug: 'necklaces', description: 'Elegant necklaces and pendants' },
-        { name: 'Earrings', slug: 'earrings', description: 'Stunning earrings for all styles' },
-        { name: 'Bracelets', slug: 'bracelets', description: 'Charming bracelets and bangles' },
-        { name: 'Watches', slug: 'watches', description: 'Luxury timepieces' },
+        { name: 'Sabzi & Greens', slug: 'sabzi-greens', description: 'Fresh vegetables and leafy greens' },
+        { name: 'Fruits', slug: 'fruits', description: 'Seasonal and exotic fruits' },
+        { name: 'Root Vegetables', slug: 'root-vegetables', description: 'Potatoes, onions, carrots & more' },
+        { name: 'Exotic & Herbs', slug: 'exotic-herbs', description: 'Fresh herbs and exotic vegetables' },
+        { name: 'Daily Essentials', slug: 'daily-essentials', description: 'Atta, dal, rice & spices' },
       ];
 
       for (const category of categories) {
@@ -115,7 +115,7 @@ async function setupDatabase() {
           );
         }
       }
-      console.log('✅ Indian jewelry categories created');
+      console.log('✅ FrashCart vegetable categories created');
     } catch (error) {
       console.error('❌ Category creation failed:', error.message);
       // Don't throw, continue
@@ -128,7 +128,7 @@ async function setupDatabase() {
     console.log(`Password: ${adminPassword}`);
     console.log('');
     console.log('📋 Next steps:');
-    console.log('1. Update frontend API URL to: https://luxury-ecommerce-api.onrender.com');
+    console.log('1. Update frontend API URL for your FrashCart deployment');
     console.log('2. Add Cloudinary credentials for image uploads');
     console.log('3. Test your deployment!');
 

@@ -11,53 +11,48 @@ const Navigation = () => {
 
   const navigationItems = [
     {
-      name: 'NECKLACES',
-      href: '/products?category=necklaces',
+      name: 'VEGETABLES',
+      href: '/products?category=sabzi-greens',
       dropdown: [
-        { name: 'Traditional Necklaces', href: '/products?category=necklaces&type=traditional', description: 'Classic Indian designs' },
-        { name: 'Modern Necklaces', href: '/products?category=necklaces&type=modern', description: 'Contemporary styles' },
-        { name: 'Gold Necklaces', href: '/products?category=necklaces&material=gold', description: 'Pure gold pieces' },
-        { name: 'Silver Necklaces', href: '/products?category=necklaces&material=silver', description: 'Elegant silver designs' }
+        { name: 'Sabzi & Greens', href: '/products?category=sabzi-greens', description: 'Taza sabziyan daily' },
+        { name: 'Tamatar, Pyaaz, Mirch', href: '/products?category=sabzi-greens&type=basics', description: 'Kitchen essentials' },
+        { name: 'Bhindi, Tori, Lauki', href: '/products?category=sabzi-greens&type=gourds', description: 'Fresh gourd vegetables' }
       ]
     },
     {
-      name: 'EARRINGS',
-      href: '/products?category=earrings',
+      name: 'FRUITS',
+      href: '/products?category=fruits',
       dropdown: [
-        { name: 'Jhumkas', href: '/products?category=earrings&type=jhumkas', description: 'Traditional jhumkas' },
-        { name: 'Studs', href: '/products?category=earrings&type=studs', description: 'Simple and elegant' },
-        { name: 'Hoops', href: '/products?category=earrings&type=hoops', description: 'Classic hoop earrings' },
-        { name: 'Danglers', href: '/products?category=earrings&type=danglers', description: 'Long dangler earrings' }
+        { name: 'Seasonal Fruits', href: '/products?category=fruits&type=seasonal', description: 'Fresh this season' },
+        { name: 'Exotic Fruits', href: '/products?category=fruits&type=exotic', description: 'Avocado, Kiwi & more' },
+        { name: 'Banana, Apple, Orange', href: '/products?category=fruits&type=daily', description: 'Everyday favourites' }
       ]
     },
     {
-      name: 'BANGLES & BRACELETS',
-      href: '/products?category=bangles-bracelets',
+      name: 'ROOT VEG',
+      href: '/products?category=root-vegetables',
       dropdown: [
-        { name: 'Traditional Bangles', href: '/products?category=bangles-bracelets&type=bangles', description: 'Classic bangle sets' },
-        { name: 'Modern Bracelets', href: '/products?category=bangles-bracelets&type=bracelets', description: 'Contemporary designs' },
-        { name: 'Gold Bangles', href: '/products?category=bangles-bracelets&material=gold', description: 'Pure gold bangles' },
-        { name: 'Glass Bangles', href: '/products?category=bangles-bracelets&material=glass', description: 'Colorful glass bangles' }
+        { name: 'Aloo (Potato)', href: '/products?category=root-vegetables&type=potato', description: 'Premium quality potatoes' },
+        { name: 'Gajar, Shalgam', href: '/products?category=root-vegetables&type=carrots', description: 'Carrots & turnips' },
+        { name: 'Adrak, Lehsun', href: '/products?category=root-vegetables&type=spice', description: 'Ginger, garlic & more' }
       ]
     },
     {
-      name: 'RINGS',
-      href: '/products?category=rings',
+      name: 'EXOTICS & HERBS',
+      href: '/products?category=exotic-herbs',
       dropdown: [
-        { name: 'Engagement Rings', href: '/products?category=rings&type=engagement', description: 'Symbols of love' },
-        { name: 'Wedding Rings', href: '/products?category=rings&type=wedding', description: 'Wedding bands' },
-        { name: 'Fashion Rings', href: '/products?category=rings&type=fashion', description: 'Style statements' },
-        { name: 'Cocktail Rings', href: '/products?category=rings&type=cocktail', description: 'Bold statement pieces' }
+        { name: 'Fresh Herbs', href: '/products?category=exotic-herbs&type=herbs', description: 'Dhania, pudina, curry patta' },
+        { name: 'Mushrooms', href: '/products?category=exotic-herbs&type=mushrooms', description: 'Button, oyster & more' },
+        { name: 'Baby Corn, Broccoli', href: '/products?category=exotic-herbs&type=exotic', description: 'Exotic veggies' }
       ]
     },
     {
-      name: 'ANKLETS',
-      href: '/products?category=anklets',
+      name: 'DAILY ESSENTIALS',
+      href: '/products?category=daily-essentials',
       dropdown: [
-        { name: 'Traditional Payals', href: '/products?category=anklets&type=payals', description: 'Classic payal designs' },
-        { name: 'Modern Anklets', href: '/products?category=anklets&type=modern', description: 'Contemporary styles' },
-        { name: 'Charm Anklets', href: '/products?category=anklets&type=charms', description: 'Charming details' },
-        { name: 'Chain Anklets', href: '/products?category=anklets&type=chains', description: 'Delicate chain designs' }
+        { name: 'Atta & Dal', href: '/products?category=daily-essentials&type=grains', description: 'Flour, lentils & rice' },
+        { name: 'Spices & Masala', href: '/products?category=daily-essentials&type=spices', description: 'Haldi, jeera, mirch' },
+        { name: 'Oil & Ghee', href: '/products?category=daily-essentials&type=oils', description: 'Cooking oils & desi ghee' }
       ]
     }
   ];
@@ -96,17 +91,15 @@ const Navigation = () => {
         <div key={item.name} className="relative" ref={(el) => dropdownRefs.current[item.name] = el}>
           <button
             onClick={() => handleDropdownToggle(item.name)}
-            className={`flex items-center space-x-1 py-2 px-3 rounded-lg transition-all duration-200 font-medium ${
-              isActive(item.href)
-                ? 'text-tiffany-blue bg-tiffany-blue/10'
-                : 'text-gray-700 hover:text-tiffany-blue hover:bg-gray-50'
-            }`}
+            className={`flex items-center space-x-1 py-2 px-3 rounded-lg transition-all duration-200 font-medium ${isActive(item.href)
+                ? 'text-fresh-green bg-fresh-green/10'
+                : 'text-gray-700 hover:text-fresh-green hover:bg-gray-50'
+              }`}
           >
             <span>{item.name}</span>
-            <IoChevronDown 
-              className={`w-4 h-4 transition-transform duration-200 ${
-                activeDropdown === item.name ? 'rotate-180' : ''
-              }`}
+            <IoChevronDown
+              className={`w-4 h-4 transition-transform duration-200 ${activeDropdown === item.name ? 'rotate-180' : ''
+                }`}
             />
           </button>
 
@@ -127,7 +120,7 @@ const Navigation = () => {
                       to={dropdownItem.href}
                       className="flex flex-col px-4 py-3 hover:bg-gray-50 transition-colors duration-150 group"
                     >
-                      <span className="font-medium text-gray-900 group-hover:text-tiffany-blue transition-colors duration-150">
+                      <span className="font-medium text-gray-900 group-hover:text-fresh-green transition-colors duration-150">
                         {dropdownItem.name}
                       </span>
                       <span className="text-sm text-gray-500 mt-1">
@@ -136,12 +129,12 @@ const Navigation = () => {
                     </Link>
                   ))}
                 </div>
-                
+
                 {/* View All Link */}
                 <div className="border-t border-gray-100 mt-3 pt-3">
                   <Link
                     to={item.href}
-                    className="flex items-center justify-between px-4 py-2 text-tiffany-blue hover:bg-tiffany-blue/5 transition-colors duration-150"
+                    className="flex items-center justify-between px-4 py-2 text-fresh-green hover:bg-fresh-green/5 transition-colors duration-150"
                   >
                     <span className="font-medium">View All {item.name}</span>
                     <motion.div
@@ -163,7 +156,7 @@ const Navigation = () => {
       {/* Search Button */}
       <button
         onClick={() => setIsSearchOpen(!isSearchOpen)}
-        className="p-2 text-gray-700 hover:text-tiffany-blue hover:bg-gray-50 rounded-lg transition-all duration-200"
+        className="p-2 text-gray-700 hover:text-fresh-green hover:bg-gray-50 rounded-lg transition-all duration-200"
         aria-label="Search"
       >
         <IoSearchOutline className="w-5 h-5" />
@@ -182,8 +175,8 @@ const Navigation = () => {
               <div className="relative">
                 <input
                   type="text"
-                  placeholder="Search for products, brands, or collections..."
-                  className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-tiffany-blue focus:border-transparent"
+                  placeholder="Search vegetables, fruits, herbs..."
+                  className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-fresh-green focus:border-transparent"
                   autoFocus
                 />
                 <IoSearchOutline className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />

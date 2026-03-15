@@ -209,7 +209,7 @@ export const ConfirmationModal = ({
 }) => {
   const variantStyles = {
     default: {
-      button: 'bg-tiffany-blue hover:bg-tiffany-blue-dark text-white',
+      button: 'bg-fresh-green hover:bg-fresh-green-dark text-white',
       icon: 'text-blue-500'
     },
     danger: {
@@ -257,14 +257,14 @@ export const ConfirmationModal = ({
         <ModalFooter justify="center">
           <button
             onClick={onClose}
-            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-tiffany-blue transition-colors duration-200"
+            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-fresh-green transition-colors duration-200"
           >
             {cancelText}
           </button>
           
           <button
             onClick={onConfirm}
-            className={`px-4 py-2 text-sm font-medium rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-tiffany-blue transition-colors duration-200 ${currentVariant.button}`}
+            className={`px-4 py-2 text-sm font-medium rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-fresh-green transition-colors duration-200 ${currentVariant.button}`}
           >
             {confirmText}
           </button>

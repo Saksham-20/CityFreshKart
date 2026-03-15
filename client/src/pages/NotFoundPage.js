@@ -6,8 +6,8 @@ import { IoHome, IoSearch, IoArrowBack } from 'react-icons/io5';
 const NotFoundPage = () => {
   const quickLinks = [
     { name: 'Home', href: '/', icon: IoHome, description: 'Return to homepage' },
-    { name: 'Products', href: '/products', icon: IoSearch, description: 'Browse our collections' },
-    { name: 'Collections', href: '/collections', icon: IoSearch, description: 'Explore categories' }
+    { name: 'Products', href: '/products', icon: IoSearch, description: 'Browse fresh produce' },
+    { name: 'Categories', href: '/products', icon: IoSearch, description: 'Explore categories' }
   ];
 
   return (
@@ -20,7 +20,7 @@ const NotFoundPage = () => {
           transition={{ duration: 0.8, type: 'spring' }}
           className="mb-8"
         >
-          <h1 className="text-9xl md:text-[12rem] font-bold text-tiffany-blue font-playfair leading-none">
+          <h1 className="text-9xl md:text-[12rem] font-bold text-fresh-green leading-none">
             404
           </h1>
         </motion.div>
@@ -32,12 +32,12 @@ const NotFoundPage = () => {
           transition={{ duration: 0.8, delay: 0.2 }}
           className="mb-8"
         >
-          <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4 font-playfair">
+          <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
             Page Not Found
           </h2>
           <p className="text-xl text-gray-600 max-w-2xl mx-auto leading-relaxed">
-            We're sorry, but the page you're looking for seems to have wandered off. 
-            Perhaps it's exploring our luxury collections or enjoying a moment of elegance elsewhere.
+            Oops! Looks like this page went out of stock. 🥬
+            Let us help you find what you're looking for.
           </p>
         </motion.div>
 
@@ -51,7 +51,7 @@ const NotFoundPage = () => {
           <h3 className="text-lg font-semibold text-gray-700 mb-6">
             Where would you like to go?
           </h3>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-2xl mx-auto">
             {quickLinks.map((link, index) => (
               <motion.div
@@ -64,10 +64,10 @@ const NotFoundPage = () => {
               >
                 <Link
                   to={link.href}
-                  className="block p-6 bg-white rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 border border-gray-100 hover:border-tiffany-blue/20"
+                  className="block p-6 bg-white rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 border border-gray-100 hover:border-fresh-green/20"
                 >
-                  <div className="w-16 h-16 bg-tiffany-blue/10 rounded-full flex items-center justify-center mx-auto mb-4 group-hover:bg-tiffany-blue group-hover:text-white transition-all duration-300">
-                    <link.icon className="w-8 h-8 text-tiffany-blue group-hover:text-white" />
+                  <div className="w-16 h-16 bg-fresh-green/10 rounded-full flex items-center justify-center mx-auto mb-4 group-hover:bg-fresh-green group-hover:text-white transition-all duration-300">
+                    <link.icon className="w-8 h-8 text-fresh-green group-hover:text-white" />
                   </div>
                   <h4 className="text-lg font-semibold text-gray-900 mb-2">
                     {link.name}
@@ -90,15 +90,15 @@ const NotFoundPage = () => {
         >
           <Link
             to="/"
-            className="bg-tiffany-blue text-white px-8 py-4 rounded-lg text-lg font-semibold hover:bg-tiffany-blue-dark transition-colors duration-300 flex items-center group"
+            className="bg-fresh-green text-white px-8 py-4 rounded-lg text-lg font-semibold hover:bg-fresh-green-dark transition-colors duration-300 flex items-center group"
           >
             <IoHome className="mr-2 group-hover:scale-110 transition-transform duration-200" />
             Back to Home
           </Link>
-          
+
           <button
             onClick={() => window.history.back()}
-            className="border-2 border-tiffany-blue text-tiffany-blue px-8 py-4 rounded-lg text-lg font-semibold hover:bg-tiffany-blue hover:text-white transition-all duration-300 flex items-center group"
+            className="border-2 border-fresh-green text-fresh-green px-8 py-4 rounded-lg text-lg font-semibold hover:bg-fresh-green hover:text-white transition-all duration-300 flex items-center group"
           >
             <IoArrowBack className="mr-2 group-hover:-translate-x-1 transition-transform duration-200" />
             Go Back
@@ -116,20 +116,19 @@ const NotFoundPage = () => {
             Need Help Finding Something?
           </h3>
           <p className="text-gray-600 mb-4">
-            Our customer service team is here to help you navigate our luxury collections 
-            and find exactly what you're looking for.
+            Our team is here to help you find the freshest produce.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <a
-              href="tel:+15551234567"
-              className="text-tiffany-blue hover:text-tiffany-blue-dark font-semibold flex items-center justify-center group"
+              href="tel:+919876543210"
+              className="text-fresh-green hover:text-fresh-green-dark font-semibold flex items-center justify-center group"
             >
               <span className="mr-2">📞</span>
-              Call us: +1 (555) 123-4567
+              Call: +91 98765 43210
             </a>
             <a
-              href="mailto:hello@luxuryecommerce.com"
-              className="text-tiffany-blue hover:text-tiffany-blue-dark font-semibold flex items-center justify-center group"
+              href="mailto:hello@frashcart.in"
+              className="text-fresh-green hover:text-fresh-green-dark font-semibold flex items-center justify-center group"
             >
               <span className="mr-2">✉️</span>
               Email us
@@ -142,13 +141,13 @@ const NotFoundPage = () => {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 1, delay: 1.2 }}
-          className="absolute top-20 left-20 w-32 h-32 bg-tiffany-blue/5 rounded-full blur-3xl"
+          className="absolute top-20 left-20 w-32 h-32 bg-fresh-green/5 rounded-full blur-3xl"
         />
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 1, delay: 1.4 }}
-          className="absolute bottom-20 right-20 w-40 h-40 bg-tiffany-blue/5 rounded-full blur-3xl"
+          className="absolute bottom-20 right-20 w-40 h-40 bg-fresh-green/5 rounded-full blur-3xl"
         />
       </div>
     </div>

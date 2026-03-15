@@ -7,26 +7,26 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        // Primary brand colors
-        'tiffany-blue': {
-          50: '#f0fdfa',
-          100: '#ccfbf1',
-          200: '#99f6e4',
-          300: '#5eead4',
-          400: '#2dd4bf',
-          500: '#14b8a6',
-          600: '#0d9488',
-          700: '#0f766e',
-          800: '#115e59',
-          900: '#134e4a',
-          950: '#042f2e',
-          DEFAULT: '#14b8a6',
-          'dark': '#0d9488',
-          'light': '#2dd4bf'
+        // Primary brand colors — FrashCart Green
+        'fresh-green': {
+          50: '#f0fdf4',
+          100: '#dcfce7',
+          200: '#bbf7d0',
+          300: '#86efac',
+          400: '#4ade80',
+          500: '#22c55e',
+          600: '#16a34a',
+          700: '#15803d',
+          800: '#166534',
+          900: '#14532d',
+          950: '#052e16',
+          DEFAULT: '#16a34a',
+          'dark': '#15803d',
+          'light': '#22c55e'
         },
-        
-        // Secondary colors
-        'rose-gold': {
+
+        // Accent — Saffron Orange
+        'saffron': {
           50: '#fff7ed',
           100: '#ffedd5',
           200: '#fed7aa',
@@ -37,10 +37,11 @@ module.exports = {
           700: '#c2410c',
           800: '#9a3412',
           900: '#7c2d12',
-          950: '#431407'
+          950: '#431407',
+          DEFAULT: '#f97316'
         },
-        
-        // Neutral grays with better contrast
+
+        // Neutral grays
         'neutral': {
           50: '#fafafa',
           100: '#f5f5f5',
@@ -54,7 +55,7 @@ module.exports = {
           900: '#171717',
           950: '#0a0a0a'
         },
-        
+
         // Semantic colors
         'success': {
           50: '#f0fdf4',
@@ -69,7 +70,7 @@ module.exports = {
           900: '#14532d',
           950: '#052e16'
         },
-        
+
         'warning': {
           50: '#fffbeb',
           100: '#fef3c7',
@@ -83,7 +84,7 @@ module.exports = {
           900: '#78350f',
           950: '#451a03'
         },
-        
+
         'error': {
           50: '#fef2f2',
           100: '#fee2e2',
@@ -98,15 +99,15 @@ module.exports = {
           950: '#450a0a'
         }
       },
-      
+
       fontFamily: {
-        'sans': ['Inter', 'system-ui', 'sans-serif'],
-        'serif': ['Playfair Display', 'Georgia', 'serif'],
+        'sans': ['Nunito', 'system-ui', 'sans-serif'],
+        'serif': ['Nunito', 'Georgia', 'serif'],
         'mono': ['JetBrains Mono', 'monospace'],
-        'display': ['Playfair Display', 'serif'],
-        'body': ['Inter', 'sans-serif']
+        'display': ['Nunito', 'sans-serif'],
+        'body': ['Nunito', 'sans-serif']
       },
-      
+
       fontSize: {
         'xs': ['0.75rem', { lineHeight: '1rem' }],
         'sm': ['0.875rem', { lineHeight: '1.25rem' }],
@@ -122,27 +123,27 @@ module.exports = {
         '8xl': ['6rem', { lineHeight: '1' }],
         '9xl': ['8rem', { lineHeight: '1' }]
       },
-      
+
       spacing: {
         '18': '4.5rem',
         '88': '22rem',
         '128': '32rem',
         '144': '36rem'
       },
-      
+
       borderRadius: {
         '4xl': '2rem',
         '5xl': '2.5rem'
       },
-      
+
       boxShadow: {
         'soft': '0 2px 15px -3px rgba(0, 0, 0, 0.07), 0 10px 20px -2px rgba(0, 0, 0, 0.04)',
         'medium': '0 4px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
         'strong': '0 10px 40px -10px rgba(0, 0, 0, 0.15), 0 20px 25px -5px rgba(0, 0, 0, 0.1)',
-        'glow': '0 0 20px rgba(20, 184, 166, 0.3)',
-        'glow-lg': '0 0 40px rgba(20, 184, 166, 0.4)'
+        'glow': '0 0 20px rgba(22, 163, 74, 0.3)',
+        'glow-lg': '0 0 40px rgba(22, 163, 74, 0.4)'
       },
-      
+
       animation: {
         'fade-in': 'fadeIn 0.5s ease-in-out',
         'fade-in-up': 'fadeInUp 0.5s ease-out',
@@ -154,7 +155,7 @@ module.exports = {
         'float': 'float 6s ease-in-out infinite',
         'shimmer': 'shimmer 2s linear infinite'
       },
-      
+
       keyframes: {
         fadeIn: {
           '0%': { opacity: '0' },
@@ -189,36 +190,34 @@ module.exports = {
           '100%': { transform: 'translateX(100%)' }
         }
       },
-      
+
       transitionDuration: {
         '400': '400ms',
         '600': '600ms',
         '800': '800ms'
       },
-      
+
       transitionTimingFunction: {
         'bounce-in': 'cubic-bezier(0.68, -0.55, 0.265, 1.55)',
         'smooth': 'cubic-bezier(0.4, 0, 0.2, 1)',
         'sharp': 'cubic-bezier(0.4, 0, 0.6, 1)'
       },
-      
+
       backdropBlur: {
         'xs': '2px'
       },
-      
+
       backgroundImage: {
         'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',
         'gradient-conic': 'conic-gradient(from 180deg at 50% 50%, var(--tw-gradient-stops))',
-        'gradient-mesh': 'linear-gradient(45deg, #f0fdfa 0%, #ccfbf1 25%, #99f6e4 50%, #ccfbf1 75%, #f0fdfa 100%)'
+        'gradient-mesh': 'linear-gradient(45deg, #f0fdf4 0%, #dcfce7 25%, #bbf7d0 50%, #dcfce7 75%, #f0fdf4 100%)'
       },
-      
-      // Custom utilities
+
       lineHeight: {
         'extra-tight': '1.1',
         'extra-loose': '2.25'
       },
-      
-      // Aspect ratios
+
       aspectRatio: {
         'auto': 'auto',
         'square': '1 / 1',
@@ -229,15 +228,15 @@ module.exports = {
       }
     }
   },
-  
+
   plugins: [
     require('@tailwindcss/forms'),
     require('@tailwindcss/typography'),
     require('@tailwindcss/aspect-ratio'),
     require('@tailwindcss/line-clamp'),
-    
-    // Custom plugin for luxury-specific utilities
-    function({ addUtilities, theme }) {
+
+    // Custom plugin for FrashCart utilities
+    function ({ addUtilities, theme }) {
       const newUtilities = {
         '.text-shadow': {
           textShadow: '0 2px 4px rgba(0,0,0,0.1)'
@@ -273,7 +272,7 @@ module.exports = {
           }
         }
       };
-      
+
       addUtilities(newUtilities);
     }
   ]
