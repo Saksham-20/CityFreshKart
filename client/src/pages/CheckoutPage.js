@@ -37,11 +37,36 @@ const CheckoutPage = () => {
       setLoading(true);
       setError('');
 
+      // Create payment intent if paying by card
+      let paymentIntentId = null;
+      if (formData.paymentMethod === 'card') {
+        try {
+          const paymentIntentResponse = await orderService.createPaymentIntent(
+            summary?.estimated_total,
+            'inr',
+            `Order for ${user.email}`
+          );
+          paymentIntentId = paymentIntentResponse?.data?.paymentIntentId;
+          
+          if (!paymentIntentId) {
+            setError('Failed to initialize payment. Please try again.');
+            setLoading(false);
+            return;
+          }
+        } catch (paymentError) {
+          setError(paymentError.message || 'Failed to initialize payment.');
+          setLoading(false);
+          return;
+        }
+      }
+
       const orderData = {
         items: cart.map(item => ({
           id: item.product_id || item.id,
           name: item.name || item.product_name,
           price: item.price,
+          price_per_kg: item.price_per_kg || null,
+          weight: item.weight || null,
           quantity: item.quantity,
           variant: item.variant_details || item.variant || null,
           image: item.primary_image || item.image
@@ -55,14 +80,15 @@ const CheckoutPage = () => {
           phone: `${formData.phoneCountryCode} ${formData.phone}`
         },
         paymentMethod: formData.paymentMethod,
+        paymentIntentId: paymentIntentId,
         paymentDetails: formData.paymentMethod === 'card' ? formData.payment : {},
         notes: formData.notes || ''
       };
 
       const response = await orderService.createOrder(orderData);
 
-      if (response) {
-        setOrderNumber(response.orderNumber || response.order_number || 'N/A');
+      if (response && response.data) {
+        setOrderNumber(response.data.orderNumber || response.data.order_number || 'N/A');
         setShowSuccessModal(true);
         setTimeout(() => { clearCart(); }, 100);
       } else {

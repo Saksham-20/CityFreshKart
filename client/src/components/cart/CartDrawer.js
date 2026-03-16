@@ -6,10 +6,16 @@ import Button from '../ui/Button';
 import CartItem from './CartItem';
 
 const CartDrawer = ({ isOpen, onClose }) => {
-  const { cart, total, itemCount, clearCart } = useCart();
+  const { items: cart, summary, clearCart } = useCart();
   const { user } = useAuth();
 
   if (!isOpen) return null;
+
+  // Use summary values
+  const subtotal = summary?.subtotal || 0;
+  const deliveryFee = summary?.delivery_fee || 0;
+  const total = summary?.estimated_total || 0;
+  const itemCount = summary?.item_count || 0;
 
   return (
     <>
@@ -20,16 +26,17 @@ const CartDrawer = ({ isOpen, onClose }) => {
       />
       
       {/* Drawer */}
-      <div className="fixed right-0 top-0 h-full w-96 bg-white shadow-xl z-50 transform transition-transform duration-300 ease-in-out">
+      <div className="fixed right-0 top-0 h-full w-96 bg-white shadow-xl z-50 transform transition-transform duration-300 ease-in-out max-w-[95vw]">
         <div className="flex flex-col h-full">
           {/* Header */}
           <div className="flex items-center justify-between p-4 border-b border-gray-200">
             <h2 className="text-lg font-semibold text-gray-900">
-              Shopping Cart ({itemCount})
+              🛒 Cart ({itemCount})
             </h2>
             <button
               onClick={onClose}
               className="text-gray-400 hover:text-gray-600 transition-colors"
+              aria-label="Close cart"
             >
               <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -55,7 +62,7 @@ const CartDrawer = ({ isOpen, onClose }) => {
             ) : (
               <div className="space-y-4">
                 {cart.map((item) => (
-                  <CartItem key={`${item.id}-${item.variant?.id || 'default'}`} item={item} />
+                  <CartItem key={`${item.id}-${item.weight || 'default'}`} item={item} />
                 ))}
               </div>
             )}
@@ -63,11 +70,37 @@ const CartDrawer = ({ isOpen, onClose }) => {
 
           {/* Footer */}
           {cart.length > 0 && (
-            <div className="border-t border-gray-200 p-4 space-y-4">
+            <div className="border-t border-gray-200 p-4 space-y-3">
+              {/* Pricing Breakdown */}
+              <div className="space-y-2 py-3 border-b border-gray-100">
+                <div className="flex justify-between text-sm text-gray-600">
+                  <span>Subtotal</span>
+                  <span>₹{subtotal.toFixed(0)}</span>
+                </div>
+                
+                <div className="flex justify-between text-sm">
+                  <span className={deliveryFee === 0 ? 'text-fresh-green font-medium' : 'text-gray-600'}>
+                    Delivery {deliveryFee === 0 ? '✓' : ''}
+                  </span>
+                  {deliveryFee > 0 ? (
+                    <span className="text-gray-600">₹{deliveryFee}</span>
+                  ) : (
+                    <span className="text-fresh-green font-medium">FREE</span>
+                  )}
+                </div>
+
+                {deliveryFee > 0 && (
+                  <p className="text-xs text-gray-500 flex items-center gap-1">
+                    <span className="text-fresh-green">💡</span>
+                    Add ₹{(300 - subtotal).toFixed(0)} more for free delivery
+                  </p>
+                )}
+              </div>
+
               {/* Total */}
-              <div className="flex justify-between text-lg font-semibold">
-                <span>Total:</span>
-                <span>${total.toFixed(2)}</span>
+              <div className="flex justify-between text-lg font-bold text-gray-900">
+                <span>Total</span>
+                <span>₹{total.toFixed(0)}</span>
               </div>
 
               {/* Actions */}
@@ -76,22 +109,22 @@ const CartDrawer = ({ isOpen, onClose }) => {
                   Continue Shopping
                 </Button>
                 
-                <Link to="/cart" className="block">
+                <Link to="/cart" className="block" onClick={onClose}>
                   <Button className="w-full">
-                    View Cart
+                    View Full Cart
                   </Button>
                 </Link>
 
                 {user ? (
-                  <Link to="/checkout" className="block">
-                    <Button className="w-full" variant="secondary">
+                  <Link to="/checkout" className="block" onClick={onClose}>
+                    <Button className="w-full bg-fresh-green hover:bg-fresh-green-dark text-white">
                       Proceed to Checkout
                     </Button>
                   </Link>
                 ) : (
-                  <Link to="/login" className="block">
-                    <Button className="w-full" variant="secondary">
-                      Login to Checkout
+                  <Link to="/login" className="block" onClick={onClose}>
+                    <Button className="w-full bg-fresh-green hover:bg-fresh-green-dark text-white">
+                      Login & Checkout
                     </Button>
                   </Link>
                 )}
@@ -99,8 +132,11 @@ const CartDrawer = ({ isOpen, onClose }) => {
 
               {/* Clear Cart */}
               <button
-                onClick={clearCart}
-                className="w-full text-sm text-red-600 hover:text-red-800 transition-colors"
+                onClick={() => {
+                  clearCart();
+                  onClose();
+                }}
+                className="w-full text-sm text-red-600 hover:text-red-800 transition-colors py-2"
               >
                 Clear Cart
               </button>

@@ -1,7 +1,7 @@
 // Get API URL from environment variables
 const API_BASE_URL = process.env.REACT_APP_API_URL 
   ? `${process.env.REACT_APP_API_URL}/api`
-  : 'http://localhost:5000/api';
+  : 'http://localhost:5001/api';
 
 // Enhanced debugging for development only
 if (process.env.NODE_ENV === 'development') {
@@ -30,12 +30,12 @@ class ApiService {
     }
   }
 
-  // Get auth token from localStorage
+  // Get auth token from localStorage (for backward compatibility)
   getAuthToken() {
     return localStorage.getItem('token');
   }
 
-  // Set auth token in localStorage
+  // Set auth token in localStorage (deprecated - use httpOnly cookies instead)
   setAuthToken(token) {
     if (token) {
       localStorage.setItem('token', token);
@@ -50,6 +50,8 @@ class ApiService {
       'Content-Type': 'application/json',
     };
 
+    // Note: Authorization header is kept for backward compatibility
+    // Cookies (httpOnly) are sent automatically with credentials: 'include'
     if (includeAuth) {
       const token = this.getAuthToken();
       if (token) {
@@ -62,14 +64,13 @@ class ApiService {
 
   // Generic request method
   async request(endpoint, options = {}) {
-    // Add cache-busting parameter to prevent browser cache issues
-    const separator = endpoint.includes('?') ? '&' : '?';
-    const url = `${this.baseURL}${endpoint}${separator}_t=${Date.now()}`;
+    const url = `${this.baseURL}${endpoint}`;
     
     console.log('🌐 API: Making request to:', url);
     
     const config = {
       headers: this.getHeaders(options.includeAuth !== false),
+      credentials: 'include', // Essential for sending httpOnly cookies
       ...options,
     };
 
@@ -80,10 +81,11 @@ class ApiService {
       
       // Handle different response statuses
       if (response.status === 401) {
-        // Unauthorized - clear token and redirect to login
+        // Unauthorized - clear token but let AuthContext handle the redirect
         this.setAuthToken(null);
-        window.location.href = '/login';
-        throw new Error('Unauthorized access');
+        const error = new Error('Unauthorized access');
+        error.status = 401;
+        throw error;
       }
 
       if (response.status === 403) {

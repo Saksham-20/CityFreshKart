@@ -24,7 +24,7 @@ const useProducts = (initialFilters = {}) => {
         ...newFilters
       });
 
-      const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+      const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5001';
       const url = `${apiUrl}/api/products?${queryParams}`;
       console.log('📦 useProducts: Fetching from URL:', url);
       

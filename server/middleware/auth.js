@@ -5,12 +5,16 @@ const { query } = require('../database/config');
 const authenticateToken = async (req, res, next) => {
   try {
     console.log('Auth middleware: Checking authentication for:', req.path);
-    console.log('Auth middleware: Headers:', req.headers);
 
-    const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
+    // Try to get token from cookies first (primary method)
+    let token = req.cookies?.authToken;
 
-    console.log('Auth middleware: Auth header:', authHeader);
+    // Fallback to Authorization header for backward compatibility
+    if (!token) {
+      const authHeader = req.headers['authorization'];
+      token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
+    }
+
     console.log('Auth middleware: Token:', token ? 'Token exists' : 'No token');
 
     if (!token) {
@@ -25,10 +29,10 @@ const authenticateToken = async (req, res, next) => {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     console.log('Auth middleware: Decoded token:', decoded);
 
-    // Get user from database
+    // Get user from database using userId from token
     const result = await query(
       'SELECT id, email, first_name, last_name, is_admin, is_verified FROM users WHERE id = $1',
-      [decoded.id],
+      [decoded.userId],
     );
     console.log('Auth middleware: Database result:', result.rows);
 
@@ -90,14 +94,20 @@ const requireVerified = (req, res, next) => {
 // Optional authentication middleware (doesn't fail if no token)
 const optionalAuth = async (req, res, next) => {
   try {
-    const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1];
+    // Try to get token from cookies first (primary method)
+    let token = req.cookies?.authToken;
+
+    // Fallback to Authorization header for backward compatibility
+    if (!token) {
+      const authHeader = req.headers['authorization'];
+      token = authHeader && authHeader.split(' ')[1];
+    }
 
     if (token) {
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
       const result = await query(
         'SELECT id, email, first_name, last_name, is_admin, is_verified FROM users WHERE id = $1',
-        [decoded.id],
+        [decoded.userId],
       );
 
       if (result.rows.length > 0) {

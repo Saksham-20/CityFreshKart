@@ -1,6 +1,8 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 const pool = require('../database/config');
+const emailService = require('../services/emailService');
 
 const authController = {
   // Register a new user
@@ -8,7 +10,15 @@ const authController = {
     try {
       const { email, password, first_name, last_name, phone } = req.body;
 
-      // Check if user already exists
+      // Check if phone is provided (required for login)
+      if (!phone) {
+        return res.status(400).json({
+          success: false,
+          message: 'Phone number is required',
+        });
+      }
+
+      // Check if user already exists by email
       const existingUser = await pool.query(
         'SELECT id FROM users WHERE email = $1',
         [email],
@@ -21,28 +31,46 @@ const authController = {
         });
       }
 
+      // Check if phone is already registered
+      const existingPhone = await pool.query(
+        'SELECT id FROM users WHERE phone = $1',
+        [phone],
+      );
+
+      if (existingPhone.rows.length > 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'User with this phone number already exists',
+        });
+      }
+
       // Hash password
       const saltRounds = 12;
       const hashedPassword = await bcrypt.hash(password, saltRounds);
 
-      // Create user
+      // Generate email verification token
+      const verificationToken = crypto.randomBytes(32).toString('hex');
+      const tokenExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours from now
+
+      // Create user with verification token
       const result = await pool.query(
-        'INSERT INTO users (email, password_hash, first_name, last_name, phone) VALUES ($1, $2, $3, $4, $5) RETURNING id, email, first_name, last_name, phone, is_admin, is_verified, created_at',
-        [email, hashedPassword, first_name, last_name, phone],
+        'INSERT INTO users (email, password_hash, first_name, last_name, phone, email_verification_token, email_verification_token_expiry) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, email, first_name, last_name, phone, is_admin, is_verified, created_at',
+        [email, hashedPassword, first_name, last_name, phone, verificationToken, tokenExpiry],
       );
 
       const user = result.rows[0];
 
-      // Generate JWT token
-      const token = jwt.sign(
-        { userId: user.id },
-        process.env.JWT_SECRET,
-        { expiresIn: '7d' },
-      );
+      // Send verification email
+      try {
+        await emailService.sendEmailVerification(user, verificationToken);
+      } catch (emailError) {
+        console.error('Error sending verification email:', emailError);
+        // Don't fail registration if email fails, but log the error
+      }
 
       res.status(201).json({
         success: true,
-        message: 'User registered successfully',
+        message: 'User registered successfully. Please check your email to verify your account.',
         data: {
           user: {
             id: user.id,
@@ -53,7 +81,7 @@ const authController = {
             is_admin: user.is_admin,
             is_verified: user.is_verified,
           },
-          token,
+          requiresEmailVerification: true,
         },
       });
     } catch (error) {
@@ -68,18 +96,18 @@ const authController = {
   // Login user
   async login(req, res) {
     try {
-      const { email, password } = req.body;
+      const { phone, password } = req.body;
 
-      // Find user by email
+      // Find user by phone number
       const result = await pool.query(
-        'SELECT id, email, password_hash, first_name, last_name, phone, is_admin, is_verified FROM users WHERE email = $1',
-        [email],
+        'SELECT id, email, password_hash, first_name, last_name, phone, is_admin, is_verified FROM users WHERE phone = $1',
+        [phone],
       );
 
       if (result.rows.length === 0) {
         return res.status(401).json({
           success: false,
-          message: 'Invalid email or password',
+          message: 'Invalid phone number or password',
         });
       }
 
@@ -90,7 +118,7 @@ const authController = {
       if (!isPasswordValid) {
         return res.status(401).json({
           success: false,
-          message: 'Invalid email or password',
+          message: 'Invalid phone number or password',
         });
       }
 
@@ -100,6 +128,15 @@ const authController = {
         process.env.JWT_SECRET,
         { expiresIn: '7d' },
       );
+
+      // Set httpOnly cookie (secure in production)
+      res.cookie('authToken', token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production', // Only send over HTTPS in production
+        sameSite: 'strict',
+        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days in milliseconds
+        path: '/',
+      });
 
       res.json({
         success: true,
@@ -114,7 +151,6 @@ const authController = {
             is_admin: user.is_admin,
             is_verified: user.is_verified,
           },
-          token,
         },
       });
     } catch (error) {

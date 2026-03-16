@@ -6,7 +6,6 @@ import Input from '../ui/Input';
 import Modal from '../ui/Modal';
 import Loading from '../ui/Loading';
 import { getImageUrl, getPlaceholderImage } from '../../utils/imageUtils';
-import api from '../../services/api';
 
 const ProductManager = () => {
   // const { user } = useAuth();
@@ -21,7 +20,8 @@ const ProductManager = () => {
   const [formData, setFormData] = useState({
     name: '',
     description: '',
-    price: '',
+    price_per_kg: '', // Changed to price_per_kg for weight-based pricing
+    discount: '', // Add discount percentage field
     category_id: '',
     sku: '',
     stock_quantity: '',
@@ -150,7 +150,8 @@ const ProductManager = () => {
     setFormData({
       name: '',
       description: '',
-      price: '',
+      price_per_kg: '',
+      discount: '',
       category_id: '',
       sku: '',
       stock_quantity: '',
@@ -372,7 +373,8 @@ const ProductManager = () => {
     setFormData({
       name: product.name,
       description: product.description,
-      price: product.price,
+      price_per_kg: product.price_per_kg || product.price || '',
+      discount: product.discount || '',
       category_id: product.category_id,
       sku: product.sku || '',
       stock_quantity: product.stock_quantity,
@@ -606,17 +608,29 @@ const ProductManager = () => {
                 />
               </div>
               
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <Input
-                  label="Price *"
-                  name="price"
+                  label="Price per kg (₹) *"
+                  name="price_per_kg"
                   type="number"
                   step="0.01"
-                  value={formData.price}
+                  value={formData.price_per_kg}
                   onChange={handleInputChange}
                   required
                   className="w-full"
                   placeholder="0.00"
+                />
+                <Input
+                  label="Discount (%) *"
+                  name="discount"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  max="100"
+                  value={formData.discount}
+                  onChange={handleInputChange}
+                  className="w-full"
+                  placeholder="0"
                 />
                 <Input
                   label="Stock Quantity *"
@@ -836,17 +850,29 @@ const ProductManager = () => {
                 />
               </div>
               
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <Input
-                  label="Price *"
-                  name="price"
+                  label="Price per kg (₹) *"
+                  name="price_per_kg"
                   type="number"
                   step="0.01"
-                  value={formData.price}
+                  value={formData.price_per_kg}
                   onChange={handleInputChange}
                   required
                   className="w-full"
                   placeholder="0.00"
+                />
+                <Input
+                  label="Discount (%) *"
+                  name="discount"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  max="100"
+                  value={formData.discount}
+                  onChange={handleInputChange}
+                  className="w-full"
+                  placeholder="0"
                 />
                 <Input
                   label="Stock Quantity *"

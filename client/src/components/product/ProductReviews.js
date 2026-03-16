@@ -22,7 +22,7 @@ const ProductReviews = ({ productId }) => {
     try {
       setLoading(true);
       // TODO: Replace with actual API call
-      const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+      const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5001';
       const response = await fetch(`${apiUrl}/api/products/${productId}/reviews`);
       const data = await response.json();
       
@@ -50,7 +50,7 @@ const ProductReviews = ({ productId }) => {
     e.preventDefault();
     try {
       // TODO: Replace with actual API call
-      const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+      const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5001';
       const response = await fetch(`${apiUrl}/api/products/${productId}/reviews`, {
         method: 'POST',
         headers: {

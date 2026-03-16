@@ -19,6 +19,10 @@ const handleValidationErrors = (req, res, next) => {
 
 // User registration validation
 const validateRegistration = [
+  body('phone')
+    .notEmpty().withMessage('Phone number is required')
+    .isLength({ min: 7 }).withMessage('Phone number must be at least 7 digits')
+    .matches(/^[\d+\s\-()]*$/).withMessage('Phone number contains invalid characters'),
   body('email')
     .isEmail()
     .normalizeEmail()
@@ -36,19 +40,15 @@ const validateRegistration = [
     .trim()
     .isLength({ min: 2, max: 50 })
     .withMessage('Last name must be between 2 and 50 characters'),
-  body('phone')
-    .optional()
-    .isMobilePhone()
-    .withMessage('Please provide a valid phone number'),
   handleValidationErrors,
 ];
 
 // User login validation
 const validateLogin = [
-  body('email')
-    .isEmail()
-    .normalizeEmail()
-    .withMessage('Please provide a valid email address'),
+  body('phone')
+    .notEmpty().withMessage('Phone number is required')
+    .isLength({ min: 7 }).withMessage('Phone number must be at least 7 digits')
+    .matches(/^[\d+\s\-()]*$/).withMessage('Phone number contains invalid characters'),
   body('password')
     .notEmpty()
     .withMessage('Password is required'),
@@ -181,7 +181,7 @@ const validateAddress = [
     .withMessage('Country must be between 2 and 100 characters'),
   body('phone')
     .optional()
-    .isMobilePhone()
+    .isLength({ min: 7 })
     .withMessage('Please provide a valid phone number'),
   handleValidationErrors,
 ];

@@ -199,16 +199,39 @@ const getOrderById = async (req, res) => {
 const createOrder = async (req, res) => {
   try {
     const userId = req.user.id;
-    const { items, shippingAddress, billingAddress, paymentMethod, paymentDetails, notes } = req.body;
+    const { items, shippingAddress, billingAddress, paymentMethod, paymentDetails, notes, paymentIntentId } = req.body;
 
     if (!items || items.length === 0) {
-      return res.status(400).json({ message: 'Order must contain at least one item' });
+      return res.status(400).json({ 
+        success: false,
+        message: 'Order must contain at least one item' 
+      });
     }
 
-    // Calculate totals
-    const subtotal = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+    // For payment methods that require Stripe, payment_intent_id is required
+    if (paymentMethod === 'card' && !paymentIntentId) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'Payment intent ID is required for card payments' 
+      });
+    }
+
+    // Generate idempotency key for this order
+    const idempotencyKey = `${userId}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+    // Calculate totals with weight-based pricing support
+    const subtotal = items.reduce((sum, item) => {
+      // For weight-based products: price_per_kg * weight * quantity
+      // For regular products: price * quantity
+      const itemTotal = item.price_per_kg 
+        ? (item.price_per_kg * (item.weight || 1) * item.quantity)
+        : (item.price * item.quantity);
+      return sum + itemTotal;
+    }, 0);
+
     const taxAmount = subtotal * 0.08; // 8% tax
-    const shippingAmount = 0; // Free shipping
+    // FREE delivery above ₹300, else ₹40
+    const shippingAmount = subtotal >= 300 ? 0 : 40;
     const totalAmount = subtotal + taxAmount + shippingAmount;
 
     // Generate order number
@@ -219,18 +242,21 @@ const createOrder = async (req, res) => {
     try {
       await client.query('BEGIN');
 
-      // Create order
+      // Create order - payment_status is 'pending' until webhook confirms payment
       const orderResult = await client.query(`
         INSERT INTO orders (
           user_id, order_number, status, subtotal, tax_amount, 
-          shipping_amount, total_amount, shipping_address, 
-          billing_address, payment_method, payment_details, notes
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+          shipping_amount, total_amount, payment_status, payment_method, 
+          payment_intent_id, payment_intent_status, idempotency_key,
+          shipping_address, billing_address, payment_details, notes
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
         RETURNING *
       `, [
         userId, orderNumber, 'pending', subtotal, taxAmount,
-        shippingAmount, totalAmount, JSON.stringify(shippingAddress),
-        JSON.stringify(billingAddress), paymentMethod,
+        shippingAmount, totalAmount, 'pending', paymentMethod,
+        paymentIntentId || null, 'processing', idempotencyKey,
+        JSON.stringify(shippingAddress),
+        JSON.stringify(billingAddress),
         JSON.stringify(paymentDetails), notes || '',
       ]);
 
@@ -238,19 +264,26 @@ const createOrder = async (req, res) => {
 
       // Create order items
       for (const item of items) {
+        // Calculate unit_price based on whether it's weight-based
+        const unitPrice = item.price_per_kg 
+          ? (item.price_per_kg * (item.weight || 1))
+          : item.price;
+        const itemTotalPrice = unitPrice * item.quantity;
+
         await client.query(`
           INSERT INTO order_items (
-            order_id, product_id, product_name, quantity, unit_price, total_price, variant_details
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+            order_id, product_id, product_name, quantity, unit_price, total_price, weight, variant_details
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
         `, [
           order.id, item.id, item.name, item.quantity,
-          item.price, item.price * item.quantity,
+          parseFloat(unitPrice.toFixed(2)), parseFloat(itemTotalPrice.toFixed(2)),
+          item.weight || null,
           JSON.stringify(item.variant || {}),
         ]);
 
         // Update product stock
         await client.query(
-          'UPDATE products SET inventory_quantity = inventory_quantity - $1 WHERE id = $2',
+          'UPDATE products SET stock_quantity = stock_quantity - $1 WHERE id = $2',
           [item.quantity, item.id],
         );
       }
@@ -266,10 +299,15 @@ const createOrder = async (req, res) => {
       await client.query('COMMIT');
 
       res.status(201).json({
-        message: 'Order created successfully',
-        order: order,
-        orderNumber: order.order_number,
-        total: order.total_amount,
+        success: true,
+        message: 'Order created successfully. Awaiting payment confirmation.',
+        data: {
+          order,
+          orderNumber: order.order_number,
+          total: order.total_amount,
+          paymentStatus: 'pending',
+          requiresPaymentConfirmation: paymentMethod === 'card'
+        }
       });
     } catch (error) {
       await client.query('ROLLBACK');
@@ -279,7 +317,10 @@ const createOrder = async (req, res) => {
     }
   } catch (error) {
     console.error('Error creating order:', error);
-    res.status(500).json({ message: 'Internal server error' });
+    res.status(500).json({ 
+      success: false,
+      message: 'Internal server error' 
+    });
   }
 };
 

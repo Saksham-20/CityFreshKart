@@ -16,6 +16,16 @@ const ProtectedRoute = ({ children }) => {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
+  // Check if email is verified (unless exempting certain routes)
+  if (!user.is_verified) {
+    // Allow access to order confirmation page without verification
+    if (location.pathname.includes('/orders/') && location.pathname.includes('/confirmation')) {
+      return children;
+    }
+    // Redirect to pending verification page
+    return <Navigate to="/pending-verification" replace />;
+  }
+
   return children;
 };
 

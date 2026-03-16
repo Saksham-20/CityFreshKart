@@ -1,4 +1,4 @@
-import React, { useMemo, useCallback } from 'react';
+import React, { useMemo, useCallback, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import useCart from '../../hooks/useCart';
@@ -7,20 +7,33 @@ import { formatCurrency as formatPrice } from '../../utils/formatters';
 import { getImageUrl, getPlaceholderImage } from '../../utils/imageUtils';
 import QuantitySelector from '../ui/QuantitySelector';
 
+const WEIGHT_OPTIONS = [0.5, 1, 1.5, 2]; // Default weight options in kg
+
 const ProductCard = React.memo(({ product, className = '' }) => {
   const { addToCart, isItemInCart, removeFromCart, items: cartItems, updateItemQuantity } = useCart();
   const { addToWishlist, removeFromWishlist, isItemInWishlist } = useWishlist();
+  
+  // For weight-based pricing
+  const [selectedWeight, setSelectedWeight] = useState(1);
 
-  const formattedPrice = useMemo(() => formatPrice(product.price), [product.price]);
-  const formattedComparePrice = useMemo(() =>
-    product.comparePrice ? formatPrice(product.comparePrice) : null,
-    [product.comparePrice]
-  );
+  const isWeightBased = useMemo(() => product.price_per_kg || product.pricePerKg, [product]);
+  
+  // Price per kg for display
+  const pricePerKg = useMemo(() => product.price_per_kg || product.pricePerKg || product.price, [product]);
+  
+  // Apply discount if exists
+  const discountPercent = useMemo(() => product.discount || 0, [product.discount]);
+  
+  // Calculate total price based on weight and discount
+  const totalPrice = useMemo(() => {
+    let price = pricePerKg * selectedWeight;
+    if (discountPercent > 0) {
+      price = price - (price * (discountPercent / 100));
+    }
+    return price;
+  }, [pricePerKg, selectedWeight, discountPercent]);
 
-  const discountPercentage = useMemo(() => {
-    if (!product.comparePrice || product.comparePrice <= product.price) return 0;
-    return Math.round(((product.comparePrice - product.price) / product.comparePrice) * 100);
-  }, [product.price, product.comparePrice]);
+  const formattedPrice = useMemo(() => formatPrice(pricePerKg), [pricePerKg]);
 
   const productId = product.product_id || product.id;
 
@@ -39,15 +52,16 @@ const ProductCard = React.memo(({ product, className = '' }) => {
       id: productId,
       name: product.name,
       slug: product.slug,
-      price: product.price,
-      compare_price: product.compare_price,
-      sku: product.sku,
+      price: totalPrice,
+      price_per_kg: pricePerKg,
+      weight: selectedWeight,
+      discount: discountPercent,
       primary_image: product.primary_image,
       category_name: product.category_name,
       category_slug: product.category_slug
     };
     addToCart(cartProduct);
-  }, [addToCart, product, productId]);
+  }, [addToCart, product, productId, totalPrice, pricePerKg, selectedWeight, discountPercent]);
 
   const handleIncrease = useCallback(() => {
     if (cartItem) {
@@ -98,9 +112,9 @@ const ProductCard = React.memo(({ product, className = '' }) => {
         </Link>
 
         {/* Discount Badge */}
-        {discountPercentage > 0 && (
+        {discountPercent > 0 && (
           <div className="absolute top-2 left-2 bg-saffron text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm">
-            -{discountPercentage}%
+            -{discountPercent}%
           </div>
         )}
 
@@ -172,48 +186,108 @@ const ProductCard = React.memo(({ product, className = '' }) => {
           </div>
         )}
 
-        {/* Price row + Cart CTA */}
-        <div className="flex items-center justify-between gap-2 mt-2">
-          <div className="flex flex-col">
-            <span className="text-base font-bold text-gray-900 leading-tight">
-              {formattedPrice}
-            </span>
-            {formattedComparePrice && (
-              <span className="text-xs text-gray-400 line-through leading-tight">
-                {formattedComparePrice}
+        {/* Price and Weight Selector for weight-based products */}
+        {isWeightBased ? (
+          <div className="space-y-2 mt-3">
+            {/* Price per kg display */}
+            <div className="flex items-baseline justify-between gap-2">
+              <span className="text-xs text-gray-500">₹{pricePerKg.toFixed(0)}/kg</span>
+              {discountPercent > 0 && (
+                <span className="text-xs bg-red-50 text-red-600 px-1.5 py-0.5 rounded">
+                  {discountPercent}% OFF
+                </span>
+              )}
+            </div>
+
+            {/* Weight Selector */}
+            <div className="flex items-center gap-2">
+              <select
+                value={selectedWeight}
+                onChange={(e) => setSelectedWeight(parseFloat(e.target.value))}
+                className="flex-1 px-2 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-fresh-green"
+              >
+                {WEIGHT_OPTIONS.map((w) => (
+                  <option key={w} value={w}>
+                    {w} kg
+                  </option>
+                ))}
+              </select>
+              <span className="text-sm font-semibold text-gray-900 whitespace-nowrap">
+                ₹{totalPrice.toFixed(0)}
               </span>
+            </div>
+
+            {/* Add to Cart Button */}
+            <div>
+              {outOfStock ? (
+                <button
+                  disabled
+                  className="w-full text-xs text-gray-400 border border-gray-200 rounded-xl px-3 py-1.5 cursor-not-allowed"
+                >
+                  Out of Stock
+                </button>
+              ) : isInCartState ? (
+                <QuantitySelector
+                  quantity={cartQty}
+                  onIncrease={handleIncrease}
+                  onDecrease={handleDecrease}
+                  size="sm"
+                  className="w-full"
+                />
+              ) : (
+                <motion.button
+                  whileTap={{ scale: 0.92 }}
+                  onClick={handleAddToCart}
+                  className="w-full flex items-center justify-center gap-1 bg-fresh-green text-white text-xs font-semibold px-3 py-1.5 rounded-xl hover:bg-fresh-green-dark transition-colors duration-200 shadow-sm"
+                  aria-label={`Add ${product.name} to cart`}
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
+                  </svg>
+                  Add
+                </motion.button>
+              )}
+            </div>
+          </div>
+        ) : (
+          /* Original price display for non-weight-based products */
+          <div className="flex items-center justify-between gap-2 mt-2">
+            <div className="flex flex-col">
+              <span className="text-base font-bold text-gray-900 leading-tight">
+                {formattedPrice}
+              </span>
+            </div>
+
+            {/* Add to Cart / Quantity Selector */}
+            {outOfStock ? (
+              <button
+                disabled
+                className="text-xs text-gray-400 border border-gray-200 rounded-xl px-3 py-1.5 cursor-not-allowed"
+              >
+                Unavailable
+              </button>
+            ) : isInCartState ? (
+              <QuantitySelector
+                quantity={cartQty}
+                onIncrease={handleIncrease}
+                onDecrease={handleDecrease}
+                size="sm"
+              />
+            ) : (
+              <motion.button
+                whileTap={{ scale: 0.92 }}
+                onClick={handleAddToCart}
+                className="flex items-center gap-1 bg-fresh-green text-white text-xs font-semibold px-3 py-1.5 rounded-xl hover:bg-fresh-green-dark transition-colors duration-200 shadow-sm"
+                aria-label={`Add ${product.name} to cart`}
+              >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
+                </svg>
+                Add
+              </motion.button>
             )}
           </div>
-
-          {/* Add to Cart / Quantity Selector */}
-          {outOfStock ? (
-            <button
-              disabled
-              className="text-xs text-gray-400 border border-gray-200 rounded-xl px-3 py-1.5 cursor-not-allowed"
-            >
-              Unavailable
-            </button>
-          ) : isInCartState ? (
-            <QuantitySelector
-              quantity={cartQty}
-              onIncrease={handleIncrease}
-              onDecrease={handleDecrease}
-              size="sm"
-            />
-          ) : (
-            <motion.button
-              whileTap={{ scale: 0.92 }}
-              onClick={handleAddToCart}
-              className="flex items-center gap-1 bg-fresh-green text-white text-xs font-semibold px-3 py-1.5 rounded-xl hover:bg-fresh-green-dark transition-colors duration-200 shadow-sm"
-              aria-label={`Add ${product.name} to cart`}
-            >
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
-              </svg>
-              Add
-            </motion.button>
-          )}
-        </div>
+        )}
       </div>
     </motion.div>
   );

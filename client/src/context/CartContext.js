@@ -14,7 +14,8 @@ const CART_ACTIONS = {
   REMOVE_ITEM: 'REMOVE_ITEM',
   CLEAR_CART: 'CLEAR_CART',
   SET_ERROR: 'SET_ERROR',
-  MERGE_GUEST_CART: 'MERGE_GUEST_CART'
+  MERGE_GUEST_CART: 'MERGE_GUEST_CART',
+  UPDATE_WEIGHT: 'UPDATE_WEIGHT'
 };
 
 // Initial state
@@ -24,7 +25,7 @@ const initialState = {
   summary: {
     item_count: 0,
     subtotal: 0,
-    estimated_tax: 0,
+    delivery_fee: 0,
     estimated_total: 0
   },
   isLoading: false,
@@ -114,7 +115,7 @@ const cartReducer = (state, action) => {
         summary: {
           item_count: 0,
           subtotal: 0,
-          estimated_tax: 0,
+          delivery_fee: 0,
           estimated_total: 0
         }
       };
@@ -133,22 +134,43 @@ const cartReducer = (state, action) => {
         summary: action.payload.summary
       };
 
+    case CART_ACTIONS.UPDATE_WEIGHT:
+      const itemsWithNewWeight = state.items.map(item =>
+        item.id === action.payload.id
+          ? { ...item, weight: action.payload.weight }
+          : item
+      );
+
+      return {
+        ...state,
+        items: itemsWithNewWeight,
+        summary: calculateSummary(itemsWithNewWeight)
+      };
+
     default:
       return state;
   }
 };
 
-// Helper function to calculate cart summary
+// Helper function to calculate cart summary with delivery fees
 const calculateSummary = (items) => {
-  const subtotal = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-  const itemCount = items.reduce((sum, item) => sum + item.quantity, 0);
-  const estimatedTax = subtotal * 0.08; // 8% tax
-  const estimatedTotal = subtotal + estimatedTax;
+  // Calculate subtotal with weight support
+  const subtotal = items.reduce((sum, item) => {
+    const itemPrice = item.price_per_kg ? item.price_per_kg * (item.weight || 1) * (item.quantity || 1) : (item.price || 0) * (item.quantity || 1);
+    return sum + itemPrice;
+  }, 0);
+
+  const itemCount = items.reduce((sum, item) => sum + (item.quantity || 1), 0);
+  
+  // Calculate delivery fee: FREE above ₹300, else ₹40
+  const deliveryFee = subtotal >= 300 ? 0 : 40;
+  
+  const estimatedTotal = subtotal + deliveryFee;
 
   return {
     item_count: itemCount,
     subtotal: parseFloat(subtotal.toFixed(2)),
-    estimated_tax: parseFloat(estimatedTax.toFixed(2)),
+    delivery_fee: deliveryFee,
     estimated_total: parseFloat(estimatedTotal.toFixed(2))
   };
 };
@@ -194,6 +216,7 @@ export const CartProvider = ({ children }) => {
     if (isAuthenticated && token) {
       loadUserCart();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthenticated, token]);
 
   // Load user cart from API
@@ -500,6 +523,42 @@ export const CartProvider = ({ children }) => {
     return state.items.find(item => item.product_id === productId);
   };
 
+  // Update cart item weight (for weight-based pricing)
+  const updateItemWeight = async (itemId, weight) => {
+    try {
+      if (isAuthenticated) {
+        // Update weight via API (if you implement this endpoint)
+        const response = await api.put(`/cart/${itemId}`, { weight }, {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+
+        if (response.data) {
+          await loadUserCart();
+          toast.success('Weight updated');
+          return { success: true };
+        } else {
+          toast.error(response.data?.message || 'Failed to update weight');
+          return { success: false };
+        }
+      } else {
+        // Update weight in guest cart
+        dispatch({
+          type: CART_ACTIONS.UPDATE_WEIGHT,
+          payload: { id: itemId, weight }
+        });
+
+        toast.success('Weight updated');
+        return { success: true };
+      }
+    } catch (error) {
+      console.error('Update weight error:', error);
+      toast.error('Failed to update weight');
+      return { success: false };
+    }
+  };
+
   const value = {
     ...state,
     addToCart,
@@ -510,7 +569,8 @@ export const CartProvider = ({ children }) => {
     getCartItemCount,
     isItemInCart,
     getCartItem,
-    loadUserCart
+    loadUserCart,
+    updateItemWeight
   };
 
   return (

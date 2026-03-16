@@ -30,6 +30,8 @@ const CheckoutPage = lazy(() => import('./pages/CheckoutPage'));
 const OrderConfirmationPage = lazy(() => import('./pages/OrderConfirmationPage'));
 const LoginPage = lazy(() => import('./pages/LoginPage'));
 const RegisterPage = lazy(() => import('./pages/RegisterPage'));
+const VerifyEmailPage = lazy(() => import('./pages/VerifyEmailPage'));
+const PendingEmailVerificationPage = lazy(() => import('./pages/PendingEmailVerificationPage'));
 const ProfilePage = lazy(() => import('./pages/ProfilePage'));
 const OrdersPage = lazy(() => import('./pages/OrdersPage'));
 const WishlistPage = lazy(() => import('./pages/WishlistPage'));
@@ -71,6 +73,8 @@ function App() {
                 {/* Auth Routes - No Header */}
                 <Route path="/login" element={<LoginPage />} />
                 <Route path="/register" element={<RegisterPage />} />
+                <Route path="/verify-email" element={<VerifyEmailPage />} />
+                <Route path="/pending-verification" element={<PendingEmailVerificationPage />} />
 
                 {/* Admin Routes - No Header */}
                 <Route path="/admin" element={

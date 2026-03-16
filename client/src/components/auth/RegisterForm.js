@@ -12,6 +12,7 @@ const RegisterForm = ({ onSwitchToLogin }) => {
     firstName: '',
     lastName: '',
     email: '',
+    phone: '',
     password: '',
     confirmPassword: ''
   });
@@ -49,6 +50,12 @@ const RegisterForm = ({ onSwitchToLogin }) => {
       newErrors.email = 'Please enter a valid email address';
     }
 
+    if (!formData.phone.trim()) {
+      newErrors.phone = 'Phone number is required';
+    } else if (!/^[\d+\s\-()]*$/.test(formData.phone) || formData.phone.replace(/\D/g, '').length < 7) {
+      newErrors.phone = 'Please enter a valid phone number';
+    }
+
     if (!formData.password) {
       newErrors.password = 'Password is required';
     } else if (formData.password.length < 8) {
@@ -81,6 +88,7 @@ const RegisterForm = ({ onSwitchToLogin }) => {
         first_name: formData.firstName,
         last_name: formData.lastName,
         email: formData.email,
+        phone: formData.phone,
         password: formData.password
       };
       await register(serverData);
@@ -171,6 +179,24 @@ const RegisterForm = ({ onSwitchToLogin }) => {
                 onChange={handleInputChange}
                 error={errors.email}
                 placeholder="Enter your email address"
+                className="h-10 text-sm"
+                fullWidth={true}
+                required
+              />
+            </div>
+
+            <div className="space-y-2 w-full">
+              <label htmlFor="phone" className="block text-sm font-semibold text-gray-700">
+                Phone Number
+              </label>
+              <Input
+                id="phone"
+                name="phone"
+                type="tel"
+                value={formData.phone}
+                onChange={handleInputChange}
+                error={errors.phone}
+                placeholder="Enter your phone number"
                 className="h-10 text-sm"
                 fullWidth={true}
                 required

@@ -1,420 +1,144 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Link } from 'react-router-dom';
-import { IoArrowForward, IoStar, IoLeaf, IoTime, IoCheckmarkCircle } from 'react-icons/io5';
-import { getFeaturedProducts } from '../data/vegetableProducts';
-import LazyImage from '../components/common/LazyImage';
-import useCart from '../hooks/useCart';
-import useWishlist from '../hooks/useWishlist';
-import QuantitySelector from '../components/ui/QuantitySelector';
-
-const FeaturedProductCard = ({ product }) => {
-  const { addToCart, isItemInCart, items: cartItems, updateItemQuantity, removeFromCart } = useCart();
-  const { addToWishlist, removeFromWishlist, isItemInWishlist } = useWishlist();
-
-  const productId = product.id;
-  const inCart = isItemInCart(productId);
-  const inWishlist = isItemInWishlist(productId);
-  const cartItem = cartItems?.find(i => (i.product_id || i.id) === productId);
-  const qty = cartItem?.quantity || 1;
-
-  const handleAdd = () => {
-    addToCart({
-      id: productId,
-      name: product.name,
-      price: product.price,
-      primary_image: product.image,
-      category_name: product.category
-    });
-  };
-
-  const handleIncrease = () => cartItem && updateItemQuantity(cartItem.id, qty + 1);
-  const handleDecrease = () => {
-    if (!cartItem) return;
-    if (qty <= 1) removeFromCart(cartItem.id);
-    else updateItemQuantity(cartItem.id, qty - 1);
-  };
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true }}
-      className="bg-white rounded-2xl shadow-soft hover:shadow-medium transition-all duration-300 overflow-hidden group"
-    >
-      <div className="relative aspect-square overflow-hidden">
-        <LazyImage
-          src={product.image}
-          alt={product.name}
-          className="w-full h-full group-hover:scale-105 transition-transform duration-500"
-        />
-        <button
-          onClick={() => inWishlist ? removeFromWishlist(productId) : addToWishlist({ id: productId, name: product.name, price: product.price, primary_image: product.image })}
-          className={`absolute top-3 right-3 w-8 h-8 rounded-full flex items-center justify-center shadow-sm transition-all duration-200 ${
-            inWishlist ? 'bg-red-50 text-red-500' : 'bg-white/90 text-gray-400 hover:text-red-400 opacity-0 group-hover:opacity-100'
-          }`}
-        >
-          <svg className="w-4 h-4" fill={inWishlist ? 'currentColor' : 'none'} stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-          </svg>
-        </button>
-        {product.weight && (
-          <span className="absolute bottom-3 left-3 bg-fresh-green text-white text-[10px] font-semibold px-2 py-0.5 rounded-full">
-            {product.weight}
-          </span>
-        )}
-      </div>
-
-      <div className="p-4">
-        <div className="text-[10px] text-fresh-green font-semibold uppercase tracking-wide mb-1">
-          {product.category}
-        </div>
-        <h3 className="text-sm font-semibold text-gray-800 mb-1.5 line-clamp-2 leading-snug">
-          {product.name}
-        </h3>
-        <div className="flex items-center gap-1 mb-3">
-          {[...Array(5)].map((_, i) => (
-            <IoStar key={i} className={`w-3 h-3 ${i < Math.floor(product.rating) ? 'text-yellow-400' : 'text-gray-200'}`} />
-          ))}
-          <span className="text-[10px] text-gray-400">({product.reviews})</span>
-        </div>
-
-        <div className="flex items-center justify-between gap-2">
-          <span className="text-base font-bold text-gray-900">₹{product.price}</span>
-          {inCart ? (
-            <QuantitySelector quantity={qty} onIncrease={handleIncrease} onDecrease={handleDecrease} size="sm" />
-          ) : (
-            <motion.button
-              whileTap={{ scale: 0.92 }}
-              onClick={handleAdd}
-              className="flex items-center gap-1 bg-fresh-green text-white text-xs font-semibold px-3 py-1.5 rounded-xl hover:bg-fresh-green-dark transition-colors duration-200 shadow-sm"
-            >
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
-              </svg>
-              Add
-            </motion.button>
-          )}
-        </div>
-      </div>
-    </motion.div>
-  );
-};
+import OfferCarousel from '../components/home/OfferCarousel';
+import CategoryFilter from '../components/home/CategoryFilter';
+import ProductCard from '../components/product/ProductCard';
+import useProducts from '../hooks/useProducts';
+import Loading from '../components/ui/Loading';
 
 const HomePage = () => {
-  const featuredProducts = getFeaturedProducts();
+  const [selectedCategory, setSelectedCategory] = useState('all');
+  
+  // Fetch products from API or use fallback
+  const { products, isLoading, error } = useProducts();
 
-  const categories = [
-    {
-      name: 'Sabzi & Greens',
-      description: 'Taza sabziyan seedha khet se',
-      image: 'https://images.unsplash.com/photo-1540420773420-3366772f4999?w=600&q=80',
-      href: '/products?category=sabzi-greens'
-    },
-    {
-      name: 'Fruits',
-      description: 'Seasonal fresh fruits daily',
-      image: 'https://images.unsplash.com/photo-1619566636858-adf3ef46400b?w=600&q=80',
-      href: '/products?category=fruits'
-    },
-    {
-      name: 'Root Vegetables',
-      description: 'Aloo, pyaaz, gajar & more',
-      image: 'https://images.unsplash.com/photo-1590868309235-ea34bed7bd7f?w=600&q=80',
-      href: '/products?category=root-vegetables'
-    },
-    {
-      name: 'Exotic & Herbs',
-      description: 'Fresh herbs & exotic veggies',
-      image: 'https://images.unsplash.com/photo-1466637574441-749b8f19452f?w=600&q=80',
-      href: '/products?category=exotic-herbs'
-    }
-  ];
+  // Filter products by category
+  const filteredProducts = selectedCategory === 'all'
+    ? products
+    : products.filter(p => {
+        const category = (p.category || p.category_name || '').toLowerCase();
+        return category.includes(selectedCategory);
+      });
 
-  const stats = [
-    { number: '10K+', label: 'Happy Families' },
-    { number: '500+', label: 'Local Farmers' },
-    { number: '2 Hrs', label: 'Avg Delivery' },
-    { number: '100%', label: 'Fresh Guarantee' }
-  ];
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.05,
+        delayChildren: 0.2,
+      },
+    },
+  };
 
-  const howItWorks = [
-    { icon: <IoLeaf className="w-8 h-8" />, title: 'Picked Fresh', desc: 'Harvested from farms every morning' },
-    { icon: <IoCheckmarkCircle className="w-8 h-8" />, title: 'Quality Checked', desc: 'Sorted & graded for A-quality' },
-    { icon: <IoTime className="w-8 h-8" />, title: 'Packed & Shipped', desc: 'Delivered to your door in hours' }
-  ];
+  const itemVariants = {
+    hidden: { opacity: 0, y: 20 },
+    visible: {
+      opacity: 1,
+      y: 0,
+      transition: { duration: 0.4 },
+    },
+  };
+
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-red-600 text-lg mb-4">{error}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="bg-fresh-green text-white px-6 py-2 rounded-lg hover:bg-fresh-green-dark"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen">
-      {/* Hero Section */}
-      <section className="relative h-screen flex items-center justify-center overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/60 to-black/50 z-10" />
-        <div
-          className="absolute inset-0 bg-cover bg-center bg-no-repeat"
-          style={{ backgroundImage: "url('https://images.unsplash.com/photo-1542838132-92c53300491e?ixlib=rb-4.0.3&auto=format&fit=crop&w=2340&q=80')" }}
-        />
-
-        <div className="relative z-20 text-center text-white px-4 max-w-4xl mx-auto">
-          <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8 }}
-            className="mb-4"
-          >
-            <span className="inline-block bg-saffron/90 text-white px-4 py-1 rounded-full text-sm font-semibold mb-4">
-              🥦 India's Freshest Vegetables — Delivered
-            </span>
-          </motion.div>
-
-          <motion.h1
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, delay: 0.1 }}
-            className="text-3xl md:text-5xl font-bold mb-4 text-white drop-shadow-lg"
-          >
-            Khet Se Aapki Thali Tak
-          </motion.h1>
-
-          <motion.p
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, delay: 0.2 }}
-            className="text-lg md:text-xl mb-6 text-white/90 font-light"
-          >
-            Farm-fresh vegetables and fruits delivered to your doorstep.
-            Same-day delivery — order before 11 AM!
-          </motion.p>
-
-          <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, delay: 0.4 }}
-            className="flex flex-col sm:flex-row gap-4 justify-center"
-          >
-            <Link
-              to="/products"
-              className="bg-fresh-green text-white px-6 py-3 rounded-lg text-base font-semibold hover:bg-fresh-green-dark transition-colors duration-300 flex items-center justify-center group"
-            >
-              🛒 Shop Now
-              <IoArrowForward className="ml-2 group-hover:translate-x-1 transition-transform duration-200" />
-            </Link>
-
-            <Link
-              to="/about"
-              className="border-2 border-white text-white px-6 py-3 rounded-lg text-base font-semibold hover:bg-white hover:text-green-900 transition-all duration-300"
-            >
-              Our Story
-            </Link>
-          </motion.div>
-        </div>
+    <div className="min-h-screen bg-white">
+      {/* Offer Carousel */}
+      <section className="px-4 sm:px-6 lg:px-8 py-4 sm:py-6 max-w-7xl mx-auto">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+        >
+          <OfferCarousel />
+        </motion.div>
       </section>
 
-      {/* Stats Section */}
-      <section className="relative py-16 bg-white overflow-hidden">
-        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
-            {stats.map((stat, index) => (
-              <motion.div
-                key={stat.label}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: index * 0.1 }}
-                className="text-center"
-              >
-                <div className="text-2xl md:text-3xl font-bold text-fresh-green mb-2">
-                  {stat.number}
-                </div>
-                <div className="text-sm text-gray-600 font-medium">
-                  {stat.label}
-                </div>
-              </motion.div>
-            ))}
-          </div>
-        </div>
+      {/* Categories */}
+      <section className="px-4 sm:px-6 lg:px-8 py-6 sm:py-8 max-w-7xl mx-auto">
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.3 }}
+        >
+          <h2 className="text-sm font-bold text-gray-500 uppercase tracking-widest mb-4 px-4 sm:px-0">
+            🛍️ Shop by Category
+          </h2>
+          <CategoryFilter
+            selectedCategory={selectedCategory}
+            onCategoryChange={setSelectedCategory}
+          />
+        </motion.div>
       </section>
 
-      {/* How It Works */}
-      <section className="py-16 bg-green-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            className="text-center mb-12"
-          >
-            <h2 className="text-2xl font-bold text-gray-900 mb-4">
-              How CityFreshKart Works
-            </h2>
-            <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-              From farm to your plate in 3 simple steps
-            </p>
-          </motion.div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {howItWorks.map((step, index) => (
-              <motion.div
-                key={step.title}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: index * 0.2 }}
-                className="text-center bg-white rounded-2xl p-8 shadow-soft"
-              >
-                <div className="w-16 h-16 bg-fresh-green/10 text-fresh-green rounded-full flex items-center justify-center mx-auto mb-4">
-                  {step.icon}
-                </div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">{step.title}</h3>
-                <p className="text-sm text-gray-600">{step.desc}</p>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Featured Products */}
-      <section className="relative py-20 bg-gray-50 overflow-hidden">
-        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            className="text-center mb-16"
-          >
-            <h2 className="text-2xl font-bold text-gray-900 mb-4">
-              Today's Fresh Picks 🥬
-            </h2>
-            <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-              Handpicked from local farms this morning — guaranteed fresh or your money back
-            </p>
-          </motion.div>
-
-          <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-            {featuredProducts.map((product) => (
-              <FeaturedProductCard key={product.id} product={product} />
-            ))}
-          </div>
-
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            className="text-center mt-12"
-          >
-            <Link
-              to="/products"
-              className="inline-flex items-center text-fresh-green hover:text-fresh-green-dark font-semibold text-base group"
+      {/* Products Grid */}
+      <section className="px-4 sm:px-6 lg:px-8 pb-8 sm:pb-12 max-w-7xl mx-auto">
+        {isLoading ? (
+          <Loading />
+        ) : filteredProducts.length === 0 ? (
+          <div className="text-center py-12">
+            <p className="text-gray-500 text-lg mb-4">No products found in this category</p>
+            <button
+              onClick={() => setSelectedCategory('all')}
+              className="bg-fresh-green text-white px-6 py-2 rounded-lg hover:bg-fresh-green-dark"
             >
               View All Products
-              <IoArrowForward className="ml-2 group-hover:translate-x-1 transition-transform duration-200" />
-            </Link>
+            </button>
+          </div>
+        ) : (
+          <motion.div
+            variants={containerVariants}
+            initial="hidden"
+            animate="visible"
+            className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4 lg:gap-6"
+          >
+            {filteredProducts.map((product) => (
+              <motion.div key={product.id || product.product_id} variants={itemVariants}>
+                <ProductCard product={product} />
+              </motion.div>
+            ))}
           </motion.div>
-        </div>
+        )}
       </section>
 
-      {/* Shop by Category */}
-      <section className="py-20 bg-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            className="text-center mb-16"
-          >
-            <h2 className="text-2xl font-bold text-gray-900 mb-4">
-              Shop by Category
-            </h2>
-            <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-              Browse our wide range of farm-fresh produce — delivered daily across India
-            </p>
-          </motion.div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-            {categories.map((category, index) => (
+      {/* Quick Info Banner */}
+      <section className="bg-fresh-green-light px-4 sm:px-6 lg:px-8 py-6 sm:py-8 mt-8">
+        <div className="max-w-7xl mx-auto">
+          <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {[
+              { icon: '🚚', title: 'Free Delivery', desc: 'Above ₹300' },
+              { icon: '⚡', title: 'Express Delivery', desc: '30 mins avg' },
+              { icon: '✅', title: 'Fresh Guarantee', desc: '100% fresh' },
+              { icon: '🌱', title: 'Direct from Farms', desc: 'No middlemen' }
+            ].map((item, index) => (
               <motion.div
-                key={category.name}
-                initial={{ opacity: 0, y: 20 }}
+                key={index}
+                initial={{ opacity: 0, y: 10 }}
                 whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: index * 0.15 }}
-                className="group"
+                transition={{ delay: index * 0.05 }}
+                className="text-center"
               >
-                <Link to={category.href}>
-                  <div className="relative overflow-hidden rounded-2xl shadow-lg group-hover:shadow-xl transition-shadow duration-300">
-                    <div className="aspect-[4/5] overflow-hidden">
-                      <LazyImage
-                        src={category.image}
-                        alt={category.name}
-                        className="w-full h-full group-hover:scale-105 transition-transform duration-500"
-                      />
-                    </div>
-
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
-
-                    <div className="absolute bottom-0 left-0 right-0 p-6 text-white">
-                      <h3 className="text-lg font-bold mb-1">
-                        {category.name}
-                      </h3>
-                      <p className="text-sm text-gray-200 mb-3">
-                        {category.description}
-                      </p>
-                      <div className="flex items-center text-fresh-green-light font-semibold text-sm group-hover:translate-x-2 transition-transform duration-200">
-                        Shop Now
-                        <IoArrowForward className="ml-2" />
-                      </div>
-                    </div>
-                  </div>
-                </Link>
+                <div className="text-3xl sm:text-4xl mb-2">{item.icon}</div>
+                <h3 className="font-semibold text-gray-800 text-sm sm:text-base">{item.title}</h3>
+                <p className="text-xs sm:text-sm text-gray-600">{item.desc}</p>
               </motion.div>
             ))}
           </div>
-        </div>
-      </section>
-
-      {/* CTA Section */}
-      <section className="py-20 bg-gradient-to-r from-fresh-green to-fresh-green-dark">
-        <div className="max-w-4xl mx-auto text-center px-4 sm:px-6 lg:px-8">
-          <motion.h2
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            className="text-2xl font-bold text-white mb-6"
-          >
-            Taza Sabzi, Har Din — Ghar Baithe Order Karo! 🌿
-          </motion.h2>
-
-          <motion.p
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ delay: 0.1 }}
-            className="text-lg text-white/90 mb-8"
-          >
-            Join thousands of happy families who get fresh vegetables delivered daily.
-            Free delivery on orders above ₹199!
-          </motion.p>
-
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ delay: 0.2 }}
-            className="flex flex-col sm:flex-row gap-4 justify-center"
-          >
-            <Link
-              to="/register"
-              className="bg-white text-fresh-green px-6 py-3 rounded-lg text-base font-semibold hover:bg-gray-100 transition-colors duration-300"
-            >
-              Create Account
-            </Link>
-
-            <Link
-              to="/products"
-              className="border-2 border-white text-white px-6 py-3 rounded-lg text-base font-semibold hover:bg-white hover:text-fresh-green transition-all duration-300"
-            >
-              Start Shopping 🛒
-            </Link>
-          </motion.div>
         </div>
       </section>
     </div>

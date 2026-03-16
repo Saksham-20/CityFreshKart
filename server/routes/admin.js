@@ -186,16 +186,15 @@ router.get('/products', async (req, res) => {
 router.post('/products', upload.array('images', 10), handleUploadError, async (req, res) => {
   try {
     const {
-      name, description, short_description, price, compare_price, sku,
-      category_id, weight, dimensions,
-      stock_quantity, low_stock_threshold, meta_title, meta_description,
-      is_active, is_featured, is_bestseller, is_new_arrival,
+      name, description, price_per_kg, discount, category_id, sku,
+      stock_quantity,
+      is_active,
     } = req.body;
 
     // Validate required fields
-    if (!name || !price || !category_id || !sku) {
+    if (!name || !price_per_kg || !category_id || !sku) {
       return res.status(400).json({
-        message: 'Missing required fields: name, price, category_id, sku',
+        message: 'Missing required fields: name, price_per_kg, category_id, sku',
       });
     }
 
@@ -211,17 +210,13 @@ router.post('/products', upload.array('images', 10), handleUploadError, async (r
     // Create product
     const newProduct = await pool.query(`
       INSERT INTO products (
-        name, slug, description, short_description, price, compare_price, sku,
-        category_id, weight, dimensions,
-        stock_quantity, low_stock_threshold, meta_title, meta_description,
-        is_active, is_featured, is_bestseller, is_new_arrival
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
+        name, slug, description, price_per_kg, discount, category_id, sku,
+        stock_quantity, is_active
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
       RETURNING *
     `, [
-      name, slug, description, short_description, price, compare_price, sku,
-      category_id, weight, dimensions,
-      stock_quantity || 0, low_stock_threshold || 5, meta_title, meta_description,
-      is_active !== false, is_featured || false, is_bestseller || false, is_new_arrival || false,
+      name, slug, description, parseFloat(price_per_kg) || 0, parseFloat(discount) || 0, category_id, sku,
+      parseInt(stock_quantity) || 0, is_active !== false,
     ]);
 
     const product = newProduct.rows[0];
@@ -284,7 +279,8 @@ router.post('/products', upload.array('images', 10), handleUploadError, async (r
 // @access  Admin
 router.put('/products/:id', upload.array('images', 10), handleUploadError, [
   body('name').optional().trim().notEmpty().withMessage('Product name is required'),
-  body('price').optional().isFloat({ min: 0 }).withMessage('Price must be a positive number'),
+  body('price_per_kg').optional().isFloat({ min: 0 }).withMessage('Price per kg must be a positive number'),
+  body('discount').optional().isFloat({ min: 0, max: 100 }).withMessage('Discount must be between 0 and 100'),
 ], async (req, res) => {
   try {
     const errors = validationResult(req);

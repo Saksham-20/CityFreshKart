@@ -1,5 +1,6 @@
 const express = require('express');
 const cors = require('cors');
+const cookieParser = require('cookie-parser');
 const helmet = require('helmet');
 const compression = require('compression');
 const rateLimit = require('express-rate-limit');
@@ -31,20 +32,13 @@ if (process.env.NODE_ENV === 'production') {
   }));
 }
 
-// Rate limiting
-const limiter = rateLimit({
-  windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // 15 minutes
-  max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100, // limit each IP to 100 requests per windowMs
-  message: 'Too many requests from this IP, please try again later.',
-});
-app.use('/api/', limiter);
-
-// Middleware
+// Middleware - order matters! CORS should be first
 app.use(compression());
+
 // CORS configuration with debugging
 const corsOptions = {
   origin: process.env.NODE_ENV === 'production'
-    ? [process.env.CLIENT_URL, process.env.CORS_ORIGIN]
+    ? [process.env.CLIENT_URL, process.env.CORS_ORIGIN].filter(Boolean)
     : true, // Allow all origins in development
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
@@ -59,7 +53,19 @@ console.log('CLIENT_URL:', process.env.CLIENT_URL);
 console.log('CORS_ORIGIN:', process.env.CORS_ORIGIN);
 console.log('CORS Origin:', corsOptions.origin);
 
+// Apply CORS BEFORE other middleware
 app.use(cors(corsOptions));
+
+// Cookie parser - for accessing httpOnly cookies
+app.use(cookieParser());
+
+// Rate limiting - applied after CORS
+const limiter = rateLimit({
+  windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // 15 minutes
+  max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100, // limit each IP to 100 requests per windowMs
+  message: 'Too many requests from this IP, please try again later.',
+});
+app.use('/api/', limiter);
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 

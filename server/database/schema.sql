@@ -10,10 +10,12 @@ CREATE TABLE IF NOT EXISTS users (
     password_hash VARCHAR(255) NOT NULL,
     first_name VARCHAR(100) NOT NULL,
     last_name VARCHAR(100) NOT NULL,
-    phone VARCHAR(20),
+    phone VARCHAR(20) UNIQUE NOT NULL,
     date_of_birth DATE,
     is_admin BOOLEAN DEFAULT FALSE,
     is_verified BOOLEAN DEFAULT FALSE,
+    email_verification_token VARCHAR(255),
+    email_verification_token_expiry TIMESTAMP WITH TIME ZONE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
@@ -60,9 +62,11 @@ CREATE TABLE IF NOT EXISTS products (
     slug VARCHAR(255) UNIQUE NOT NULL,
     description TEXT,
     short_description VARCHAR(500),
-    price DECIMAL(10,2) NOT NULL,
+    price DECIMAL(10,2),
     compare_price DECIMAL(10,2),
     cost_price DECIMAL(10,2),
+    price_per_kg DECIMAL(10,2),
+    discount DECIMAL(5,2) DEFAULT 0,
     sku VARCHAR(100) UNIQUE,
     barcode VARCHAR(100),
     weight DECIMAL(8,2),
@@ -136,6 +140,9 @@ CREATE TABLE IF NOT EXISTS orders (
     payment_status VARCHAR(50) NOT NULL DEFAULT 'pending', -- pending, paid, failed, refunded
     payment_method VARCHAR(50),
     payment_intent_id VARCHAR(255),
+    payment_intent_status VARCHAR(50), -- processing, succeeded, canceled, requires_action, requires_payment_method
+    idempotency_key VARCHAR(255) UNIQUE,
+    payment_confirmed_at TIMESTAMP WITH TIME ZONE,
     shipping_address_id UUID REFERENCES user_addresses(id),
     billing_address_id UUID REFERENCES user_addresses(id),
     shipping_method VARCHAR(100),
@@ -154,6 +161,7 @@ CREATE TABLE IF NOT EXISTS order_items (
     product_name VARCHAR(255) NOT NULL,
     product_sku VARCHAR(100),
     quantity INTEGER NOT NULL,
+    weight DECIMAL(8,2), -- Weight in kg for weight-based products
     unit_price DECIMAL(10,2) NOT NULL,
     total_price DECIMAL(10,2) NOT NULL,
     variant_details JSONB,
@@ -175,6 +183,7 @@ CREATE TABLE IF NOT EXISTS cart_items (
     cart_id UUID REFERENCES cart(id) ON DELETE CASCADE,
     product_id UUID REFERENCES products(id) ON DELETE CASCADE,
     quantity INTEGER NOT NULL DEFAULT 1,
+    weight DECIMAL(8,2), -- Weight in kg for weight-based products
     variant_details JSONB,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
@@ -235,9 +244,13 @@ CREATE INDEX IF NOT EXISTS idx_products_slug ON products(slug);
 CREATE INDEX IF NOT EXISTS idx_products_is_active ON products(is_active);
 CREATE INDEX IF NOT EXISTS idx_products_is_featured ON products(is_featured);
 CREATE INDEX IF NOT EXISTS idx_products_price ON products(price);
+CREATE INDEX IF NOT EXISTS idx_products_price_per_kg ON products(price_per_kg);
 CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id);
 CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
+CREATE INDEX IF NOT EXISTS idx_orders_payment_status ON orders(payment_status);
 CREATE INDEX IF NOT EXISTS idx_orders_created_at ON orders(created_at);
+CREATE INDEX IF NOT EXISTS idx_orders_payment_intent_id ON orders(payment_intent_id);
+CREATE INDEX IF NOT EXISTS idx_orders_idempotency_key ON orders(idempotency_key);
 CREATE INDEX IF NOT EXISTS idx_order_items_order_id ON order_items(order_id);
 CREATE INDEX IF NOT EXISTS idx_cart_user_id ON cart(user_id);
 CREATE INDEX IF NOT EXISTS idx_cart_items_cart_id ON cart_items(cart_id);

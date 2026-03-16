@@ -1,9 +1,11 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 const { query } = require('../database/config');
 const { authenticateToken, requireVerified } = require('../middleware/auth');
 const { validateRegistration, validateLogin } = require('../middleware/validation');
+const authController = require('../controllers/authController');
 
 const router = express.Router();
 
@@ -14,10 +16,30 @@ router.get('/test', (req, res) => {
 });
 
 // @route   POST /api/auth/setup-database
-// @desc    Setup database tables and seed data (for production setup)
-// @access  Public (temporary endpoint for setup)
+// @desc    Setup database tables and seed data (for development only)
+// @access  Development only (localhost or SETUP_KEY required)
 router.post('/setup-database', async (req, res) => {
   try {
+    // SECURITY: Only allow from localhost or with correct setup key in development
+    const isLocalhost = req.ip === '127.0.0.1' || req.ip === '::1' || req.hostname === 'localhost';
+    const hasValidSetupKey = req.headers['x-setup-key'] === process.env.SETUP_KEY;
+    
+    // Block in production unless localhost
+    if (process.env.NODE_ENV === 'production' && !isLocalhost) {
+      return res.status(403).json({
+        success: false,
+        message: 'Setup endpoint not available in production',
+      });
+    }
+
+    // Block if not localhost and no valid setup key
+    if (!isLocalhost && !hasValidSetupKey) {
+      return res.status(403).json({
+        success: false,
+        message: 'Unauthorized: Setup key required',
+      });
+    }
+
     console.log('🔧 Starting database setup...');
 
     // Import setup and seed functions
@@ -46,145 +68,20 @@ router.post('/setup-database', async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Database setup failed',
-      error: error.message,
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error',
     });
   }
 });
 
 // @route   POST /api/auth/register
-// @desc    Register a new user
+// @desc    Register a new user (sends verification email)
 // @access  Public
-router.post('/register', validateRegistration, async (req, res) => {
-  try {
-    const { email, password, first_name, last_name, phone } = req.body;
-
-    // Check if user already exists
-    const existingUser = await query(
-      'SELECT id FROM users WHERE email = $1',
-      [email],
-    );
-
-    if (existingUser.rows.length > 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'User with this email already exists',
-      });
-    }
-
-    // Hash password
-    const saltRounds = 12;
-    const passwordHash = await bcrypt.hash(password, saltRounds);
-
-    // Create user
-    const result = await query(`
-      INSERT INTO users (email, password_hash, first_name, last_name, phone)
-      VALUES ($1, $2, $3, $4, $5)
-      RETURNING id, email, first_name, last_name, phone, is_admin, is_verified, created_at
-    `, [email, passwordHash, first_name, last_name, phone]);
-
-    const user = result.rows[0];
-
-    // Generate JWT token
-    const token = jwt.sign(
-      { userId: user.id },
-      process.env.JWT_SECRET,
-      { expiresIn: '7d' },
-    );
-
-    res.status(201).json({
-      success: true,
-      message: 'User registered successfully',
-      data: {
-        user: {
-          id: user.id,
-          email: user.email,
-          first_name: user.first_name,
-          last_name: user.last_name,
-          phone: user.phone,
-          is_admin: user.is_admin,
-          is_verified: user.is_verified,
-        },
-        token,
-      },
-    });
-
-  } catch (error) {
-    console.error('Registration error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Internal server error',
-    });
-  }
-});
+router.post('/register', validateRegistration, authController.register);
 
 // @route   POST /api/auth/login
 // @desc    Authenticate user & get token
 // @access  Public
-router.post('/login', validateLogin, async (req, res) => {
-  try {
-    console.log('🔐 Login attempt - Email:', req.body.email);
-    console.log('🔐 Login attempt - Headers:', req.headers);
-    const { email, password } = req.body;
-
-    // Check if user exists
-    const result = await query(`
-      SELECT id, email, password_hash, first_name, last_name, phone, is_admin, is_verified
-      FROM users WHERE email = $1
-    `, [email]);
-
-    if (result.rows.length === 0) {
-      return res.status(401).json({
-        success: false,
-        message: 'Invalid credentials',
-      });
-    }
-
-    const user = result.rows[0];
-
-    // Check password
-    const isPasswordValid = await bcrypt.compare(password, user.password_hash);
-    if (!isPasswordValid) {
-      return res.status(401).json({
-        success: false,
-        message: 'Invalid credentials',
-      });
-    }
-
-    // Generate JWT token
-    const token = jwt.sign(
-      { id: user.id, is_admin: user.is_admin },
-      process.env.JWT_SECRET,
-      { expiresIn: '7d' },
-    );
-
-    const responseData = {
-      success: true,
-      message: 'Login successful',
-      data: {
-        user: {
-          id: user.id,
-          email: user.email,
-          first_name: user.first_name,
-          last_name: user.last_name,
-          phone: user.phone,
-          is_admin: user.is_admin,
-          is_verified: user.is_verified,
-        },
-        token,
-      },
-    };
-
-    console.log('🔐 Login successful - sending response:', JSON.stringify(responseData, null, 2));
-    res.json(responseData);
-
-  } catch (error) {
-    console.error('Login error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Internal server error',
-    });
-  }
-});
+router.post('/login', validateLogin, authController.login);
 
 // @route   GET /api/auth/me
 // @desc    Get current user profile
@@ -360,13 +257,177 @@ router.post('/refresh', authenticateToken, async (req, res) => {
 });
 
 // @route   POST /api/auth/logout
-// @desc    Logout user (client-side token removal)
+// @desc    Logout user (clear httpOnly cookie)
 // @access  Private
 router.post('/logout', authenticateToken, (req, res) => {
+  // Clear httpOnly cookie
+  res.clearCookie('authToken', {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict',
+    path: '/',
+  });
+
   res.json({
     success: true,
     message: 'Logout successful',
   });
+});
+
+// @route   POST /api/auth/verify-email
+// @desc    Verify user email with token
+// @access  Public
+router.post('/verify-email', async (req, res) => {
+  try {
+    const { token } = req.body;
+
+    if (!token) {
+      return res.status(400).json({
+        success: false,
+        message: 'Verification token is required',
+      });
+    }
+
+    // Find user with this token and check if it's still valid
+    const result = await query(`
+      SELECT id, email, first_name, last_name, phone, is_admin
+      FROM users 
+      WHERE email_verification_token = $1 
+      AND email_verification_token_expiry > NOW()
+    `, [token]);
+
+    if (result.rows.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid or expired verification token',
+      });
+    }
+
+    const user = result.rows[0];
+
+    // Mark user as verified and clear token
+    await query(`
+      UPDATE users 
+      SET is_verified = true, 
+          email_verification_token = NULL, 
+          email_verification_token_expiry = NULL,
+          updated_at = NOW()
+      WHERE id = $1
+    `, [user.id]);
+
+    // Generate JWT token for auto-login after verification
+    const jwtToken = jwt.sign(
+      { userId: user.id },
+      process.env.JWT_SECRET,
+      { expiresIn: '7d' },
+    );
+
+    // Set httpOnly cookie
+    res.cookie('authToken', jwtToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+      path: '/',
+    });
+
+    res.json({
+      success: true,
+      message: 'Email verified successfully! You are now logged in.',
+      data: {
+        user: {
+          id: user.id,
+          email: user.email,
+          first_name: user.first_name,
+          last_name: user.last_name,
+          phone: user.phone,
+          is_admin: user.is_admin,
+          is_verified: true,
+        },
+      },
+    });
+  } catch (error) {
+    console.error('Email verification error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error during verification',
+    });
+  }
+});
+
+// @route   POST /api/auth/resend-verification-email
+// @desc    Resend verification email to user
+// @access  Public
+router.post('/resend-verification-email', async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email is required',
+      });
+    }
+
+    // Find user by email
+    const result = await query(`
+      SELECT id, email, first_name, last_name, is_verified
+      FROM users WHERE email = $1
+    `, [email]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found',
+      });
+    }
+
+    const user = result.rows[0];
+
+    // Check if user is already verified
+    if (user.is_verified) {
+      return res.status(400).json({
+        success: false,
+        message: 'User email is already verified',
+      });
+    }
+
+    // Generate new verification token
+    const verificationToken = crypto.randomBytes(32).toString('hex');
+    const tokenExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+    // Update user with new token
+    await query(`
+      UPDATE users 
+      SET email_verification_token = $1,
+          email_verification_token_expiry = $2,
+          updated_at = NOW()
+      WHERE id = $3
+    `, [verificationToken, tokenExpiry, user.id]);
+
+    // Send verification email
+    const emailService = require('../services/emailService');
+    try {
+      await emailService.sendEmailVerification(user, verificationToken);
+    } catch (emailError) {
+      console.error('Error sending verification email:', emailError);
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to send verification email',
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Verification email sent successfully. Please check your inbox.',
+    });
+  } catch (error) {
+    console.error('Resend verification email error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+    });
+  }
 });
 
 module.exports = router;

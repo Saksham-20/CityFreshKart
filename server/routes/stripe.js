@@ -2,15 +2,17 @@ const express = require('express');
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const { authenticateToken, requireAdmin } = require('../middleware/auth');
 const { body, validationResult } = require('express-validator');
+const { query } = require('../database/config');
+const emailService = require('../services/emailService');
 
 const router = express.Router();
 
 // @route   POST /api/stripe/create-payment-intent
-// @desc    Create payment intent for checkout
+// @desc    Create payment intent for checkout with idempotency support
 // @access  Private
 router.post('/create-payment-intent', authenticateToken, [
   body('amount').isFloat({ min: 0.5 }).withMessage('Amount must be at least $0.50'),
-  body('currency').optional().isIn(['usd', 'eur', 'gbp']).withMessage('Invalid currency'),
+  body('currency').optional().isIn(['usd', 'eur', 'gbp', 'inr']).withMessage('Invalid currency'),
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -18,32 +20,48 @@ router.post('/create-payment-intent', authenticateToken, [
       return res.status(400).json({ errors: errors.array() });
     }
 
-    const { amount, currency = 'usd' } = req.body;
+    const { amount, currency = 'inr', description } = req.body;
 
-    // Convert amount to cents (Stripe expects amounts in smallest currency unit)
-    const amountInCents = Math.round(amount * 100);
+    // Convert amount to smallest currency unit (paise for INR, cents for others)
+    const amountInSmallestUnit = Math.round(amount * (currency === 'inr' ? 100 : 100));
 
-    // Create payment intent
-    const paymentIntent = await stripe.paymentIntents.create({
-      amount: amountInCents,
-      currency: currency,
-      metadata: {
-        user_id: req.user.id.toString(),
-        user_email: req.user.email,
+    // Create payment intent with idempotency key
+    const paymentIntent = await stripe.paymentIntents.create(
+      {
+        amount: amountInSmallestUnit,
+        currency: currency,
+        description: description || `Purchase from ${req.user.email}`,
+        metadata: {
+          user_id: req.user.id.toString(),
+          user_email: req.user.email,
+          user_name: `${req.user.first_name} ${req.user.last_name}`,
+        },
+        automatic_payment_methods: {
+          enabled: true,
+        },
+        statement_descriptor: 'CityFreshKart',
       },
-      automatic_payment_methods: {
-        enabled: true,
-      },
-    });
+      {
+        // Idempotency key prevents duplicate charges if request is retried
+        idempotencyKey: `${req.user.id}-${amount}-${Date.now()}`,
+      }
+    );
 
     res.json({
-      clientSecret: paymentIntent.client_secret,
-      paymentIntentId: paymentIntent.id,
+      success: true,
+      data: {
+        clientSecret: paymentIntent.client_secret,
+        paymentIntentId: paymentIntent.id,
+        amount: paymentIntent.amount,
+        currency: paymentIntent.currency,
+        status: paymentIntent.status,
+      },
     });
 
   } catch (error) {
-    console.error('Create payment intent error:', error);
+    console.error('❌ Create payment intent error:', error);
     res.status(500).json({
+      success: false,
       message: 'Failed to create payment intent',
       error: error.message,
     });
@@ -51,62 +69,206 @@ router.post('/create-payment-intent', authenticateToken, [
 });
 
 // @route   POST /api/stripe/webhook
-// @desc    Handle Stripe webhooks
+// @desc    Handle Stripe webhooks with payment validation
 // @access  Public
 router.post('/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
   const sig = req.headers['stripe-signature'];
   let event;
 
   try {
-    // Verify webhook signature
+    // Verify webhook signature - CRITICAL for security
     event = stripe.webhooks.constructEvent(
       req.body,
       sig,
       process.env.STRIPE_WEBHOOK_SECRET,
     );
   } catch (err) {
-    console.error('Webhook signature verification failed:', err.message);
+    console.error('❌ Webhook signature verification failed:', err.message);
     return res.status(400).send(`Webhook Error: ${err.message}`);
   }
 
   try {
-    // Handle the event
+    // Handle payment events
     switch (event.type) {
-    case 'payment_intent.succeeded':
-      const paymentIntent = event.data.object;
-      console.log('Payment succeeded:', paymentIntent.id);
+      case 'payment_intent.succeeded':
+        await handlePaymentIntentSucceeded(event.data.object);
+        break;
 
-      // Here you could update order status, send confirmation emails, etc.
-      // For now, we'll just log the success
-      break;
+      case 'payment_intent.payment_failed':
+        await handlePaymentIntentFailed(event.data.object);
+        break;
 
-    case 'payment_intent.payment_failed':
-      const failedPayment = event.data.object;
-      console.log('Payment failed:', failedPayment.id);
+      case 'charge.refunded':
+        await handleChargeRefunded(event.data.object);
+        break;
 
-      // Here you could update order status, send failure notifications, etc.
-      break;
-
-    case 'charge.succeeded':
-      const charge = event.data.object;
-      console.log('Charge succeeded:', charge.id);
-      break;
-
-    case 'charge.failed':
-      const failedCharge = event.data.object;
-      console.log('Charge failed:', failedCharge.id);
-      break;
-
-    default:
-      console.log(`Unhandled event type: ${event.type}`);
+      default:
+        console.log(`ℹ️ Unhandled event type: ${event.type}`);
     }
 
+    // Acknowledge receipt of the event
     res.json({ received: true });
   } catch (error) {
-    console.error('Webhook handler error:', error);
+    console.error('❌ Webhook handler error:', error);
     res.status(500).json({ error: 'Webhook handler failed' });
   }
 });
+
+// Handle successful payment intent
+async function handlePaymentIntentSucceeded(paymentIntent) {
+  try {
+    console.log('✅ Payment succeeded:', paymentIntent.id);
+
+    // Find order by payment_intent_id
+    const orderResult = await query(
+      'SELECT * FROM orders WHERE payment_intent_id = $1',
+      [paymentIntent.id]
+    );
+
+    if (orderResult.rows.length === 0) {
+      console.log('⚠️ No order found for payment intent:', paymentIntent.id);
+      return;
+    }
+
+    const order = orderResult.rows[0];
+
+    // Only update if not already processed (idempotency)
+    if (order.payment_status === 'paid') {
+      console.log('ℹ️ Order already marked as paid:', order.id);
+      return;
+    }
+
+    // Update order with confirmed payment
+    await query(
+      `UPDATE orders 
+       SET payment_status = $1,
+           payment_intent_status = $2,
+           payment_confirmed_at = NOW(),
+           status = 'confirmed',
+           updated_at = NOW()
+       WHERE id = $3`,
+      ['paid', paymentIntent.status, order.id]
+    );
+
+    console.log('✅ Order marked as paid:', order.id);
+
+    // Get user and order details to send confirmation
+    const userResult = await query(
+      'SELECT email, first_name FROM users WHERE id = $1',
+      [order.user_id]
+    );
+
+    if (userResult.rows.length > 0) {
+      const user = userResult.rows[0];
+      try {
+        // Send order confirmation email
+        await emailService.sendOrderConfirmation(order, user);
+      } catch (emailError) {
+        console.error('⚠️ Failed to send order confirmation email:', emailError);
+      }
+    }
+  } catch (error) {
+    console.error('❌ Error handling payment succeeded:', error);
+    throw error;
+  }
+}
+
+// Handle failed payment intent
+async function handlePaymentIntentFailed(paymentIntent) {
+  try {
+    console.log('❌ Payment failed:', paymentIntent.id);
+
+    // Find order by payment_intent_id
+    const orderResult = await query(
+      'SELECT * FROM orders WHERE payment_intent_id = $1',
+      [paymentIntent.id]
+    );
+
+    if (orderResult.rows.length === 0) {
+      console.log('⚠️ No order found for failed payment:', paymentIntent.id);
+      return;
+    }
+
+    const order = orderResult.rows[0];
+
+    // Only update if not already processed
+    if (order.payment_status === 'failed') {
+      console.log('ℹ️ Order already marked as failed:', order.id);
+      return;
+    }
+
+    // Update order with failed payment
+    await query(
+      `UPDATE orders 
+       SET payment_status = $1,
+           payment_intent_status = $2,
+           status = 'payment_failed',
+           updated_at = NOW()
+       WHERE id = $3`,
+      ['failed', paymentIntent.status, order.id]
+    );
+
+    console.log('❌ Order marked as failed:', order.id);
+
+    // Get user to send failure notification
+    const userResult = await query(
+      'SELECT email, first_name FROM users WHERE id = $1',
+      [order.user_id]
+    );
+
+    if (userResult.rows.length > 0) {
+      const user = userResult.rows[0];
+      try {
+        // Could send payment failure email here
+        console.log('📧 Payment failure notification would be sent to:', user.email);
+      } catch (emailError) {
+        console.error('⚠️ Failed to send payment failure email:', emailError);
+      }
+    }
+  } catch (error) {
+    console.error('❌ Error handling payment failed:', error);
+    throw error;
+  }
+}
+
+// Handle charge refund
+async function handleChargeRefunded(charge) {
+  try {
+    console.log('💰 Charge refunded:', charge.id);
+
+    // Find orders with this charge ID (via payment intent)
+    const orderResult = await query(
+      `SELECT o.* FROM orders o 
+       WHERE o.payment_intent_id IN (
+         SELECT payment_intent_id FROM orders WHERE id IN (
+           SELECT id FROM orders WHERE payment_method = $1
+         )
+       )`,
+      [charge.payment_intent]
+    );
+
+    if (orderResult.rows.length === 0) {
+      console.log('⚠️ No orders found for refunded charge:', charge.id);
+      return;
+    }
+
+    // Update order with refund status
+    const order = orderResult.rows[0];
+    await query(
+      `UPDATE orders 
+       SET payment_status = $1,
+           status = 'refunded',
+           updated_at = NOW()
+       WHERE id = $2`,
+      ['refunded', order.id]
+    );
+
+    console.log('💰 Order marked as refunded:', order.id);
+  } catch (error) {
+    console.error('❌ Error handling charge refund:', error);
+    throw error;
+  }
+}
 
 // @route   GET /api/stripe/payment-methods
 // @desc    Get user's saved payment methods

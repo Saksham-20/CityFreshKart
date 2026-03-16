@@ -1,4 +1,4 @@
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5001';
 
 class AuthService {
   async login(credentials) {
@@ -8,6 +8,7 @@ class AuthService {
         headers: {
           'Content-Type': 'application/json',
         },
+        credentials: 'include', // Essential for sending/receiving cookies
         body: JSON.stringify(credentials),
       });
 
@@ -18,8 +19,8 @@ class AuthService {
 
       const data = await response.json();
       
-      // Store token in localStorage
-      localStorage.setItem('token', data.data.token);
+      // Token is now stored as httpOnly cookie by server
+      // No need to store in localStorage
       localStorage.setItem('user', JSON.stringify(data.data.user));
 
       return data;
@@ -35,6 +36,7 @@ class AuthService {
         headers: {
           'Content-Type': 'application/json',
         },
+        credentials: 'include', // Essential for sending/receiving cookies
         body: JSON.stringify(userData),
       });
 
@@ -51,20 +53,15 @@ class AuthService {
 
   async logout() {
     try {
-      const token = localStorage.getItem('token');
-      
-      if (token) {
-        await fetch(`${API_BASE_URL}/api/auth/logout`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-          },
-        });
-      }
+      // Call server to clear httpOnly cookie
+      await fetch(`${API_BASE_URL}/api/auth/logout`, {
+        method: 'POST',
+        credentials: 'include', // Essential for sending/receiving cookies
+      });
     } catch (error) {
       console.error('Logout error:', error);
     } finally {
-      // Clear local storage regardless of API call success
+      // Clear local storage
       localStorage.removeItem('token');
       localStorage.removeItem('user');
     }
@@ -72,17 +69,9 @@ class AuthService {
 
   async refreshToken() {
     try {
-      const token = localStorage.getItem('token');
-      
-      if (!token) {
-        throw new Error('No token found');
-      }
-
       const response = await fetch(`${API_BASE_URL}/api/auth/refresh`, {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
+        credentials: 'include', // Essential for sending/receiving cookies
       });
 
       if (!response.ok) {
@@ -91,9 +80,11 @@ class AuthService {
 
       const data = await response.json();
       
-      // Update stored token
-      localStorage.setItem('token', data.data.token);
-      localStorage.setItem('user', JSON.stringify(data.data.user));
+      // Token is refreshed via httpOnly cookie by server
+      // Update user info if needed
+      if (data.data && data.data.user) {
+        localStorage.setItem('user', JSON.stringify(data.data.user));
+      }
 
       return data;
     } catch (error) {
@@ -105,18 +96,12 @@ class AuthService {
 
   async updateProfile(profileData) {
     try {
-      const token = localStorage.getItem('token');
-      
-      if (!token) {
-        throw new Error('No token found');
-      }
-
       const response = await fetch(`${API_BASE_URL}/api/auth/profile`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
         },
+        credentials: 'include',
         body: JSON.stringify(profileData),
       });
 
@@ -140,18 +125,12 @@ class AuthService {
 
   async changePassword(passwordData) {
     try {
-      const token = localStorage.getItem('token');
-      
-      if (!token) {
-        throw new Error('No token found');
-      }
-
       const response = await fetch(`${API_BASE_URL}/api/auth/change-password`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
         },
+        credentials: 'include',
         body: JSON.stringify(passwordData),
       });
 

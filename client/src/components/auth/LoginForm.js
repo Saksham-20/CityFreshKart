@@ -7,7 +7,7 @@ import Input from '../ui/Input';
 const LoginForm = ({ onSwitchToRegister }) => {
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
-    email: '',
+    phone: '',
     password: ''
   });
   const [errors, setErrors] = useState({});
@@ -33,10 +33,10 @@ const LoginForm = ({ onSwitchToRegister }) => {
   const validateForm = () => {
     const newErrors = {};
     
-    if (!formData.email) {
-      newErrors.email = 'Email is required';
-    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-      newErrors.email = 'Email is invalid';
+    if (!formData.phone) {
+      newErrors.phone = 'Phone number is required';
+    } else if (!/^[\d+\s\-()]*$/.test(formData.phone) || formData.phone.replace(/\D/g, '').length < 7) {
+      newErrors.phone = 'Please enter a valid phone number';
     }
     
     if (!formData.password) {
@@ -56,7 +56,7 @@ const LoginForm = ({ onSwitchToRegister }) => {
     
     setIsLoading(true);
     try {
-      const result = await login(formData.email, formData.password);
+      const result = await login(formData.phone, formData.password);
       console.log('LoginForm - Login result:', result);
       if (result.success) {
         // Check if user is admin and redirect accordingly
@@ -97,17 +97,17 @@ const LoginForm = ({ onSwitchToRegister }) => {
         )}
         
         <div className="space-y-2 w-full">
-          <label htmlFor="email" className="block text-sm font-semibold text-gray-700">
-            Email Address
+          <label htmlFor="phone" className="block text-sm font-semibold text-gray-700">
+            Phone Number
           </label>
           <Input
-            id="email"
-            name="email"
-            type="email"
-            value={formData.email}
+            id="phone"
+            name="phone"
+            type="tel"
+            value={formData.phone}
             onChange={handleChange}
-            error={errors.email}
-            placeholder="Enter your email"
+            error={errors.phone}
+            placeholder="Enter your phone number"
             className="h-10 text-sm"
             fullWidth={true}
             required

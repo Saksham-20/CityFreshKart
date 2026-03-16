@@ -13,7 +13,9 @@ root.render(
 
 // Initialize PWA capabilities
 if (initPWA) {
-  initPWA().catch((error) => {
-    console.log('SW registration failed:', error);
-  });
+  try {
+    initPWA();
+  } catch (error) {
+    console.log('PWA initialization failed:', error);
+  }
 }

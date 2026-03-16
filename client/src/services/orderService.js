@@ -1,6 +1,22 @@
 import api from './api';
 
 export const orderService = {
+  // Create payment intent for card payment
+  async createPaymentIntent(amount, currency = 'inr', description) {
+    try {
+      const response = await api.post('/stripe/create-payment-intent', {
+        amount,
+        currency,
+        description
+      });
+      
+      return response.data;
+    } catch (error) {
+      console.error('Failed to create payment intent:', error);
+      throw new Error(error.response?.data?.message || 'Failed to create payment intent');
+    }
+  },
+
   // Get user's orders
   async getOrders(page = 1, limit = 10) {
     try {
@@ -27,8 +43,6 @@ export const orderService = {
   async createOrder(orderData) {
     try {
       console.log('OrderService: Creating order with data:', orderData);
-      console.log('OrderService: API base URL:', api.baseURL);
-      console.log('OrderService: Full request URL will be:', `${api.baseURL}/orders/checkout`);
       
       // Validate order data before sending
       if (!orderData.items || !Array.isArray(orderData.items) || orderData.items.length === 0) {
@@ -51,6 +65,9 @@ export const orderService = {
         shipping_address: orderData.shippingAddress,
         billing_address: orderData.billingAddress,
         payment_method: orderData.paymentMethod,
+        payment_details: orderData.paymentDetails,
+        // Include payment_intent_id if available (for Stripe payments)
+        payment_intent_id: orderData.paymentIntentId,
         notes: orderData.notes
       };
       
@@ -58,8 +75,8 @@ export const orderService = {
       
       const response = await api.post('/orders', transformedOrderData);
       console.log('OrderService: Response received:', response);
-      console.log('OrderService: Order created successfully with ID:', response?.order?.id);
-      return response;
+      console.log('OrderService: Order created successfully with ID:', response?.data?.order?.id);
+      return response.data;
     } catch (error) {
       console.error('OrderService: Error creating order:', error);
       console.error('OrderService: Error details:', {

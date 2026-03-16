@@ -21,7 +21,7 @@ const AUTH_ACTIONS = {
 // Initial state
 const initialState = {
   user: null,
-  token: localStorage.getItem('token'),
+  token: null,
   isAuthenticated: false,
   isLoading: false,
   error: null
@@ -98,53 +98,31 @@ const authReducer = (state, action) => {
 export const AuthProvider = ({ children }) => {
   const [state, dispatch] = useReducer(authReducer, initialState);
 
-  // Check if token is valid on app load
+  // Check if user is authenticated on app load
   useEffect(() => {
     const checkAuthStatus = async () => {
-      const token = localStorage.getItem('token');
-      console.log('🔐 AuthContext - checkAuthStatus - token exists:', !!token);
-      console.log('🔐 AuthContext - checkAuthStatus - current state:', state);
-      
-      // Skip if already loading (to prevent race conditions)
-      if (state.isLoading) {
-        console.log('🔐 AuthContext - checkAuthStatus - already loading, skipping');
-        return;
-      }
-      
-      if (token) {
-        try {
-          dispatch({ type: AUTH_ACTIONS.SET_LOADING, payload: true });
-          
-          const response = await api.get('/auth/me', {
-            headers: {
-              'Authorization': `Bearer ${token}`
+      try {
+        dispatch({ type: AUTH_ACTIONS.SET_LOADING, payload: true });
+
+        // Call server to check authentication (cookie sent automatically)
+        const response = await api.get('/auth/me');
+
+        if (response.data && response.data.data && response.data.data.user) {
+          dispatch({
+            type: AUTH_ACTIONS.LOGIN_SUCCESS,
+            payload: {
+              user: response.data.data.user,
+              token: 'authenticated_via_cookie'
             }
           });
-
-          console.log('🔐 AuthContext - checkAuthStatus - response:', response);
-
-          if (response.data) {
-            console.log('AuthContext - checkAuthStatus - user data:', response.data.data.user);
-            dispatch({
-              type: AUTH_ACTIONS.LOGIN_SUCCESS,
-              payload: {
-                user: response.data.data.user,
-                token
-              }
-            });
-          } else {
-            console.log('AuthContext - checkAuthStatus - token invalid, logging out');
-            // Token is invalid, remove it
-            localStorage.removeItem('token');
-            dispatch({ type: AUTH_ACTIONS.LOGOUT });
-          }
-        } catch (error) {
-          console.error('AuthContext - checkAuthStatus - error:', error);
-          localStorage.removeItem('token');
+        } else {
           dispatch({ type: AUTH_ACTIONS.LOGOUT });
-        } finally {
-          dispatch({ type: AUTH_ACTIONS.SET_LOADING, payload: false });
         }
+      } catch (error) {
+        // Token is invalid or expired, no user is logged in
+        dispatch({ type: AUTH_ACTIONS.LOGOUT });
+      } finally {
+        dispatch({ type: AUTH_ACTIONS.SET_LOADING, payload: false });
       }
     };
 
@@ -152,43 +130,32 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   // Login function
-  const login = async (email, password) => {
+  const login = async (phone, password) => {
     try {
-      console.log('AuthContext - login - starting login for:', email);
       dispatch({ type: AUTH_ACTIONS.LOGIN_START });
 
-      const response = await api.post('/auth/login', { email, password });
-      console.log('AuthContext - login - response:', response);
-      console.log('AuthContext - login - response.data:', response.data);
-      console.log('AuthContext - login - response.data.data:', response.data?.data);
+      const response = await api.post('/auth/login', { phone, password });
 
-      if (response.data && response.data.data) {
-        console.log('AuthContext - login - storing token and user data');
-        localStorage.setItem('token', response.data.data.token);
+      if (response.data && response.data.data && response.data.data.user) {
         dispatch({
           type: AUTH_ACTIONS.LOGIN_SUCCESS,
           payload: {
             user: response.data.data.user,
-            token: response.data.data.token
+            token: 'authenticated_via_cookie'
           }
         });
         toast.success('Login successful!');
-        console.log('AuthContext - login - returning success with user:', response.data.data.user);
         return { success: true, user: response.data.data.user };
       } else {
-        console.log('AuthContext - login - login failed:', response.data?.message);
+        const errorMessage = response.data?.message || 'Login failed';
         dispatch({
           type: AUTH_ACTIONS.LOGIN_FAILURE,
-          payload: response.data?.message || 'Login failed'
+          payload: errorMessage
         });
-        toast.error(response.data?.message || 'Login failed');
-        return { success: false, message: response.data?.message };
+        toast.error(errorMessage);
+        return { success: false, message: errorMessage };
       }
     } catch (error) {
-      console.error('AuthContext - login - error:', error);
-      console.error('AuthContext - login - error response:', error.response);
-      console.error('AuthContext - login - error message:', error.message);
-      
       const errorMessage = error.response?.data?.message || error.message || 'Login failed';
       dispatch({
         type: AUTH_ACTIONS.LOGIN_FAILURE,
@@ -206,51 +173,42 @@ export const AuthProvider = ({ children }) => {
 
       const response = await api.post('/auth/register', userData);
 
-      if (response.data) {
-        // Don't automatically log in after registration
-        // Just show success message and let the form handle redirect
-        toast.success('Registration successful! Please log in to your account.');
-        return { success: true };
+      if (response.data && response.data.data && response.data.data.user) {
+        // User is created but email verification is required
+        dispatch({
+          type: AUTH_ACTIONS.LOGOUT  // Don't auto-login
+        });
+        toast.success('Registration successful! Please verify your email to complete signup.');
+        return { success: true, user: response.data.data.user, requiresEmailVerification: true };
       } else {
+        const errorMessage = response.data?.message || 'Registration failed';
         dispatch({
           type: AUTH_ACTIONS.REGISTER_FAILURE,
-          payload: response.data?.message || 'Registration failed'
+          payload: errorMessage
         });
-        toast.error(response.data?.message || 'Registration failed');
-        return { success: false, message: response.data?.message };
+        toast.error(errorMessage);
+        return { success: false, message: errorMessage };
       }
     } catch (error) {
       console.error('Registration error:', error);
+      const errorMessage = error.response?.data?.message || 'Network error. Please try again.';
       dispatch({
         type: AUTH_ACTIONS.REGISTER_FAILURE,
-        payload: 'Network error. Please try again.'
+        payload: errorMessage
       });
-      toast.error('Network error. Please try again.');
-      return { success: false, message: 'Network error' };
+      toast.error(errorMessage);
+      return { success: false, message: errorMessage };
     }
   };
 
   // Logout function
   const logout = async () => {
     try {
-      const token = localStorage.getItem('token');
-      
-      if (token) {
-        // Call logout endpoint
-        try {
-          await api.post('/auth/logout', {}, {
-            headers: {
-              'Authorization': `Bearer ${token}`
-            }
-          });
-        } catch (error) {
-          console.log('Logout API call failed, but continuing with local logout');
-        }
-      }
+      // Call logout endpoint to clear server-side cookie
+      await api.post('/auth/logout');
     } catch (error) {
-      console.error('Logout error:', error);
+      console.log('Logout API call failed, but continuing with local logout');
     } finally {
-      localStorage.removeItem('token');
       dispatch({ type: AUTH_ACTIONS.LOGOUT });
       toast.success('Logged out successfully');
     }
@@ -261,13 +219,9 @@ export const AuthProvider = ({ children }) => {
     try {
       dispatch({ type: AUTH_ACTIONS.SET_LOADING, payload: true });
 
-      const response = await api.put('/auth/profile', profileData, {
-        headers: {
-          'Authorization': `Bearer ${state.token}`
-        }
-      });
+      const response = await api.put('/auth/profile', profileData);
 
-      if (response.data) {
+      if (response.data && response.data.data && response.data.data.user) {
         dispatch({
           type: AUTH_ACTIONS.UPDATE_PROFILE,
           payload: response.data.data.user
@@ -291,10 +245,6 @@ export const AuthProvider = ({ children }) => {
       const response = await api.put('/auth/change-password', {
         current_password: currentPassword,
         new_password: newPassword
-      }, {
-        headers: {
-          'Authorization': `Bearer ${state.token}`
-        }
       });
 
       if (response.data) {
@@ -314,17 +264,13 @@ export const AuthProvider = ({ children }) => {
   // Refresh token function
   const refreshToken = async () => {
     try {
-      const response = await api.post('/auth/refresh', {}, {
-        headers: {
-          'Authorization': `Bearer ${state.token}`
-        }
-      });
+      const response = await api.post('/auth/refresh', {});
 
       if (response.data) {
-        localStorage.setItem('token', response.data.data.token);
+        // Cookie is automatically refreshed by server
         dispatch({
           type: AUTH_ACTIONS.REFRESH_TOKEN,
-          payload: { token: response.data.data.token }
+          payload: { token: 'authenticated_via_cookie' }
         });
         return { success: true };
       } else {

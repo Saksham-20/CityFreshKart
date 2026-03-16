@@ -33,12 +33,14 @@ router.get('/', authenticateToken, async (req, res) => {
       SELECT 
         ci.id,
         ci.quantity,
+        ci.weight,
         ci.variant_details,
         ci.created_at,
         p.id as product_id,
         p.name,
         p.slug,
         p.price,
+        p.price_per_kg,
         p.compare_price,
         p.stock_quantity,
         p.sku,
@@ -57,19 +59,27 @@ router.get('/', authenticateToken, async (req, res) => {
       ORDER BY ci.created_at DESC
     `, [cartId]);
 
-    // Calculate totals
+    // Calculate totals with weight support
     let subtotal = 0;
     let itemCount = 0;
     const items = itemsResult.rows.map(item => {
-      const itemTotal = item.price * item.quantity;
+      // For weight-based products: price_per_kg * weight * quantity
+      // For regular products: price * quantity
+      const unitPrice = item.price_per_kg ? (item.price_per_kg * (item.weight || 1)) : item.price;
+      const itemTotal = unitPrice * item.quantity;
       subtotal += itemTotal;
       itemCount += item.quantity;
 
       return {
         ...item,
-        item_total: itemTotal,
+        unit_price: unitPrice,
+        item_total: parseFloat(itemTotal.toFixed(2)),
       };
     });
+
+    // FREE delivery above ₹300, else ₹40
+    const deliveryFee = subtotal >= 300 ? 0 : 40;
+    const estimatedTotal = subtotal + deliveryFee;
 
     // Cart items processed successfully
 
@@ -81,8 +91,9 @@ router.get('/', authenticateToken, async (req, res) => {
         summary: {
           item_count: itemCount,
           subtotal: parseFloat(subtotal.toFixed(2)),
+          delivery_fee: deliveryFee,
           estimated_tax: parseFloat((subtotal * 0.08).toFixed(2)), // 8% tax
-          estimated_total: parseFloat((subtotal * 1.08).toFixed(2)),
+          estimated_total: parseFloat((estimatedTotal * 1.08).toFixed(2)),
         },
       },
     });
@@ -105,11 +116,12 @@ router.post('/add', authenticateToken, async (req, res) => {
     console.log('🛒 Request body:', req.body);
     console.log('🛒 User ID:', req.user.id);
 
-    const { product_id, quantity = 1, variant_details } = req.body;
+    const { product_id, quantity = 1, variant_details, weight } = req.body;
 
     // Adding item to cart
     console.log('🛒 Product ID:', product_id);
     console.log('🛒 Quantity:', quantity);
+    console.log('🛒 Weight:', weight);
     console.log('🛒 Variant details:', variant_details);
 
     if (!product_id) {
@@ -130,7 +142,7 @@ router.post('/add', authenticateToken, async (req, res) => {
     // Check if product exists and is active
     console.log('🛒 Checking if product exists:', product_id);
     const productResult = await query(
-      'SELECT id, name, price, stock_quantity FROM products WHERE id = $1 AND is_active = true',
+      'SELECT id, name, price, price_per_kg, stock_quantity FROM products WHERE id = $1 AND is_active = true',
       [product_id],
     );
 
@@ -145,6 +157,14 @@ router.post('/add', authenticateToken, async (req, res) => {
     }
 
     const product = productResult.rows[0];
+
+    // Validate weight for weight-based products
+    if (product.price_per_kg && (!weight || weight <= 0)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Weight is required for weight-based products and must be greater than 0',
+      });
+    }
 
     // Check stock availability
     if (product.stock_quantity < quantity) {
@@ -178,7 +198,7 @@ router.post('/add', authenticateToken, async (req, res) => {
     );
 
     if (existingItemResult.rows.length > 0) {
-      // Update existing item quantity
+      // Update existing item quantity and weight
       const newQuantity = existingItemResult.rows[0].quantity + quantity;
 
       if (newQuantity > product.stock_quantity) {
@@ -189,8 +209,8 @@ router.post('/add', authenticateToken, async (req, res) => {
       }
 
       await query(
-        'UPDATE cart_items SET quantity = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
-        [newQuantity, existingItemResult.rows[0].id],
+        'UPDATE cart_items SET quantity = $1, weight = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
+        [newQuantity, weight || null, existingItemResult.rows[0].id],
       );
 
       res.json({
@@ -204,10 +224,10 @@ router.post('/add', authenticateToken, async (req, res) => {
     } else {
       // Add new item to cart
       const newItemResult = await query(`
-        INSERT INTO cart_items (cart_id, product_id, quantity, variant_details)
-        VALUES ($1, $2, $3, $4)
+        INSERT INTO cart_items (cart_id, product_id, quantity, weight, variant_details)
+        VALUES ($1, $2, $3, $4, $5)
         RETURNING id
-      `, [cartId, product_id, quantity, variant_details || null]);
+      `, [cartId, product_id, quantity, weight || null, variant_details || null]);
 
       res.status(201).json({
         success: true,
@@ -236,7 +256,7 @@ router.post('/add', authenticateToken, async (req, res) => {
 router.put('/:item_id', authenticateToken, async (req, res) => {
   try {
     const { item_id } = req.params;
-    const { quantity } = req.body;
+    const { quantity, weight } = req.body;
 
     if (!quantity || quantity < 1) {
       return res.status(400).json({
@@ -250,9 +270,11 @@ router.put('/:item_id', authenticateToken, async (req, res) => {
       SELECT 
         ci.id,
         ci.quantity as current_quantity,
+        ci.weight as current_weight,
         p.id as product_id,
         p.name,
         p.price,
+        p.price_per_kg,
         p.stock_quantity
       FROM cart_items ci
       JOIN cart c ON ci.cart_id = c.id
@@ -261,13 +283,21 @@ router.put('/:item_id', authenticateToken, async (req, res) => {
     `, [item_id, req.user.id]);
 
     if (itemResult.rows.length === 0) {
-      return res.status(404).json({
+      return res.status(400).json({
         success: false,
         message: 'Cart item not found',
       });
     }
 
     const item = itemResult.rows[0];
+
+    // Validate weight for weight-based products
+    if (item.price_per_kg && weight !== undefined && (!weight || weight <= 0)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Weight is required for weight-based products and must be greater than 0',
+      });
+    }
 
     // Check stock availability
     if (quantity > item.stock_quantity) {
@@ -277,11 +307,15 @@ router.put('/:item_id', authenticateToken, async (req, res) => {
       });
     }
 
-    // Update quantity
+    // Update quantity and weight
     await query(
-      'UPDATE cart_items SET quantity = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
-      [quantity, item_id],
+      'UPDATE cart_items SET quantity = $1, weight = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
+      [quantity, weight || item.current_weight || null, item_id],
     );
+
+    // Calculate item total with weight if applicable
+    const unitPrice = item.price_per_kg ? (item.price_per_kg * (weight || item.current_weight || 1)) : item.price;
+    const itemTotal = unitPrice * quantity;
 
     res.json({
       success: true,
@@ -289,7 +323,9 @@ router.put('/:item_id', authenticateToken, async (req, res) => {
       data: {
         cart_item_id: item_id,
         new_quantity: quantity,
-        item_total: item.price * quantity,
+        weight: weight || item.current_weight || null,
+        unit_price: parseFloat(unitPrice.toFixed(2)),
+        item_total: parseFloat(itemTotal.toFixed(2)),
       },
     });
 
