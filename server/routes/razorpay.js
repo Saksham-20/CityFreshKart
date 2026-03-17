@@ -33,7 +33,7 @@ router.post('/create-order', authenticateToken, [
       receipt: receipt || `receipt_${req.user.id}_${Date.now()}`,
       notes: {
         user_id: req.user.id.toString(),
-        user_email: req.user.email,
+        user_phone: req.user.phone,
       },
     };
 
@@ -85,7 +85,7 @@ router.post('/verify-payment', authenticateToken, [
     // Update order payment status if orderId provided
     if (orderId) {
       await query(
-        `UPDATE orders SET "paymentStatus" = 'paid', status = 'confirmed', "updatedAt" = NOW() WHERE id = $1 AND "userId" = $2`,
+        `UPDATE orders SET payment_status = 'paid', status = 'confirmed', updated_at = NOW() WHERE id = $1 AND user_id = $2`,
         [orderId, req.user.id]
       );
     }
@@ -128,7 +128,7 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
         const payment = event.payload.payment.entity;
         // Find and update order by razorpay order id stored in notes or payment_intent_id
         await query(
-          `UPDATE orders SET "paymentStatus" = 'paid', status = 'confirmed', "updatedAt" = NOW() WHERE "paymentMethod" = $1`,
+          `UPDATE orders SET payment_status = 'paid', status = 'confirmed', updated_at = NOW() WHERE payment_method = $1`,
           [payment.order_id]
         ).catch(err => console.error('Webhook order update error:', err));
         break;
@@ -136,7 +136,7 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
       case 'payment.failed': {
         const payment = event.payload.payment.entity;
         await query(
-          `UPDATE orders SET "paymentStatus" = 'failed', "updatedAt" = NOW() WHERE "paymentMethod" = $1`,
+          `UPDATE orders SET payment_status = 'failed', updated_at = NOW() WHERE payment_method = $1`,
           [payment.order_id]
         ).catch(err => console.error('Webhook order update error:', err));
         break;

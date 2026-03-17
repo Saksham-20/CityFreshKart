@@ -10,7 +10,7 @@ test.describe('CityFreshKart - Product & Checkout Flow', () => {
   // Test 1: Product Selection & Weight Pricing
   test('should calculate price correctly based on weight selection', async ({ page }) => {
     // Navigate to products
-    await page.click('a:has-text("Products")');
+    await page.goto(`${BASE_URL}/products`);
     await page.waitForLoadState('networkidle');
 
     // Find first product card
@@ -39,7 +39,7 @@ test.describe('CityFreshKart - Product & Checkout Flow', () => {
 
   // Test 2: Add to Cart
   test('should add product to cart with correct weight', async ({ page }) => {
-    await page.click('a:has-text("Products")');
+    await page.goto(`${BASE_URL}/products`);
     await page.waitForLoadState('networkidle');
 
     const productCard = page.locator('[data-testid="product-card"]').first();
@@ -63,7 +63,7 @@ test.describe('CityFreshKart - Product & Checkout Flow', () => {
   // Test 3: Free Delivery Threshold
   test('should show free delivery when order exceeds ₹300', async ({ page }) => {
     // Add multiple products to reach ₹300
-    await page.click('a:has-text("Products")');
+    await page.goto(`${BASE_URL}/products`);
     await page.waitForLoadState('networkidle');
 
     let cartTotal = 0;
@@ -93,7 +93,7 @@ test.describe('CityFreshKart - Product & Checkout Flow', () => {
 
   // Test 4: Cart Calculation
   test('should calculate cart total correctly with delivery fee', async ({ page }) => {
-    await page.click('a:has-text("Products")');
+    await page.goto(`${BASE_URL}/products`);
     await page.waitForLoadState('networkidle');
 
     const productCard = page.locator('[data-testid="product-card"]').first();
@@ -125,7 +125,7 @@ test.describe('CityFreshKart - Product & Checkout Flow', () => {
 
   // Test 5: Discount Application
   test('should apply and display discounts correctly', async ({ page }) => {
-    await page.click('a:has-text("Products")');
+    await page.goto(`${BASE_URL}/products`);
     await page.waitForLoadState('networkidle');
 
     // Find product with discount

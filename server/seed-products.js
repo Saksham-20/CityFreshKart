@@ -41,11 +41,12 @@ async function seedProducts() {
       const exists = await query('SELECT id FROM products WHERE slug = $1', [product.slug]);
       if (exists.rows.length === 0) {
         await query(
-          'INSERT INTO products (name, slug, description, price_per_kg, discount, category_id, is_active, is_featured, stock_quantity) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)',
+          'INSERT INTO products (name, slug, description, price, price_per_kg, discount, category_id, is_active, is_featured, stock_quantity) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)',
           [
             product.name,
             product.slug,
             product.description,
+            product.price_per_kg, // Use price_per_kg as price as well
             product.price_per_kg,
             product.discount,
             categoryIds[product.category_slug],

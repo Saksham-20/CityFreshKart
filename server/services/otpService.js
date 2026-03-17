@@ -6,9 +6,7 @@
  * Users authenticate via phone number + 6-digit OTP only.
  */
 
-const { PrismaClient } = require('@prisma/client');
-
-const prisma = new PrismaClient();
+const { query } = require('../database/config');
 
 class OTPService {
   /**
@@ -52,33 +50,33 @@ class OTPService {
       const normalized = this.normalizePhone(phone);
       const otp = this.generateOTP();
 
-      // Check if user exists using Prisma
-      let user = await prisma.user.findUnique({
-        where: { phone: normalized }
-      });
+      // Check if user exists
+      let userResult = await query('SELECT id FROM users WHERE phone = $1', [normalized]);
 
       let userId;
-      if (!user) {
+      if (userResult.rows.length === 0) {
         // Create new user with just phone and auto-generated name
-        const name = `User-${normalized.slice(-4)}`; // Temp name
-        const newUser = await prisma.user.create({
-          data: { phone: normalized, name }
-        });
-        userId = newUser.id;
+        const tempName = `User${normalized.slice(-4)}`;
+        const newUser = await query(
+          `INSERT INTO users (phone, first_name, last_name, email, password_hash)
+           VALUES ($1, $2, '', $3, 'N/A')
+           RETURNING id`,
+          [normalized, tempName, `${normalized.replace('+', '')}@placeholder.local`]
+        );
+        userId = newUser.rows[0].id;
       } else {
-        userId = user.id;
+        userId = userResult.rows[0].id;
       }
 
+      // Delete any existing OTP sessions for this user
+      await query('DELETE FROM otp_sessions WHERE user_id = $1', [userId]);
+
       // Store OTP with 5-minute expiry
-      const expiryTime = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
-      await prisma.oTPSession.create({
-        data: {
-          userId,
-          phone: normalized,
-          otp,
-          expiresAt: expiryTime
-        }
-      });
+      const expiryTime = new Date(Date.now() + 5 * 60 * 1000);
+      await query(
+        'INSERT INTO otp_sessions (user_id, phone, otp, expires_at) VALUES ($1, $2, $3, $4)',
+        [userId, normalized, otp, expiryTime]
+      );
 
       // Send OTP via SMS
       await this.sendOTP(normalized, otp);
@@ -100,24 +98,21 @@ class OTPService {
   async verifyOTP(userId, otp) {
     try {
       // Find valid OTP session
-      const session = await prisma.oTPSession.findFirst({
-        where: {
-          userId,
-          expiresAt: {
-            gt: new Date() // Greater than now
-          }
-        },
-        orderBy: {
-          createdAt: 'desc'
-        }
-      });
+      const sessionResult = await query(
+        `SELECT * FROM otp_sessions 
+         WHERE user_id = $1 AND expires_at > NOW()
+         ORDER BY created_at DESC LIMIT 1`,
+        [userId]
+      );
 
-      if (!session) {
+      if (sessionResult.rows.length === 0) {
         return {
           success: false,
           message: 'OTP expired. Please request a new one.'
         };
       }
+
+      const session = sessionResult.rows[0];
 
       // Verify OTP
       if (session.otp !== otp) {
@@ -127,28 +122,23 @@ class OTPService {
         };
       }
 
-      // Mark session as used
-      await prisma.oTPSession.delete({
-        where: { id: session.id }
-      });
+      // Delete the used session
+      await query('DELETE FROM otp_sessions WHERE id = $1', [session.id]);
 
       // Get user details
-      const user = await prisma.user.findUnique({
-        where: { id: userId },
-        select: {
-          id: true,
-          phone: true,
-          name: true,
-          isAdmin: true
-        }
-      });
+      const userResult = await query(
+        'SELECT id, phone, first_name, last_name, is_admin FROM users WHERE id = $1',
+        [userId]
+      );
 
-      if (!user) {
+      if (userResult.rows.length === 0) {
         return {
           success: false,
           message: 'User not found'
         };
       }
+
+      const user = userResult.rows[0];
 
       // Generate JWT token
       const token = require('jsonwebtoken').sign(
@@ -163,8 +153,8 @@ class OTPService {
         user: {
           id: user.id,
           phone: user.phone,
-          name: user.name,
-          is_admin: user.isAdmin
+          name: `${user.first_name} ${user.last_name}`.trim(),
+          is_admin: user.is_admin
         }
       };
 

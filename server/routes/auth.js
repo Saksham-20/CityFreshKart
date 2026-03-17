@@ -4,6 +4,7 @@ const otpService = require('../services/otpService');
 const { isFirebaseAdminConfigured, verifyFirebaseIdToken } = require('../services/firebaseAdmin');
 const { syncUserByPhone, createAppSessionToken } = require('../services/authSessionService');
 const { authenticateToken, requireAdmin } = require('../middleware/auth');
+const { authLimiter } = require('../middleware/rateLimit');
 const pool = require('../database/config');
 
 const setAuthCookie = (res, token) => {
@@ -21,7 +22,7 @@ const setAuthCookie = (res, token) => {
  * @desc    Request OTP for phone number (new user or existing)
  * @access  Public
  */
-router.post('/request-otp', async (req, res) => {
+router.post('/request-otp', authLimiter, async (req, res) => {
   try {
     const { phone } = req.body;
 
@@ -214,8 +215,13 @@ router.put('/profile', authenticateToken, async (req, res) => {
     }
 
     const result = await pool.query(
-      'UPDATE users SET name = $1, updated_at = NOW() WHERE id = $2 RETURNING id, phone, name, is_admin',
-      [name, userId]
+      `UPDATE users SET 
+        first_name = $1, 
+        last_name = $2, 
+        updated_at = NOW() 
+       WHERE id = $3 
+       RETURNING id, phone, name, is_admin`,
+      [name.split(' ')[0] || name, name.split(' ').slice(1).join(' ') || '', userId]
     );
 
     if (result.rows.length === 0) {

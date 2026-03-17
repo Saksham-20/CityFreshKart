@@ -60,10 +60,6 @@ router.get('/dashboard', async (req, res) => {
       lowStockProducts: lowStockProducts.rows,
     };
 
-    console.log('Dashboard API Response:', response);
-    console.log('Total Products from DB:', totalProducts.rows[0].count);
-    console.log('Total Users from DB:', totalUsers.rows[0].count);
-
     res.json(response);
 
   } catch (error) {
@@ -81,14 +77,8 @@ router.get('/dashboard', async (req, res) => {
 // @access  Admin
 router.get('/products', async (req, res) => {
   try {
-    console.log('👑 GET /api/admin/products - Request received');
-    console.log('👑 Query params:', req.query);
-    console.log('👑 User:', req.user);
-
     const { page = 1, limit = 20, search, category, status } = req.query;
     const offset = (page - 1) * limit;
-
-    console.log('👑 Processed params:', { page, limit, search, category, status, offset });
 
     let query = `
       SELECT 
@@ -120,15 +110,10 @@ router.get('/products', async (req, res) => {
       queryParams.push(status === 'active');
     }
 
-    query += ` ORDER BY p."createdAt" DESC LIMIT $${paramCount + 1} OFFSET $${paramCount + 2}`;
+    query += ` ORDER BY p.created_at DESC LIMIT $${paramCount + 1} OFFSET $${paramCount + 2}`;
     queryParams.push(parseInt(limit), offset);
-created_at
-    console.log('👑 Admin products query:', query);
-    console.log('👑 Admin products params:', queryParams);
 
     const products = await pool.query(query, queryParams);
-    console.log('👑 Admin products found:', products.rows.length);
-    console.log('👑 First admin product:', products.rows[0]);
 
     // Get total count
     let countQuery = `
@@ -354,23 +339,23 @@ router.get('/orders', async (req, res) => {
     let query = `
       SELECT 
         o.*,
-        u."firstName", u."lastName", u.email, u.phone,
+        u.name, u.phone,
         COUNT(oi.id) as item_count,
         COALESCE(
           JSON_AGG(
             JSON_BUILD_OBJECT(
               'id', oi.id,
-              'productName', oi."productName",
+              'product_name', oi.product_name,
               'quantity', oi.quantity,
-              'price', oi.price,
-              'calculatedPrice', oi."calculatedPrice"
+              'price_per_kg', oi.price_per_kg,
+              'total_price', oi.total_price
             )
           ) FILTER (WHERE oi.id IS NOT NULL), 
           '[]'::json
         ) as items
       FROM orders o
-      JOIN users u ON o."userId" = u.id
-      LEFT JOIN order_items oi ON o.id = oi."orderId"
+      JOIN users u ON o.user_id = u.id
+      LEFT JOIN order_items oi ON o.id = oi.order_id
       WHERE 1=1
     `;
 
@@ -385,11 +370,11 @@ router.get('/orders', async (req, res) => {
 
     if (search) {
       paramCount++;
-      query += ` AND (o."orderNumber" ILIKE $${paramCount} OR u.email ILIKE $${paramCount})`;
+      query += ` AND (o.order_number ILIKE $${paramCount} OR u.phone ILIKE $${paramCount})`;
       queryParams.push(`%${search}%`);
     }
 
-    query += ` GROUP BY o.id, u."firstName", u."lastName", u.email, u.phone ORDER BY o."createdAt" DESC LIMIT $${paramCount + 1} OFFSET $${paramCount + 2}`;
+    query += ` GROUP BY o.id, u.name, u.phone ORDER BY o.created_at DESC LIMIT $${paramCount + 1} OFFSET $${paramCount + 2}`;
     queryParams.push(parseInt(limit), offset);
 
     const orders = await pool.query(query, queryParams);
@@ -398,7 +383,7 @@ router.get('/orders', async (req, res) => {
     let countQuery = `
       SELECT COUNT(*) as total
       FROM orders o
-      JOIN users u ON o."userId" = u.id
+      JOIN users u ON o.user_id = u.id
       WHERE 1=1
     `;
 
@@ -413,7 +398,7 @@ router.get('/orders', async (req, res) => {
 
     if (search) {
       paramCount++;
-      countQuery += ` AND (o."orderNumber" ILIKE $${paramCount} OR u.email ILIKE $${paramCount})`;
+      countQuery += ` AND (o.order_number ILIKE $${paramCount} OR u.phone ILIKE $${paramCount})`;
       countParams.push(`%${search}%`);
     }
 
@@ -458,7 +443,7 @@ router.put('/orders/:id/status', [
 
     // Update status
     await pool.query(
-      'UPDATE orders SET status = $1, "updatedAt" = CURRENT_TIMESTAMP WHERE id = $2',
+      'UPDATE orders SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
       [status, id],
     );
 
@@ -471,12 +456,11 @@ router.put('/orders/:id/status', [
 });
 
 // @route   POST /api/admin/users
-// @desc    Create new user for admin
+// @desc    Create new user for admin (phone-based OTP app - users are created via OTP flow)
 // @access  Admin
 router.post('/users', [
-  body('firstName').trim().notEmpty().withMessage('First name is required'),
-  body('lastName').trim().notEmpty().withMessage('Last name is required'),
-  body('email').isEmail().withMessage('Valid email is required'),
+  body('name').trim().notEmpty().withMessage('Name is required'),
+  body('phone').trim().notEmpty().withMessage('Phone number is required'),
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -484,25 +468,22 @@ router.post('/users', [
       return res.status(400).json({ errors: errors.array() });
     }
 
-    const { firstName, lastName, email, phone, isAdmin, isVerified } = req.body;
+    const { name, phone, is_admin } = req.body;
 
-    // Check if email already exists
-    const existingUser = await pool.query('SELECT id FROM users WHERE email = $1', [email]);
+    // Normalize phone number
+    const normalizedPhone = phone.startsWith('+') ? phone : `+91${phone.replace(/\D/g, '').slice(-10)}`;
+
+    // Check if phone already exists
+    const existingUser = await pool.query('SELECT id FROM users WHERE phone = $1', [normalizedPhone]);
     if (existingUser.rows.length > 0) {
-      return res.status(400).json({ message: 'Email already exists' });
+      return res.status(400).json({ message: 'Phone number already exists' });
     }
 
-    // Generate a temporary password (in production, send via email)
-    const tempPassword = 'temp123'; // This should be generated and sent via email
-    const bcrypt = require('bcryptjs');
-    const hashedPassword = await bcrypt.hash(tempPassword, 10);
-
-    // Create user
     const newUser = await pool.query(`
-      INSERT INTO users ("firstName", "lastName", email, phone, password, "isAdmin", "isVerified")
-      VALUES ($1, $2, $3, $4, $5, $6, $7)
-      RETURNING id, "firstName", "lastName", email, phone, "isAdmin", "isVerified", "createdAt"
-    `, [firstName, lastName, email, phone, hashedPassword, isAdmin || false, isVerified || false]);
+      INSERT INTO users (phone, first_name, last_name, email, password_hash, is_admin)
+      VALUES ($1, $2, $3, $4, $5, $6)
+      RETURNING id, phone, name, is_admin, created_at
+    `, [normalizedPhone, name.split(' ')[0] || name, name.split(' ').slice(1).join(' ') || '', `${normalizedPhone}@placeholder.local`, 'N/A', is_admin || false]);
 
     res.status(201).json({
       message: 'User created successfully',
@@ -520,12 +501,12 @@ router.post('/users', [
 // @access  Admin
 router.get('/users', async (req, res) => {
   try {
-    const { page = 1, limit = 20, search, role, sortBy = 'created_at', sortOrder = 'DESC' } = req.query;
+    const { page = 1, limit = 20, search, role, sortOrder = 'DESC' } = req.query;
     const offset = (page - 1) * limit;
 
     let query = `
       SELECT 
-        id, email, "firstName", "lastName", phone, "isAdmin", "isVerified", "createdAt", "updatedAt"
+        id, phone, name, is_admin, created_at, updated_at
       FROM users
       WHERE 1=1
     `;
@@ -535,17 +516,17 @@ router.get('/users', async (req, res) => {
 
     if (search) {
       paramCount++;
-      query += ` AND ("firstName" ILIKE $${paramCount} OR "lastName" ILIKE $${paramCount} OR email ILIKE $${paramCount})`;
+      query += ` AND (name ILIKE $${paramCount} OR phone ILIKE $${paramCount})`;
       queryParams.push(`%${search}%`);
     }
 
     if (role) {
       paramCount++;
-      query += ` AND "isAdmin" = $${paramCount}`;
+      query += ` AND is_admin = $${paramCount}`;
       queryParams.push(role === 'admin');
     }
 
-    query += ` ORDER BY "createdAt" ${sortOrder} LIMIT $${paramCount + 1} OFFSET $${paramCount + 2}`;
+    query += ` ORDER BY created_at ${sortOrder} LIMIT $${paramCount + 1} OFFSET $${paramCount + 2}`;
     queryParams.push(parseInt(limit), offset);
 
     const users = await pool.query(query, queryParams);
@@ -562,13 +543,13 @@ router.get('/users', async (req, res) => {
 
     if (search) {
       paramCount++;
-      countQuery += ` AND ("firstName" ILIKE $${paramCount} OR "lastName" ILIKE $${paramCount} OR email ILIKE $${paramCount})`;
+      countQuery += ` AND (name ILIKE $${paramCount} OR phone ILIKE $${paramCount})`;
       countParams.push(`%${search}%`);
     }
 
     if (role) {
       paramCount++;
-      countQuery += ` AND "isAdmin" = $${paramCount}`;
+      countQuery += ` AND is_admin = $${paramCount}`;
       countParams.push(role === 'admin');
     }
 
@@ -599,7 +580,7 @@ router.get('/users/:id', async (req, res) => {
 
     const user = await pool.query(`
       SELECT 
-        id, email, "firstName", "lastName", phone, "isAdmin", "isVerified", "createdAt", "updatedAt"
+        id, phone, name, is_admin, created_at, updated_at
       FROM users 
       WHERE id = $1
     `, [id]);
@@ -620,9 +601,7 @@ router.get('/users/:id', async (req, res) => {
 // @desc    Update user for admin
 // @access  Admin
 router.put('/users/:id', [
-  body('firstName').trim().notEmpty().withMessage('First name is required'),
-  body('lastName').trim().notEmpty().withMessage('Last name is required'),
-  body('email').isEmail().withMessage('Valid email is required'),
+  body('name').optional().trim().notEmpty().withMessage('Name cannot be empty'),
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -631,7 +610,7 @@ router.put('/users/:id', [
     }
 
     const { id } = req.params;
-    const { firstName, lastName, email, phone, isAdmin, isVerified } = req.body;
+    const { name, is_admin } = req.body;
 
     // Check if user exists
     const existingUser = await pool.query('SELECT id FROM users WHERE id = $1', [id]);
@@ -639,22 +618,15 @@ router.put('/users/:id', [
       return res.status(404).json({ message: 'User not found' });
     }
 
-    // Check if email is already taken by another user
-    const emailCheck = await pool.query(
-      'SELECT id FROM users WHERE email = $1 AND id != $2',
-      [email, id],
-    );
-    if (emailCheck.rows.length > 0) {
-      return res.status(400).json({ message: 'Email already taken' });
-    }
-
     // Update user
     await pool.query(`
       UPDATE users 
-      SET "firstName" = $1, "lastName" = $2, email = $3, phone = $4, 
-          "isAdmin" = $5, "isVerified" = $6, "updatedAt" = CURRENT_TIMESTAMP
-      WHERE id = $7
-    `, [firstName, lastName, email, phone, isAdmin || false, isVerified || false, id]);
+      SET first_name = COALESCE(SPLIT_PART($1, ' ', 1), first_name), 
+          last_name = COALESCE(NULLIF(SUBSTRING($1 FROM POSITION(' ' IN $1) + 1), ''), last_name),
+          is_admin = COALESCE($2, is_admin),
+          updated_at = CURRENT_TIMESTAMP
+      WHERE id = $3
+    `, [name, is_admin, id]);
 
     res.json({ message: 'User updated successfully' });
 
@@ -672,7 +644,7 @@ router.delete('/users/:id', async (req, res) => {
     const { id } = req.params;
 
     // Check if user exists
-    const existingUser = await pool.query('SELECT id, "isAdmin" FROM users WHERE id = $1', [id]);
+    const existingUser = await pool.query('SELECT id, is_admin FROM users WHERE id = $1', [id]);
     if (existingUser.rows.length === 0) {
       return res.status(404).json({ message: 'User not found' });
     }
@@ -683,7 +655,7 @@ router.delete('/users/:id', async (req, res) => {
     }
 
     // Prevent deleting other admins
-    if (existingUser.rows[0].isAdmin) {
+    if (existingUser.rows[0].is_admin) {
       return res.status(400).json({ message: 'Cannot delete admin accounts' });
     }
 
@@ -721,7 +693,7 @@ router.put('/products/:id/stock', [
 
     // Update stock quantity
     const updatedProduct = await pool.query(
-      'UPDATE products SET stock_quantity = $1, "updatedAt" = CURRENT_TIMESTAMP WHERE id = $2 RETURNING *',
+      'UPDATE products SET stock_quantity = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 RETURNING *',
       [quantity, id],
     );
 
@@ -749,24 +721,24 @@ router.get('/analytics', async (req, res) => {
 
     switch (period) {
     case '24h':
-      dateFilter = 'AND o."createdAt" >= NOW() - INTERVAL \'24 hours\'';
-      groupBy = 'DATE(o."createdAt")';
+      dateFilter = 'AND o.created_at >= NOW() - INTERVAL \'24 hours\'';
+      groupBy = 'DATE(o.created_at)';
       break;
     case '7d':
-      dateFilter = 'AND o."createdAt" >= NOW() - INTERVAL \'7 days\'';
-      groupBy = 'DATE(o."createdAt")';
+      dateFilter = 'AND o.created_at >= NOW() - INTERVAL \'7 days\'';
+      groupBy = 'DATE(o.created_at)';
       break;
     case '30d':
-      dateFilter = 'AND o."createdAt" >= NOW() - INTERVAL \'30 days\'';
-      groupBy = 'DATE(o."createdAt")';
+      dateFilter = 'AND o.created_at >= NOW() - INTERVAL \'30 days\'';
+      groupBy = 'DATE(o.created_at)';
       break;
     case '90d':
-      dateFilter = 'AND o."createdAt" >= NOW() - INTERVAL \'90 days\'';
-      groupBy = 'DATE(o."createdAt")';
+      dateFilter = 'AND o.created_at >= NOW() - INTERVAL \'90 days\'';
+      groupBy = 'DATE(o.created_at)';
       break;
     case '1y':
-      dateFilter = 'AND o."createdAt" >= NOW() - INTERVAL \'1 year\'';
-      groupBy = 'DATE_TRUNC(\'month\', o."createdAt")';
+      dateFilter = 'AND o.created_at >= NOW() - INTERVAL \'1 year\'';
+      groupBy = 'DATE_TRUNC(\'month\', o.created_at)';
       break;
     }
 
@@ -788,19 +760,18 @@ router.get('/analytics', async (req, res) => {
       SELECT 
         p.id,
         p.name,
-        p.price,
-        pi.image_url,
+        p.price_per_kg,
+        p.image,
         c.name as category_name,
         COUNT(oi.id) as order_count,
         SUM(oi.quantity) as total_quantity,
-        SUM(oi."calculatedPrice") as total_revenue
+        SUM(oi.total_price) as total_revenue
       FROM products p
-      LEFT JOIN order_items oi ON p.id = oi."productId"
-      LEFT JOIN orders o ON oi."orderId" = o.id
-      LEFT JOIN product_images pi ON p.id = pi."productId" AND pi.is_primary = true
-      LEFT JOIN categories c ON p."categoryId" = c.id
+      LEFT JOIN order_items oi ON p.id = oi.product_id
+      LEFT JOIN orders o ON oi.order_id = o.id
+      LEFT JOIN categories c ON p.category_id = c.id
       WHERE o.status != 'cancelled' ${dateFilter}
-      GROUP BY p.id, p.name, p.price, pi.image_url, c.name
+      GROUP BY p.id, p.name, p.price_per_kg, p.image, c.name
       ORDER BY total_quantity DESC
       LIMIT 10
     `);
@@ -809,17 +780,16 @@ router.get('/analytics', async (req, res) => {
     const recentOrders = await pool.query(`
       SELECT 
         o.id,
-        o."orderNumber",
+        o.order_number,
         o.total,
         o.status,
-        o."createdAt",
-        u."firstName",
-        u."lastName",
-        u.email
+        o.created_at,
+        u.name,
+        u.phone
       FROM orders o
-      LEFT JOIN users u ON o."userId" = u.id
+      LEFT JOIN users u ON o.user_id = u.id
       WHERE o.status != 'cancelled' ${dateFilter}
-      ORDER BY o."createdAt" DESC
+      ORDER BY o.created_at DESC
       LIMIT 10
     `);
 
@@ -830,12 +800,12 @@ router.get('/analytics', async (req, res) => {
         c.name,
         COUNT(DISTINCT p.id) as product_count,
         COUNT(oi.id) as order_count,
-        SUM(oi."calculatedPrice") as revenue
+        COALESCE(SUM(oi.total_price), 0) as revenue
       FROM categories c
-      LEFT JOIN products p ON c.id = p."categoryId"
-      LEFT JOIN order_items oi ON p.id = oi."productId"
-      LEFT JOIN orders o ON oi."orderId" = o.id
-      WHERE o.status != 'cancelled' ${dateFilter}
+      LEFT JOIN products p ON c.id = p.category_id
+      LEFT JOIN order_items oi ON p.id = oi.product_id
+      LEFT JOIN orders o ON oi.order_id = o.id
+      WHERE o.status IS NULL OR o.status != 'cancelled'
       GROUP BY c.id, c.name
       ORDER BY revenue DESC
     `);
@@ -846,13 +816,13 @@ router.get('/analytics', async (req, res) => {
         status,
         COUNT(*) as count
       FROM orders 
-      WHERE "createdAt" >= NOW() - INTERVAL '30 days'
+      WHERE created_at >= NOW() - INTERVAL '30 days'
       GROUP BY status
     `);
 
     // Get basic stats for analytics
     const totalProducts = await pool.query('SELECT COUNT(*) as count FROM products');
-    const totalUsers = await pool.query('SELECT COUNT(*) as count FROM users WHERE "isAdmin" = false');
+    const totalUsers = await pool.query('SELECT COUNT(*) as count FROM users WHERE is_admin = false');
     const totalOrders = await pool.query('SELECT COUNT(*) as count FROM orders');
     const totalRevenue = await pool.query(`
       SELECT COALESCE(SUM(total), 0) as revenue 

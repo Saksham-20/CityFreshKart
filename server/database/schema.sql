@@ -20,6 +20,24 @@ CREATE TABLE IF NOT EXISTS users (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
+-- OTP Sessions table
+CREATE TABLE IF NOT EXISTS otp_sessions (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    phone VARCHAR(20) NOT NULL,
+    otp VARCHAR(6) NOT NULL,
+    attempts INT DEFAULT 0,
+    max_attempts INT DEFAULT 5,
+    expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    verified BOOLEAN DEFAULT FALSE,
+    verified_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_otp_sessions_user_id ON otp_sessions(user_id);
+CREATE INDEX IF NOT EXISTS idx_otp_sessions_phone ON otp_sessions(phone);
+CREATE INDEX IF NOT EXISTS idx_otp_sessions_expires_at ON otp_sessions(expires_at);
+
 -- User addresses table
 CREATE TABLE IF NOT EXISTS user_addresses (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),

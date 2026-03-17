@@ -1,21 +1,21 @@
 import React from 'react';
 import useCart from '../../hooks/useCart';
+import { FREE_DELIVERY_THRESHOLD, calculateDelivery } from '../../utils/weightSystem';
 import Button from '../ui/Button';
-
-const FREE_SHIPPING_THRESHOLD = 199;
 
 const CartSummary = ({ onCheckout, showCheckoutButton = true }) => {
   const { items, summary, getCartItemCount } = useCart();
 
   const subtotal = summary?.subtotal || 0;
-  const shipping = subtotal >= FREE_SHIPPING_THRESHOLD ? 0 : 40;
+  const deliveryInfo = calculateDelivery(subtotal);
+  const shipping = deliveryInfo.deliveryFee;
   const tax = subtotal * 0.05; // 5% GST
   const total = subtotal + shipping + tax;
   const itemCount = getCartItemCount();
 
   // Progress toward free shipping
-  const shippingProgress = Math.min((subtotal / FREE_SHIPPING_THRESHOLD) * 100, 100);
-  const amountToFreeShipping = Math.max(FREE_SHIPPING_THRESHOLD - subtotal, 0);
+  const shippingProgress = Math.min((subtotal / FREE_DELIVERY_THRESHOLD) * 100, 100);
+  const amountToFreeShipping = Math.max(FREE_DELIVERY_THRESHOLD - subtotal, 0);
 
   if (!items || items.length === 0) {
     return (
@@ -44,7 +44,7 @@ const CartSummary = ({ onCheckout, showCheckoutButton = true }) => {
           </div>
         </div>
       ) : (
-        <div className="mb-5 p-3 bg-fresh-green-50 rounded-xl border border-fresh-green-100">
+        <div className="mb-5 p-3 bg-fresh-green-50 rounded-xl border border-fresh-green-100" data-testid="delivery-status">
           <p className="text-xs font-semibold text-fresh-green-700">
             🎉 You've unlocked <strong>FREE delivery!</strong>
           </p>
@@ -54,14 +54,14 @@ const CartSummary = ({ onCheckout, showCheckoutButton = true }) => {
       <div className="space-y-3 mb-5">
         <div className="flex justify-between text-sm">
           <span className="text-gray-500">Subtotal ({itemCount} item{itemCount !== 1 ? 's' : ''})</span>
-          <span className="text-gray-800 font-medium">
+          <span className="text-gray-800 font-medium" data-testid="subtotal">
             ₹{subtotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </span>
         </div>
 
         <div className="flex justify-between text-sm">
           <span className="text-gray-500">Delivery</span>
-          <span className={shipping === 0 ? 'text-fresh-green font-medium' : 'text-gray-800 font-medium'}>
+          <span className={shipping === 0 ? 'text-fresh-green font-medium' : 'text-gray-800 font-medium'} data-testid="delivery-fee">
             {shipping === 0 ? 'FREE' : `₹${shipping.toFixed(2)}`}
           </span>
         </div>
@@ -76,7 +76,7 @@ const CartSummary = ({ onCheckout, showCheckoutButton = true }) => {
         <div className="border-t border-gray-100 pt-3">
           <div className="flex justify-between text-base font-bold">
             <span className="text-gray-900">Total</span>
-            <span className="text-gray-900">
+            <span className="text-gray-900" data-testid="total">
               ₹{total.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </span>
           </div>

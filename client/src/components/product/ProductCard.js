@@ -17,14 +17,17 @@ const ProductCard = React.memo(({ product, className = '' }) => {
   const isWeightBased = useMemo(() => product.price_per_kg || product.pricePerKg, [product]);
   
   // Price per kg for display
-  const pricePerKg = useMemo(() => product.price_per_kg || product.pricePerKg || product.price, [product]);
+  const pricePerKg = useMemo(() => {
+    const price = product.price_per_kg || product.pricePerKg || product.price;
+    return Number(price) || 0;
+  }, [product]);
   
   // Apply discount if exists
   const discountPercent = useMemo(() => product.discount || 0, [product.discount]);
   
   // Calculate total price based on weight and discount
   const totalPrice = useMemo(() => {
-    let price = pricePerKg * selectedWeight;
+    let price = (pricePerKg || 0) * selectedWeight;
     if (discountPercent > 0) {
       price = price - (price * (discountPercent / 100));
     }

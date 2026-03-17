@@ -13,7 +13,7 @@ const LoginForm = ({ onSwitchToRegister }) => {
   const [step, setStep] = useState('phone'); // 'phone' or 'otp'
   const [phone, setPhone] = useState('');
   const [otp, setOtp] = useState('');
-  const [userId, setUserId] = useState(null);
+  const [confirmationResult, setConfirmationResult] = useState(null);
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
   const [otpExpiry, setOtpExpiry] = useState(null);
@@ -62,7 +62,7 @@ const LoginForm = ({ onSwitchToRegister }) => {
         return;
       }
 
-      setUserId(result.userId || result.id);
+      setConfirmationResult(result.confirmationResult);
       setStep('otp');
       setOtpExpiry(new Date().getTime() + 5 * 60 * 1000);
 
@@ -97,7 +97,7 @@ const LoginForm = ({ onSwitchToRegister }) => {
 
     setIsLoading(true);
     try {
-      const result = await verifyOTP(userId, otp);
+      const result = await verifyOTP(confirmationResult, otp);
 
       if (!result?.success) {
         setErrors({ general: result?.message || 'Invalid OTP. Please try again.' });
@@ -125,7 +125,7 @@ const LoginForm = ({ onSwitchToRegister }) => {
   const handleBackToPhone = () => {
     setStep('phone');
     setOtp('');
-    setUserId(null);
+    setConfirmationResult(null);
     setOtpExpiry(null);
     setErrors({});
   };

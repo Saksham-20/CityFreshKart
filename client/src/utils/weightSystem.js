@@ -15,16 +15,20 @@ export const FREE_DELIVERY_THRESHOLD = 300; // ₹300
  * @returns {object} Pricing breakdown
  */
 export const calculatePrice = (pricePerKg, weight, discount = 0) => {
-  const basePrice = pricePerKg * weight;
-  const finalPrice = Math.max(0, basePrice - discount);
+  const price = Number(pricePerKg) || 0;
+  const w = Number(weight) || 1;
+  const disc = Number(discount) || 0;
+  
+  const basePrice = price * w;
+  const finalPrice = Math.max(0, basePrice - disc);
 
   return {
-    pricePerKg,
-    weight,
+    pricePerKg: price,
+    weight: w,
     basePrice: Math.round(basePrice * 100) / 100,
-    discount: Math.round(discount * 100) / 100,
+    discount: Math.round(disc * 100) / 100,
     finalPrice: Math.round(finalPrice * 100) / 100,
-    discountPercentage: discount > 0 ? Math.round((discount / basePrice) * 100) : 0,
+    discountPercentage: disc > 0 ? Math.round((disc / basePrice) * 100) : 0,
   };
 };
 
@@ -51,7 +55,8 @@ export const calculateDelivery = (subtotal) => {
  * @returns {string} Formatted price
  */
 export const formatPrice = (price) => {
-  return `₹${Math.round(price).toLocaleString('en-IN')}`;
+  const p = Number(price) || 0;
+  return `₹${Math.round(p).toLocaleString('en-IN')}`;
 };
 
 /**

@@ -1,10 +1,17 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, Navigate } from 'react-router-dom';
 import LoginForm from '../components/auth/LoginForm';
 import RegisterForm from '../components/auth/RegisterForm';
+import { useAuthStore } from '../store/useAuthStore';
 
 const LoginPage = () => {
   const [isLogin, setIsLogin] = useState(true);
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+
+  // If already logged in, redirect to products
+  if (isAuthenticated) {
+    return <Navigate to="/products" replace />;
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex flex-col justify-center py-8 px-4 sm:px-6 lg:px-8">
@@ -29,8 +36,8 @@ const LoginPage = () => {
 
       <div className="mt-6 text-center">
         <p className="text-sm text-gray-600">
-          <Link to="/" className="text-fresh-green hover:text-fresh-green/80 font-medium">
-            ← Back to Home
+          <Link to="/products" className="text-fresh-green hover:text-fresh-green/80 font-medium">
+            ← Back to Shop
           </Link>
         </p>
       </div>

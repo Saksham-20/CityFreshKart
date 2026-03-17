@@ -56,7 +56,11 @@ export const useAuthStore = create(
                 error: null
               });
               toast.success('OTP sent! Check your phone.');
-              return { success: true, userId: result.userId || phone };
+              return {
+                success: true,
+                ...result,
+                userId: result.userId || phone,
+              };
             }
             throw new Error(result?.message || 'Failed to send OTP');
           } catch (error) {
@@ -71,10 +75,10 @@ export const useAuthStore = create(
          * Verify OTP and complete login
          * User provides the 6-digit OTP they received
          */
-        verifyOTP: async (userId, otp) => {
+        verifyOTP: async (otpContext, otp) => {
           try {
             set({ isLoading: true, error: null });
-            const result = await authProviderService.verifyOTP(userId, otp);
+            const result = await authProviderService.verifyOTP(otpContext, otp);
 
             if (result?.success) {
               const user = result.user;

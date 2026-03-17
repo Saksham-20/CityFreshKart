@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, ShoppingCart, Trash2 } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { calculateDelivery, FREE_DELIVERY_THRESHOLD } from '@/utils/weightSystem';
-import Button from './Button';
+import Button from '../ui/Button';
 
 /**
  * CartDrawer Component
@@ -73,6 +73,7 @@ const CartDrawer = ({
               'shadow-lg z-50',
               'flex flex-col'
             )}
+            data-testid="cart-drawer"
           >
             {/* Header */}
             <div className="flex items-center justify-between p-4 border-b border-gray-200">

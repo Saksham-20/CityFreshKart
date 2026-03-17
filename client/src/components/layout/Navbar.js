@@ -1,10 +1,19 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { FiShoppingBag, FiUser } from 'react-icons/fi';
+import { useCartStore } from '../../store/useCartStore';
+import { useAuthStore } from '../../store/useAuthStore';
 
 /**
- * Navbar — Top navigation with branding
+ * Navbar — Top navigation with branding, cart, and account icons
  */
-const Navbar = () => {
+const Navbar = ({ onCartClick }) => {
+  const navigate = useNavigate();
+  const handleCartClick = onCartClick || (() => navigate('/cart'));
+  const cartItems = useCartStore((s) => s.items);
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const cartCount = cartItems?.reduce((t, i) => t + (i.quantity || 1), 0) || 0;
+
   return (
     <nav className="sticky top-0 z-50 bg-gradient-to-r from-fresh-green-600 to-fresh-green-700 text-white shadow-lg">
       <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6 py-3 sm:py-4">
@@ -25,11 +34,44 @@ const Navbar = () => {
           {/* Desktop Title */}
           <div className="sm:hidden text-center">
             <h1 className="text-base font-bold">CityFreshKart</h1>
-            <p className="text-xs text-white/80">Fresh Produce</p>
           </div>
 
-          {/* Right section spacer */}
-          <div className="w-8" />
+          {/* Right section: Cart + Account */}
+          <div className="flex items-center gap-2">
+            {/* Cart Button */}
+            <button
+              onClick={handleCartClick}
+              className="relative flex items-center gap-1.5 bg-white/20 hover:bg-white/30 transition-all duration-200 px-3 py-2 rounded-lg"
+              aria-label="Open cart"
+            >
+              <FiShoppingBag size={20} />
+              <span className="hidden sm:inline text-sm font-medium">Cart</span>
+              {cartCount > 0 && (
+                <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold">
+                  {cartCount > 99 ? '99+' : cartCount}
+                </span>
+              )}
+            </button>
+
+            {/* Account / Login */}
+            {isAuthenticated ? (
+              <Link
+                to="/profile"
+                className="flex items-center gap-1.5 bg-white/20 hover:bg-white/30 transition-all duration-200 px-3 py-2 rounded-lg"
+              >
+                <FiUser size={20} />
+                <span className="hidden sm:inline text-sm font-medium">Account</span>
+              </Link>
+            ) : (
+              <Link
+                to="/login"
+                className="flex items-center gap-1.5 bg-white/20 hover:bg-white/30 transition-all duration-200 px-3 py-2 rounded-lg"
+              >
+                <FiUser size={20} />
+                <span className="hidden sm:inline text-sm font-medium">Login</span>
+              </Link>
+            )}
+          </div>
         </div>
       </div>
     </nav>

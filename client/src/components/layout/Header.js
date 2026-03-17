@@ -194,11 +194,12 @@ const Header = () => {
                 to="/cart"
                 className="relative flex items-center gap-1.5 bg-fresh-green text-white pl-3 pr-4 py-2 rounded-xl hover:bg-fresh-green-dark transition-colors duration-200 text-sm font-semibold"
                 aria-label="Cart"
+                data-testid="cart-icon"
               >
                 <FiShoppingBag className="w-4 h-4" />
                 <span className="hidden sm:inline">Cart</span>
                 {cartItemCount > 0 && (
-                  <span className="bg-white text-fresh-green text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center leading-none">
+                  <span className="bg-white text-fresh-green text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center leading-none" data-testid="cart-badge">
                     {cartItemCount > 9 ? '9+' : cartItemCount}
                   </span>
                 )}
@@ -221,6 +222,14 @@ const Header = () => {
       <nav className="hidden lg:block border-b border-gray-100 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <ul className="flex justify-center gap-1">
+            <li>
+              <Link
+                to="/products"
+                className="flex items-center gap-1.5 px-4 py-3 text-xs font-semibold text-gray-600 hover:text-fresh-green transition-colors duration-200 uppercase tracking-wide whitespace-nowrap"
+              >
+                🏪 Products
+              </Link>
+            </li>
             {navigationItems.map((item) => (
               <li key={item.name}>
                 <Link

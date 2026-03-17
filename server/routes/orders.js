@@ -139,19 +139,17 @@ router.post('/', authenticateToken, [
       ]);
 
       const billingAddr = billing_address || shipping_address;
+      // Billing address uses same table with snake_case columns
       const billingResult = await client.query(`
-        INSERT INTO user_addresses ("userId", "addressType", "firstName", "lastName", company, "addressLine1", "addressLine2", city, state, "postalCode", country, phone, "isDefault")
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+        INSERT INTO user_addresses (user_id, first_name, last_name, address_line, city, state, postal_code, phone, is_default)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
         RETURNING id
       `, [
-        req.user.id, 'billing',
+        req.user.id,
         billingAddr.firstName || billingAddr.first_name || '', billingAddr.lastName || billingAddr.last_name || '',
-        billingAddr.company || null,
-        billingAddr.addressLine1 || billingAddr.address_line_1 || billingAddr.address1 || '',
-        billingAddr.addressLine2 || billingAddr.address_line_2 || billingAddr.address2 || null,
+        billingAddr.addressLine1 || billingAddr.address_line_1 || billingAddr.address1 || billingAddr.address_line || '',
         billingAddr.city || '', billingAddr.state || '',
         billingAddr.postalCode || billingAddr.postal_code || billingAddr.zip || '',
-        billingAddr.country || 'India',
         billingAddr.phone || '', false,
       ]);
 
@@ -227,7 +225,7 @@ router.post('/', authenticateToken, [
         success: true,
         data: {
           order,
-          orderNumber: order.orderNumber,
+          orderNumber: order.order_number,
           subtotal: parseFloat(subtotal.toFixed(2)),
           discount: parseFloat(discountAmount.toFixed(2)),
           deliveryFee,

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import useCart from '../hooks/useCart';
 import useAuth from '../hooks/useAuth';
+import Navbar from '../components/layout/Navbar';
 import { orderService } from '../services/orderService';
 import CheckoutForm from '../components/cart/CheckoutForm';
 import CartSummary from '../components/cart/CartSummary';
@@ -135,8 +136,10 @@ const CheckoutPage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <>
+      <Navbar onCartClick={() => navigate('/cart')} />
+      <div className="min-h-screen bg-gray-50 pt-20">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <Breadcrumb />
 
         <div className="mb-8">
@@ -278,8 +281,9 @@ const CheckoutPage = () => {
             </div>
           </div>
         </Modal>
+        </div>
       </div>
-    </div>
+    </>
   );
 };
 

@@ -40,11 +40,9 @@ router.get('/search', async (req, res) => {
         p.price_per_kg,
         p.discount,
         p.stock_quantity,
+        p.image,
         c.name as category_name,
-        c.slug as category_slug,
-        (
-          SELECT image FROM products WHERE id = p.id LIMIT 1
-        ) as image
+        c.slug as category_slug
       FROM products p
       LEFT JOIN categories c ON p.category_id = c.id
       WHERE p.is_active = true 
@@ -94,9 +92,6 @@ router.get('/search', async (req, res) => {
 // @access  Public
 router.get('/', validateProductQuery, async (req, res) => {
   try {
-    console.log('🔍 GET /api/products - Request received');
-    console.log('🔍 Query params:', req.query);
-
     const {
       page = 1,
       limit = 12,
@@ -108,8 +103,6 @@ router.get('/', validateProductQuery, async (req, res) => {
       order = 'desc',
       search,
     } = req.query;
-
-    console.log('🔍 Processed params:', { page, limit, category, brand, min_price, max_price, sort, order, search });
 
     const offset = (page - 1) * limit;
 
@@ -164,22 +157,21 @@ router.get('/', validateProductQuery, async (req, res) => {
 
     const countResult = await query(countQuery, queryParams);
     const total = parseInt(countResult.rows[0].total);
-    console.log('🔍 Total products found:', total);
 
-    // Get products with pagination - SIMPLIFIED SCHEMA
+    // Get products with pagination - use products.image directly (simplified schema)
     const productsQuery = `
       SELECT 
         p.id,
         p.name,
         p.slug,
         p.description,
-        p.image,
         p.price_per_kg,
         p.discount,
         p.stock_quantity,
         p.is_featured,
-        p."created_at",
-        p."updated_at",
+        p.image,
+        p.created_at,
+        p.updated_at,
         c.name as category_name,
         c.slug as category_slug
       FROM products p
@@ -189,19 +181,14 @@ router.get('/', validateProductQuery, async (req, res) => {
       LIMIT $${paramCount + 1} OFFSET $${paramCount + 2}
     `;
 
-    console.log('🔍 Products query:', productsQuery);
-    console.log('🔍 Products params:', [...queryParams, limit, offset]);
-
     const productsResult = await query(productsQuery, [...queryParams, limit, offset]);
-    console.log('🔍 Products result count:', productsResult.rows.length);
-    console.log('🔍 First product sample:', productsResult.rows[0]);
 
     // Calculate pagination info
     const totalPages = Math.ceil(total / limit);
     const hasNextPage = page < totalPages;
     const hasPrevPage = page > 1;
 
-    const response = {
+    res.json({
       success: true,
       data: {
         products: productsResult.rows,
@@ -214,10 +201,7 @@ router.get('/', validateProductQuery, async (req, res) => {
           has_prev_page: hasPrevPage,
         },
       },
-    };
-
-    console.log('🔍 Sending response with', productsResult.rows.length, 'products');
-    res.json(response);
+    });
 
   } catch (error) {
     console.error('Get products error:', error);
@@ -276,16 +260,11 @@ router.get('/featured', async (req, res) => {
 // @access  Public
 router.get('/categories', async (req, res) => {
   try {
-    console.log('🔍 GET /api/products/categories - Request received');
-
     const result = await query(`
-      SELECT id, name, slug, description, image
+      SELECT id, name, slug, description, image_url as image
       FROM categories
       ORDER BY name ASC
     `);
-
-    console.log('🔍 Categories found:', result.rows.length);
-    console.log('🔍 Categories data:', result.rows);
 
     res.json({
       success: true,

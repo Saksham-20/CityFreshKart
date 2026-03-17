@@ -7,7 +7,7 @@ import SearchBar from '../components/common/SearchBar';
 import Navbar from '../components/layout/Navbar';
 import api from '../services/api';
 
-const ProductsPage = ({ category: propCategory }) => {
+const ProductsPage = ({ category: propCategory, onCartClick }) => {
   const { subcategory } = useParams();
   const [searchParams] = useSearchParams();
   const category = propCategory || subcategory || searchParams.get('category') || '';
@@ -112,7 +112,7 @@ const ProductsPage = ({ category: propCategory }) => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-white via-fresh-green-50 to-white">
-      <Navbar />
+      <Navbar onCartClick={onCartClick} />
       
       <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6 xl:px-8 py-6 sm:py-8 lg:py-10">
         {/* Header Section */}

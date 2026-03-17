@@ -3,8 +3,8 @@ import { motion } from 'framer-motion';
 import { Heart, ShoppingCart, Plus, Minus } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { formatPrice, calculatePrice } from '@/utils/weightSystem';
-import WeightSelector from './WeightSelector';
-import Button from './Button';
+import WeightSelector from '../ui/WeightSelector';
+import Button from '../ui/Button';
 
 /**
  * ProductCard Component
@@ -53,6 +53,7 @@ const ProductCard = ({
         'shadow-sm hover:shadow-md transition-all duration-300',
         'flex flex-col h-full'
       )}
+      data-testid="product-card"
     >
       {/* Image Section */}
       <div className="relative aspect-square bg-gray-100 overflow-hidden group">
@@ -69,8 +70,8 @@ const ProductCard = ({
 
         {/* Discount Badge */}
         {product.discount > 0 && (
-          <div className="absolute top-3 left-3 bg-red-500 text-white px-2.5 py-1 rounded-lg">
-            <span className="text-xs font-bold">
+          <div className="absolute top-3 left-3 bg-red-500 text-white px-2.5 py-1 rounded-lg" data-testid="discount-badge">
+            <span className="text-xs font-bold" data-testid="discount-amount">
               Save ₹{Math.round(product.discount)}
             </span>
           </div>
@@ -143,11 +144,11 @@ const ProductCard = ({
         <div className="mb-4">
           <span className="text-xs text-gray-600">Price per kg</span>
           <div className="flex items-baseline gap-1">
-            <span className="text-lg font-bold text-gray-900">
+            <span className="text-lg font-bold text-gray-900" data-testid="product-price">
               ₹{product.price_per_kg}
             </span>
             {product.discount > 0 && (
-              <span className="text-xs text-gray-400 line-through">
+              <span className="text-xs text-gray-400 line-through" data-testid="original-price">
                 ₹{Math.round(product.price_per_kg + product.discount / 1)}
               </span>
             )}
@@ -156,7 +157,7 @@ const ProductCard = ({
 
         {/* Weight Selector - Collapsible on mobile */}
         {isExpanded && (
-          <div className="mb-4 pb-4 border-t border-gray-200 pt-4">
+          <div className="mb-4 pb-4 border-t border-gray-200 pt-4" data-testid="weight-selector">
             <WeightSelector
               weight={selectedWeight}
               onWeightChange={setSelectedWeight}
@@ -181,7 +182,7 @@ const ProductCard = ({
               </div>
               <div className="text-right">
                 <div className="text-xs text-gray-600">Total:</div>
-                <div className="text-lg font-bold text-green-600">
+                <div className="text-lg font-bold text-green-600" data-testid="calculated-price">
                   ₹{Math.round(pricing.finalPrice)}
                 </div>
               </div>
@@ -196,6 +197,7 @@ const ProductCard = ({
               onClick={handleAddClick}
               className="w-full"
               variant="default"
+              data-testid="add-to-cart-btn"
             >
               <ShoppingCart className="w-4 h-4 mr-2" />
               Add to Cart
@@ -210,7 +212,7 @@ const ProductCard = ({
               >
                 <Minus className="w-4 h-4" />
               </Button>
-              <span className="flex-1 text-center text-sm font-semibold text-green-600">
+              <span className="flex-1 text-center text-sm font-semibold text-green-600" data-testid="cart-quantity">
                 {cartQuantity}
               </span>
               <Button

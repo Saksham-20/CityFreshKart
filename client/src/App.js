@@ -23,6 +23,8 @@ const ProductDetailPage = lazy(() => import('./pages/ProductDetailPage'));
 const CartPage = lazy(() => import('./pages/CartPage'));
 const CheckoutPage = lazy(() => import('./pages/CheckoutPage'));
 const OrderConfirmationPage = lazy(() => import('./pages/OrderConfirmationPage'));
+const OrdersPage = lazy(() => import('./pages/OrdersPage'));
+const ProfilePage = lazy(() => import('./pages/ProfilePage'));
 const AdminDashboardPage = lazy(() => import('./pages/AdminDashboardPage'));
 const AdminProductsPage = lazy(() => import('./pages/AdminProductsPage'));
 const AdminOrdersPage = lazy(() => import('./pages/AdminOrdersPage'));
@@ -42,6 +44,7 @@ function App() {
   const [cartDrawerOpen, setCartDrawerOpen] = useState(false);
   const checkAuth = useAuthStore((s) => s.checkAuth);
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const isLoading = useAuthStore((s) => s.isLoading);
   const loadUserCart = useCartStore((s) => s.loadUserCart);
   const initGuestCart = useCartStore((s) => s.initGuestCart);
 
@@ -99,14 +102,15 @@ function App() {
 
           {/* Main App Routes */}
           <Route path="/*" element={
+            isLoading ? <PageLoader /> : !isAuthenticated ? <Navigate to="/login" replace /> : (
             <div className="min-h-screen bg-white flex flex-col pb-20">
               <main className="flex-1">
                 <Routes>
-                  {/* Default to products */}
-                  <Route path="/" element={<ProductsPage />} />
+                  {/* Default to products - requires auth */}
+                  <Route path="/" element={<ProductsPage onCartClick={() => setCartDrawerOpen(true)} />} />
                   
-                  {/* Public Routes */}
-                  <Route path="/products" element={<ProductsPage />} />
+                  {/* Protected Routes */}
+                  <Route path="/products" element={<ProductsPage onCartClick={() => setCartDrawerOpen(true)} />} />
                   <Route path="/products/:id" element={<ProductDetailPage />} />
                   <Route path="/cart" element={<CartPage />} />
 
@@ -116,9 +120,19 @@ function App() {
                       <CheckoutPage />
                     </ProtectedRoute>
                   } />
+                  <Route path="/orders" element={
+                    <ProtectedRoute>
+                      <OrdersPage />
+                    </ProtectedRoute>
+                  } />
                   <Route path="/orders/:orderId/confirmation" element={
                     <ProtectedRoute>
                       <OrderConfirmationPage />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/profile" element={
+                    <ProtectedRoute>
+                      <ProfilePage />
                     </ProtectedRoute>
                   } />
 
@@ -130,6 +144,7 @@ function App() {
               {/* Simple Mobile Bottom Navigation for logged-in users */}
               <MobileBottomNav onCartClick={() => setCartDrawerOpen(true)} />
             </div>
+            )
           } />
         </Routes>
 

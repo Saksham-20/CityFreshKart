@@ -4,8 +4,6 @@ const { query } = require('../database/config');
 // Middleware to verify JWT token
 const authenticateToken = async (req, res, next) => {
   try {
-    console.log('Auth middleware: Checking authentication for:', req.path);
-
     // Try to get token from cookies first (primary method)
     let token = req.cookies?.authToken;
 
@@ -15,10 +13,7 @@ const authenticateToken = async (req, res, next) => {
       token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
     }
 
-    console.log('Auth middleware: Token:', token ? 'Token exists' : 'No token');
-
     if (!token) {
-      console.log('Auth middleware: No token provided');
       return res.status(401).json({
         success: false,
         message: 'Access token required',
@@ -27,14 +22,12 @@ const authenticateToken = async (req, res, next) => {
 
     // Verify token
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    console.log('Auth middleware: Decoded token:', decoded);
 
     // Get user from database using userId from token
     const result = await query(
       'SELECT id, phone, name, is_admin FROM users WHERE id = $1',
       [decoded.userId],
     );
-    console.log('Auth middleware: Database result:', result.rows);
 
     if (result.rows.length === 0) {
       return res.status(401).json({
