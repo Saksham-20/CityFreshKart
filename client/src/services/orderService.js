@@ -1,29 +1,27 @@
 import api from './api';
 
 export const orderService = {
-  // Create payment intent for card payment
-  async createPaymentIntent(amount, currency = 'inr', description) {
+  // Create Razorpay order for card payment
+  async createPaymentIntent(amount, currency = 'INR', description) {
     try {
-      const response = await api.post('/stripe/create-payment-intent', {
+      const response = await api.post('/razorpay/create-order', {
         amount,
         currency,
-        description
+        receipt: description,
       });
-      
-      return response.data;
+      return response.data?.data || response.data;
     } catch (error) {
-      console.error('Failed to create payment intent:', error);
-      throw new Error(error.response?.data?.message || 'Failed to create payment intent');
+      console.error('Failed to create Razorpay order:', error);
+      throw new Error(error.response?.data?.message || 'Failed to create payment order');
     }
   },
 
   // Get user's orders
   async getOrders(page = 1, limit = 10) {
     try {
-      const response = await api.get('/orders', {
-        params: { page, limit }
-      });
-      return response.data;
+      const response = await api.get('/orders', { params: { page, limit } });
+      // Support both { data: { orders } } and { orders } formats
+      return response.data?.data || response.data;
     } catch (error) {
       throw new Error('Failed to fetch orders');
     }
@@ -33,7 +31,8 @@ export const orderService = {
   async getOrder(orderId) {
     try {
       const response = await api.get(`/orders/${orderId}`);
-      return response.data;
+      // Support both { data: { order, items } } and { order, items } formats
+      return response.data?.data || response.data;
     } catch (error) {
       throw new Error('Failed to fetch order');
     }
@@ -43,58 +42,36 @@ export const orderService = {
   async createOrder(orderData) {
     try {
       console.log('OrderService: Creating order with data:', orderData);
-      
-      // Validate order data before sending
+
       if (!orderData.items || !Array.isArray(orderData.items) || orderData.items.length === 0) {
         throw new Error('Order must contain at least one item');
       }
-      
       if (!orderData.shippingAddress) {
         throw new Error('Shipping address is required');
       }
-      
       if (!orderData.paymentMethod) {
         throw new Error('Payment method is required');
       }
-      
-      console.log('OrderService: Order data validation passed');
-      
-      // Transform data to match backend expectations
+
       const transformedOrderData = {
         items: orderData.items,
         shipping_address: orderData.shippingAddress,
         billing_address: orderData.billingAddress,
         payment_method: orderData.paymentMethod,
         payment_details: orderData.paymentDetails,
-        // Include payment_intent_id if available (for Stripe payments)
         payment_intent_id: orderData.paymentIntentId,
-        notes: orderData.notes
+        coupon_code: orderData.couponCode || null,
+        notes: orderData.notes,
       };
-      
-      console.log('OrderService: Transformed order data:', transformedOrderData);
-      
+
       const response = await api.post('/orders', transformedOrderData);
-      console.log('OrderService: Response received:', response);
-      console.log('OrderService: Order created successfully with ID:', response?.data?.order?.id);
-      return response.data;
+      console.log('OrderService: Order created:', response.data);
+      // Return { data: { order, orderNumber, ... } }
+      return response.data?.data || response.data;
     } catch (error) {
       console.error('OrderService: Error creating order:', error);
-      console.error('OrderService: Error details:', {
-        message: error.message,
-        status: error.status,
-        response: error.response?.data
-      });
-      
-      // Provide more specific error messages
-      if (error.message.includes('Resource not found')) {
-        throw new Error('Order service is currently unavailable. Please try again later.');
-      } else if (error.message.includes('Unauthorized')) {
-        throw new Error('Please log in to continue with your order.');
-      } else if (error.message.includes('Server error')) {
-        throw new Error('Server error occurred. Please try again later.');
-      } else {
-        throw new Error(error.message || 'Failed to create order');
-      }
+      const msg = error.response?.data?.error?.message || error.response?.data?.message || error.message || 'Failed to create order';
+      throw new Error(msg);
     }
   },
 

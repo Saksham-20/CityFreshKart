@@ -24,7 +24,12 @@ const OrderConfirmationPage = () => {
     try {
       setLoading(true);
       const orderData = await orderService.getOrder(orderId);
-      setOrder(orderData);
+      // orderService.getOrder returns response.data?.data || response.data
+      // So orderData could be { order, items } directly
+      setOrder({
+        ...(orderData.order || orderData),
+        items: orderData.items || orderData.order?.items || [],
+      });
     } catch (err) {
       setError('Failed to load order details');
       console.error('Error fetching order:', err);

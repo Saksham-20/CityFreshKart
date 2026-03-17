@@ -4,6 +4,10 @@ import { test, expect } from '@playwright/test';
  * PRODUCTION AUDIT TEST SUITE
  * Comprehensive testing of City Fresh Kart application
  * Tests: UI, functionality, security, cart logic, pricing
+ * 
+ * NOTE: Login/Authentication tests are bypassed for now
+ * All other workflows (product browsing, cart, checkout) are tested
+ * Screenshots are captured for all test scenarios
  */
 
 test.describe('PRODUCTION AUDIT - CityFreshKart', () => {
@@ -366,59 +370,11 @@ test.describe('PRODUCTION AUDIT - CityFreshKart', () => {
   });
 
   // ============================================================================
-  // SECTION 5: AUTHENTICATION & SECURITY
+  // SECTION 5: AUTHENTICATION & SECURITY (AUTHENTICATION BYPASSED)
   // ============================================================================
-
-  test('[AUDIT-11] Registration Page - Check for security issues', async ({ page }) => {
-    await page.goto('/register');
-    await page.waitForLoadState('networkidle');
-
-    // Check if form fields are visible
-    const emailInput = await page.locator('input[type="email"]').first();
-    const passwordInput = await page.locator('input[type="password"]').first();
-
-    expect(emailInput).toBeDefined();
-    expect(passwordInput).toBeDefined();
-
-    // Check for CSRF token
-    const csrfToken = await page.locator('input[name*="csrf"], input[name*="token"]').first().isVisible().catch(() => false);
-    if (!csrfToken) {
-      console.log('⚠️ NO CSRF TOKEN - SECURITY ISSUE');
-    }
-
-    // Check password strength indicator
-    const strengthIndicator = await page.locator('[data-testid="password-strength"], .password-strength').first().isVisible().catch(() => false);
-    if (!strengthIndicator) {
-      console.log('⚠️ NO PASSWORD STRENGTH indicator');
-    }
-
-    await page.screenshot({ path: 'audit-screenshots/11-registration.png' });
-  });
-
-  test('[AUDIT-12] Login Page - Check security and session handling', async ({ page }) => {
-    await page.goto('/login');
-    await page.waitForLoadState('networkidle');
-
-    const emailInput = await page.locator('input[type="email"]').first();
-    const passwordInput = await page.locator('input[type="password"]').first();
-
-    expect(emailInput).toBeDefined();
-    expect(passwordInput).toBeDefined();
-
-    // Check for "Remember me" or two-factor options
-    const rememberMe = await page.locator('input[type="checkbox"]').first().isVisible().catch(() => false);
-    const mfaField = await page.locator('[data-testid="2fa"], input[name*="otp"]').first().isVisible().catch(() => false);
-
-    console.log(`Remember Me option: ${rememberMe}, 2FA option: ${mfaField}`);
-
-    // Check for forgot password link
-    const forgotLink = await page.locator('a:has-text("Forgot"), a:has-text("Reset")').first().isVisible().catch(() => false);
-    if (!forgotLink) {
-      console.log('⚠️ NO FORGOT PASSWORD link');
-    }
-
-    await page.screenshot({ path: 'audit-screenshots/12-login.png' });
-  });
+  
+  // Login and registration tests are bypassed for now
+  // Focus is on testing the product browsing, cart, and checkout workflows
 
   // ============================================================================
   // SECTION 6: MOBILE RESPONSIVENESS

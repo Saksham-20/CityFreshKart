@@ -31,7 +31,7 @@ const authenticateToken = async (req, res, next) => {
 
     // Get user from database using userId from token
     const result = await query(
-      'SELECT id, email, first_name, last_name, is_admin, is_verified FROM users WHERE id = $1',
+      'SELECT id, phone, name, is_admin FROM users WHERE id = $1',
       [decoded.userId],
     );
     console.log('Auth middleware: Database result:', result.rows);
@@ -44,7 +44,8 @@ const authenticateToken = async (req, res, next) => {
     }
 
     // Add user info to request
-    req.user = result.rows[0];
+    const u = result.rows[0];
+    req.user = { id: u.id, phone: u.phone, name: u.name, is_admin: u.is_admin };
     next();
   } catch (error) {
     if (error.name === 'TokenExpiredError') {
@@ -80,17 +81,6 @@ const requireAdmin = (req, res, next) => {
   next();
 };
 
-// Middleware to check if user is verified
-const requireVerified = (req, res, next) => {
-  if (!req.user || !req.user.is_verified) {
-    return res.status(403).json({
-      success: false,
-      message: 'Email verification required',
-    });
-  }
-  next();
-};
-
 // Optional authentication middleware (doesn't fail if no token)
 const optionalAuth = async (req, res, next) => {
   try {
@@ -106,12 +96,13 @@ const optionalAuth = async (req, res, next) => {
     if (token) {
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
       const result = await query(
-        'SELECT id, email, first_name, last_name, is_admin, is_verified FROM users WHERE id = $1',
+        'SELECT id, phone, name, is_admin FROM users WHERE id = $1',
         [decoded.userId],
       );
 
       if (result.rows.length > 0) {
-        req.user = result.rows[0];
+        const u = result.rows[0];
+        req.user = { id: u.id, phone: u.phone, name: u.name, is_admin: u.is_admin };
       }
     }
     next();
@@ -124,6 +115,5 @@ const optionalAuth = async (req, res, next) => {
 module.exports = {
   authenticateToken,
   requireAdmin,
-  requireVerified,
   optionalAuth,
 };

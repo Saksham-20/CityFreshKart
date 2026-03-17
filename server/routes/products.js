@@ -6,6 +6,89 @@ const { body, validationResult } = require('express-validator');
 
 const router = express.Router();
 
+/**
+ * SEARCH ENDPOINT - FAST, SIMPLE, OPTIMIZED
+ * @route   GET /api/products/search?q=keyword
+ * @desc    Fast product search by name and category
+ * @access  Public
+ * @performance Uses indexed columns (name, category) for instant results
+ */
+router.get('/search', async (req, res) => {
+  try {
+    const { q = '', limit = 20 } = req.query;
+    
+    // Minimum 2 characters required for search
+    if (!q || q.trim().length < 2) {
+      return res.json({
+        success: true,
+        data: {
+          products: [],
+          query: q
+        }
+      });
+    }
+
+    const searchQuery = `%${q.toLowerCase()}%`;
+    
+    // Use indexed columns for performance: name, category
+    const result = await query(`
+      SELECT 
+        p.id,
+        p.name,
+        p.slug,
+        p.description,
+        p.price_per_kg,
+        p.discount,
+        p.stock_quantity,
+        c.name as category_name,
+        c.slug as category_slug,
+        (
+          SELECT image FROM products WHERE id = p.id LIMIT 1
+        ) as image
+      FROM products p
+      LEFT JOIN categories c ON p.category_id = c.id
+      WHERE p.is_active = true 
+        AND (
+          LOWER(p.name) LIKE $1 
+          OR LOWER(c.name) LIKE $1
+        )
+      ORDER BY 
+        CASE WHEN LOWER(p.name) LIKE $1 THEN 0 ELSE 1 END,
+        p.name ASC
+      LIMIT $2
+    `, [searchQuery, parseInt(limit || 20)]);
+
+    // Format response
+    const products = result.rows.map(p => ({
+      id: p.id,
+      name: p.name,
+      slug: p.slug,
+      pricePerKg: p.price_per_kg,
+      discount: p.discount,
+      image: p.image,
+      category: p.category_name,
+      categorySlug: p.category_slug,
+      inStock: p.stock_quantity > 0
+    }));
+
+    res.json({
+      success: true,
+      data: {
+        products,
+        query: q,
+        count: products.length
+      }
+    });
+
+  } catch (error) {
+    console.error('Search products error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Search failed'
+    });
+  }
+});
+
 // @route   GET /api/products
 // @desc    Get all products with filtering, sorting, and pagination
 // @access  Public
@@ -21,7 +104,7 @@ router.get('/', validateProductQuery, async (req, res) => {
       brand,
       min_price,
       max_price,
-      sort = 'created_at',
+      sort = 'createdAt',
       order = 'desc',
       search,
     } = req.query;
@@ -44,13 +127,13 @@ router.get('/', validateProductQuery, async (req, res) => {
 
     if (min_price) {
       paramCount++;
-      whereConditions.push(`p.price >= $${paramCount}`);
+      whereConditions.push(`p.price_per_kg >= $${paramCount}`);
       queryParams.push(parseFloat(min_price));
     }
 
     if (max_price) {
       paramCount++;
-      whereConditions.push(`p.price <= $${paramCount}`);
+      whereConditions.push(`p.price_per_kg <= $${paramCount}`);
       queryParams.push(parseFloat(max_price));
     }
 
@@ -62,8 +145,14 @@ router.get('/', validateProductQuery, async (req, res) => {
 
     const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : '';
 
-    // Build ORDER BY clause
-    const orderByClause = `ORDER BY p.${sort} ${order.toUpperCase()}`;
+    // Build ORDER BY clause - use only price_per_kg (not price)
+    const sortMap = { 
+      createdAt: 'p."created_at"', 
+      price: 'p.price_per_kg', 
+      name: 'p.name' 
+    };
+    const sortCol = sortMap[sort] || 'p."created_at"';
+    const orderByClause = `ORDER BY ${sortCol} ${order.toUpperCase()}`;
 
     // Get total count
     const countQuery = `
@@ -77,45 +166,22 @@ router.get('/', validateProductQuery, async (req, res) => {
     const total = parseInt(countResult.rows[0].total);
     console.log('🔍 Total products found:', total);
 
-    // Get products with pagination
+    // Get products with pagination - SIMPLIFIED SCHEMA
     const productsQuery = `
       SELECT 
         p.id,
         p.name,
         p.slug,
         p.description,
-        p.short_description,
-        p.price,
+        p.image,
         p.price_per_kg,
         p.discount,
-        p.compare_price,
-        p.sku,
         p.stock_quantity,
         p.is_featured,
-        p.is_bestseller,
-        p.is_new_arrival,
-        p.meta_title,
-        p.meta_description,
-        p.created_at,
-        p.updated_at,
+        p."created_at",
+        p."updated_at",
         c.name as category_name,
-        c.slug as category_slug,
-        COALESCE(
-          (SELECT AVG(r.rating)::numeric(3,2)
-           FROM product_reviews r
-           WHERE r.product_id = p.id AND r.is_approved = true), 0
-        ) as average_rating,
-        COALESCE(
-          (SELECT COUNT(*)
-           FROM product_reviews r
-           WHERE r.product_id = p.id AND r.is_approved = true), 0
-        ) as review_count,
-        (
-          SELECT pi.image_url
-          FROM product_images pi
-          WHERE pi.product_id = p.id AND pi.is_primary = true
-          LIMIT 1
-        ) as primary_image
+        c.slug as category_slug
       FROM products p
       LEFT JOIN categories c ON p.category_id = c.id
       ${whereClause}
@@ -173,27 +239,19 @@ router.get('/featured', async (req, res) => {
         p.name,
         p.slug,
         p.description,
-        p.short_description,
-        p.price,
+        p.image,
         p.price_per_kg,
         p.discount,
-        p.compare_price,
-        p.sku,
+        p.stock_quantity,
         p.is_featured,
-        p.is_bestseller,
-        p.is_new_arrival,
+        p."created_at",
+        p."updated_at",
         c.name as category_name,
-        c.slug as category_slug,
-        (
-          SELECT pi.image_url
-          FROM product_images pi
-          WHERE pi.product_id = p.id AND pi.is_primary = true
-          LIMIT 1
-        ) as primary_image
+        c.slug as category_slug
       FROM products p
       LEFT JOIN categories c ON p.category_id = c.id
-      WHERE p.is_active = true AND (p.is_featured = true OR p.is_bestseller = true OR p.is_new_arrival = true)
-      ORDER BY p.is_featured DESC, p.is_bestseller DESC, p.is_new_arrival DESC, p.created_at DESC
+      WHERE p.is_active = true AND p.is_featured = true
+      ORDER BY p."created_at" DESC
       LIMIT 8
     `);
 
@@ -221,10 +279,9 @@ router.get('/categories', async (req, res) => {
     console.log('🔍 GET /api/products/categories - Request received');
 
     const result = await query(`
-      SELECT id, name, slug, description, image_url, sort_order
+      SELECT id, name, slug, description, image
       FROM categories
-      WHERE is_active = true
-      ORDER BY sort_order ASC, name ASC
+      ORDER BY name ASC
     `);
 
     console.log('🔍 Categories found:', result.rows.length);
@@ -254,22 +311,24 @@ router.get('/:identifier', async (req, res) => {
     // Check if identifier is a UUID (ID) or slug
     const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(identifier);
 
-    // Get product details
+    // Get product details - SIMPLIFIED SCHEMA
     const productResult = await query(`
       SELECT 
-        p.*,
+        p.id,
+        p.name,
+        p.slug,
+        p.description,
+        p.image,
+        p.category_id,
+        p.price_per_kg,
+        p.discount,
+        p.stock_quantity,
+        p.is_active,
+        p.is_featured,
+        p."created_at",
+        p."updated_at",
         c.name as category_name,
-        c.slug as category_slug,
-        COALESCE(
-          (SELECT AVG(r.rating)::numeric(3,2)
-           FROM product_reviews r
-           WHERE r.product_id = p.id AND r.is_approved = true), 0
-        ) as average_rating,
-        COALESCE(
-          (SELECT COUNT(*)
-           FROM product_reviews r
-           WHERE r.product_id = p.id AND r.is_approved = true), 0
-        ) as review_count
+        c.slug as category_slug
       FROM products p
       LEFT JOIN categories c ON p.category_id = c.id
       WHERE ${isUUID ? 'p.id = $1' : 'p.slug = $1'} AND p.is_active = true
@@ -284,43 +343,22 @@ router.get('/:identifier', async (req, res) => {
 
     const product = productResult.rows[0];
 
-    // Get product images
-    const imagesResult = await query(`
-      SELECT id, image_url, alt_text, sort_order, is_primary
-      FROM product_images
-      WHERE product_id = $1
-      ORDER BY sort_order, is_primary DESC
-    `, [product.id]);
-
-    // Get product variants
-    const variantsResult = await query(`
-      SELECT id, name, value, price_adjustment, stock_quantity, sku
-      FROM product_variants
-      WHERE product_id = $1
-      ORDER BY name, value
-    `, [product.id]);
-
-    // Get related products
+    // Get related products (same category)
     const relatedResult = await query(`
       SELECT 
         p.id,
         p.name,
         p.slug,
-        p.price,
-        p.compare_price,
-        c.slug as category_slug,
-        (
-          SELECT pi.image_url
-          FROM product_images pi
-          WHERE pi.product_id = p.id AND pi.is_primary = true
-          LIMIT 1
-        ) as primary_image
+        p.price_per_kg,
+        p.discount,
+        p.image,
+        c.slug as category_slug
       FROM products p
       LEFT JOIN categories c ON p.category_id = c.id
       WHERE p.is_active = true 
         AND p.id != $1 
         AND p.category_id = $2
-      ORDER BY p.is_featured DESC, p.created_at DESC
+      ORDER BY p.is_featured DESC, p."created_at" DESC
       LIMIT 4
     `, [product.id, product.category_id]);
 
@@ -329,8 +367,6 @@ router.get('/:identifier', async (req, res) => {
       data: {
         product: {
           ...product,
-          images: imagesResult.rows,
-          variants: variantsResult.rows,
           related_products: relatedResult.rows,
         },
       },
@@ -354,14 +390,12 @@ router.post('/', authenticateToken, requireAdmin, validateProduct, async (req, r
       name,
       slug,
       description,
-      short_description,
-      price,
-      compare_price,
-      sku,
+      image,
+      price_per_kg,
+      discount,
       stock_quantity,
       category_id,
-      meta_title,
-      meta_description,
+      is_featured,
     } = req.body;
 
     // Check if slug already exists
@@ -377,17 +411,17 @@ router.post('/', authenticateToken, requireAdmin, validateProduct, async (req, r
       });
     }
 
-    // Create product
+    // Create product - SIMPLIFIED SCHEMA
     const result = await query(`
       INSERT INTO products (
-        name, slug, description, short_description, price, compare_price,
-        sku, stock_quantity, category_id, meta_title, meta_description
+        name, slug, description, image, price_per_kg, discount,
+        stock_quantity, category_id, is_featured, is_active
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-      RETURNING *
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+      RETURNING id, name, slug, description, image, price_per_kg, discount, stock_quantity, category_id, is_featured, is_active, created_at, updated_at
     `, [
-      name, slug, description, short_description, price, compare_price,
-      sku, stock_quantity, category_id, meta_title, meta_description,
+      name, slug, description, image, price_per_kg || 0, discount || 0,
+      stock_quantity || 0, category_id, is_featured || false, true,
     ]);
 
     res.status(201).json({
@@ -413,7 +447,18 @@ router.post('/', authenticateToken, requireAdmin, validateProduct, async (req, r
 router.put('/:id', authenticateToken, requireAdmin, validateUUID, validateProduct, async (req, res) => {
   try {
     const { id } = req.params;
-    const updateData = req.body;
+    const {
+      name,
+      slug,
+      description,
+      image,
+      price_per_kg,
+      discount,
+      stock_quantity,
+      category_id,
+      is_featured,
+      is_active,
+    } = req.body;
 
     // Check if product exists
     const existingProduct = await query(
@@ -428,38 +473,26 @@ router.put('/:id', authenticateToken, requireAdmin, validateUUID, validateProduc
       });
     }
 
-    // Build update query dynamically
-    const updateFields = [];
-    const updateValues = [];
-    let paramCount = 0;
-
-    Object.keys(updateData).forEach(key => {
-      if (key !== 'id' && updateData[key] !== undefined) {
-        paramCount++;
-        updateFields.push(`${key} = $${paramCount}`);
-        updateValues.push(updateData[key]);
-      }
-    });
-
-    if (updateFields.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'No fields to update',
-      });
-    }
-
-    updateFields.push('updated_at = CURRENT_TIMESTAMP');
-    paramCount++;
-    updateValues.push(id);
-
-    const updateQuery = `
+    // Update product - SIMPLIFIED SCHEMA
+    const result = await query(`
       UPDATE products 
-      SET ${updateFields.join(', ')}
-      WHERE id = $${paramCount}
-      RETURNING *
-    `;
-
-    const result = await query(updateQuery, updateValues);
+      SET 
+        name = COALESCE($1, name),
+        slug = COALESCE($2, slug),
+        description = COALESCE($3, description),
+        image = COALESCE($4, image),
+        price_per_kg = COALESCE($5, price_per_kg),
+        discount = COALESCE($6, discount),
+        stock_quantity = COALESCE($7, stock_quantity),
+        category_id = COALESCE($8, category_id),
+        is_featured = COALESCE($9, is_featured),
+        is_active = COALESCE($10, is_active),
+        updated_at = CURRENT_TIMESTAMP
+      WHERE id = $11
+      RETURNING id, name, slug, description, image, price_per_kg, discount, stock_quantity, category_id, is_featured, is_active, created_at, updated_at
+    `, [
+      name, slug, description, image, price_per_kg, discount, stock_quantity, category_id, is_featured, is_active, id,
+    ]);
 
     res.json({
       success: true,
@@ -511,198 +544,6 @@ router.delete('/:id', authenticateToken, requireAdmin, validateUUID, async (req,
 
   } catch (error) {
     console.error('Delete product error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Internal server error',
-    });
-  }
-});
-
-// @route   GET /api/products/:id/reviews
-// @desc    Get product reviews
-// @access  Public
-router.get('/:id/reviews', validateUUID, async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { page = 1, limit = 10 } = req.query;
-    const offset = (page - 1) * limit;
-
-    // Get reviews with pagination
-    const result = await query(`
-      SELECT 
-        r.id,
-        r.rating,
-        r.title,
-        r.comment,
-        r.is_verified_purchase,
-        r.created_at,
-        u.first_name,
-        u.last_name
-      FROM product_reviews r
-      JOIN users u ON r.user_id = u.id
-      WHERE r.product_id = $1 AND r.is_approved = true
-      ORDER BY r.created_at DESC
-      LIMIT $2 OFFSET $3
-    `, [id, limit, offset]);
-
-    // Get total count
-    const countResult = await query(
-      'SELECT COUNT(*) as total FROM product_reviews WHERE product_id = $1 AND is_approved = true',
-      [id],
-    );
-
-    const total = parseInt(countResult.rows[0].total);
-    const totalPages = Math.ceil(total / limit);
-
-    res.json({
-      success: true,
-      data: {
-        reviews: result.rows,
-        pagination: {
-          current_page: parseInt(page),
-          total_pages: totalPages,
-          total_items: total,
-          items_per_page: parseInt(limit),
-        },
-      },
-    });
-
-  } catch (error) {
-    console.error('Get product reviews error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Internal server error',
-    });
-  }
-});
-
-// @route   GET /api/products/related
-// @desc    Get related products
-// @access  Public
-router.get('/related', async (req, res) => {
-  try {
-    const { categoryId, excludeId, limit = 4 } = req.query;
-    
-    console.log('🔗 Related Products - categoryId:', categoryId);
-    console.log('🔗 Related Products - excludeId:', excludeId);
-    console.log('🔗 Related Products - limit:', limit);
-
-    if (!categoryId) {
-      console.log('🔗 Related Products - ERROR: Category ID is missing');
-      return res.status(400).json({
-        success: false,
-        message: 'Category ID is required',
-      });
-    }
-
-    const result = await query(`
-      SELECT 
-        p.*,
-        pi.image_url as primary_image
-      FROM products p
-      LEFT JOIN product_images pi ON p.id = pi.product_id AND pi.is_primary = true
-      WHERE p.category_id = $1 
-        AND p.id != $2 
-        AND p.is_active = true
-      ORDER BY p.is_featured DESC, p.created_at DESC
-      LIMIT $3
-    `, [categoryId, excludeId || null, parseInt(limit)]);
-
-    console.log('🔗 Related Products - Query result count:', result.rows.length);
-    console.log('🔗 Related Products - Query result:', result.rows);
-
-    res.json({
-      success: true,
-      data: result.rows,
-    });
-
-  } catch (error) {
-    console.error('Get related products error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Internal server error',
-    });
-  }
-});
-
-// @route   GET /api/products/:id/reviews
-// @desc    Get product reviews
-// @access  Public
-router.get('/:id/reviews', async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    const result = await query(`
-      SELECT 
-        r.*,
-        u.first_name,
-        u.last_name
-      FROM product_reviews r
-      JOIN users u ON r.user_id = u.id
-      WHERE r.product_id = $1 AND r.is_approved = true
-      ORDER BY r.created_at DESC
-    `, [id]);
-
-    res.json({
-      success: true,
-      data: result.rows,
-    });
-
-  } catch (error) {
-    console.error('Get product reviews error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Internal server error',
-    });
-  }
-});
-
-// @route   POST /api/products/:id/reviews
-// @desc    Add product review
-// @access  Private
-router.post('/:id/reviews', authenticateToken, [
-  body('rating').isInt({ min: 1, max: 5 }).withMessage('Rating must be between 1 and 5'),
-  body('comment').optional().isLength({ min: 1, max: 1000 }).withMessage('Comment must be between 1 and 1000 characters'),
-], async (req, res) => {
-  try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({
-        success: false,
-        errors: errors.array(),
-      });
-    }
-
-    const { id } = req.params;
-    const { rating, comment } = req.body;
-
-    // Check if user already reviewed this product
-    const existingReview = await query(
-      'SELECT id FROM product_reviews WHERE product_id = $1 AND user_id = $2',
-      [id, req.user.id],
-    );
-
-    if (existingReview.rows.length > 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'You have already reviewed this product',
-      });
-    }
-
-    // Add review
-    const result = await query(`
-      INSERT INTO product_reviews (product_id, user_id, rating, comment, is_approved)
-      VALUES ($1, $2, $3, $4, $5)
-      RETURNING *
-    `, [id, req.user.id, rating, comment, true]);
-
-    res.status(201).json({
-      success: true,
-      data: result.rows[0],
-    });
-
-  } catch (error) {
-    console.error('Add product review error:', error);
     res.status(500).json({
       success: false,
       message: 'Internal server error',

@@ -9,16 +9,25 @@ import Breadcrumb from '../components/common/Breadcrumb';
 import Loading from '../components/ui/Loading';
 import Modal from '../components/ui/Modal';
 
+const MIN_ORDER_AMOUNT = 100; // ₹100 minimum order
+
 const CheckoutPage = () => {
   const navigate = useNavigate();
-  const { items: cart, clearCart, summary } = useCart();
+  const { items: cart, clearCart, summary, coupon, applyCoupon, removeCoupon } = useCart();
   const { user } = useAuth();
 
-  const total = summary?.estimated_total || 0;
+  const subtotal = summary?.subtotal || 0;
+  const deliveryFee = summary?.delivery_fee || 0;
+  const discount = coupon ? (coupon.discountAmount || 0) : 0;
+  const tax = parseFloat(((subtotal - discount) * 0.08).toFixed(2));
+  const total = parseFloat((subtotal - discount + tax + deliveryFee).toFixed(2));
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [orderNumber, setOrderNumber] = useState('');
+  const [couponInput, setCouponInput] = useState('');
+  const [couponLoading, setCouponLoading] = useState(false);
 
   // Redirect if cart is empty
   if (!cart || cart.length === 0) {
@@ -32,7 +41,24 @@ const CheckoutPage = () => {
     return null;
   }
 
+  const handleApplyCoupon = async () => {
+    if (!couponInput.trim()) return;
+    setCouponLoading(true);
+    await applyCoupon(couponInput.trim().toUpperCase());
+    setCouponLoading(false);
+  };
+
   const handleCheckout = async (formData) => {
+    if (total < MIN_ORDER_AMOUNT) {
+      setError(`Minimum order amount is ₹${MIN_ORDER_AMOUNT}`);
+      return;
+    }
+
+    if (!formData.address || !formData.address.address_line_1) {
+      setError('Delivery address is required');
+      return;
+    }
+
     try {
       setLoading(true);
       setError('');
@@ -41,13 +67,8 @@ const CheckoutPage = () => {
       let paymentIntentId = null;
       if (formData.paymentMethod === 'card') {
         try {
-          const paymentIntentResponse = await orderService.createPaymentIntent(
-            summary?.estimated_total,
-            'inr',
-            `Order for ${user.email}`
-          );
-          paymentIntentId = paymentIntentResponse?.data?.paymentIntentId;
-          
+          const paymentIntentResponse = await orderService.createPaymentIntent(total, 'inr', `Order for ${user.email}`);
+          paymentIntentId = paymentIntentResponse?.paymentIntentId || paymentIntentResponse?.data?.paymentIntentId;
           if (!paymentIntentId) {
             setError('Failed to initialize payment. Please try again.');
             setLoading(false);
@@ -61,36 +82,39 @@ const CheckoutPage = () => {
       }
 
       const orderData = {
-        items: cart.map(item => ({
+        items: cart.map((item) => ({
           id: item.product_id || item.id,
+          product_id: item.product_id || item.id,
           name: item.name || item.product_name,
           price: item.price,
           price_per_kg: item.price_per_kg || null,
           weight: item.weight || null,
           quantity: item.quantity,
           variant: item.variant_details || item.variant || null,
-          image: item.primary_image || item.image
+          image: item.primary_image || item.image,
         })),
         shippingAddress: {
           ...formData.address,
-          phone: `${formData.phoneCountryCode} ${formData.phone}`
+          phone: formData.phone ? `${formData.phoneCountryCode || ''} ${formData.phone}`.trim() : formData.address.phone,
         },
         billingAddress: {
           ...formData.address,
-          phone: `${formData.phoneCountryCode} ${formData.phone}`
+          phone: formData.phone ? `${formData.phoneCountryCode || ''} ${formData.phone}`.trim() : formData.address.phone,
         },
         paymentMethod: formData.paymentMethod,
-        paymentIntentId: paymentIntentId,
+        paymentIntentId,
         paymentDetails: formData.paymentMethod === 'card' ? formData.payment : {},
-        notes: formData.notes || ''
+        couponCode: coupon?.code || null,
+        notes: formData.notes || '',
       };
 
       const response = await orderService.createOrder(orderData);
 
-      if (response && response.data) {
-        setOrderNumber(response.data.orderNumber || response.data.order_number || 'N/A');
+      if (response) {
+        const num = response.orderNumber || response.order?.order_number || response.order_number || 'N/A';
+        setOrderNumber(num);
         setShowSuccessModal(true);
-        setTimeout(() => { clearCart(); }, 100);
+        clearCart();
       } else {
         setError('No response received from order service');
       }
@@ -148,7 +172,71 @@ const CheckoutPage = () => {
 
           {/* Order Summary */}
           <div className="lg:col-span-1">
-            <div className="sticky top-24">
+            <div className="sticky top-24 space-y-4">
+              {/* Coupon Input */}
+              <div className="bg-white rounded-2xl shadow-soft border border-gray-100 p-4">
+                <h3 className="text-sm font-semibold text-gray-900 mb-3">Apply Coupon</h3>
+                {coupon ? (
+                  <div className="flex items-center justify-between bg-green-50 border border-green-200 rounded-lg p-3">
+                    <div>
+                      <p className="text-sm font-semibold text-green-800">{coupon.code}</p>
+                      <p className="text-xs text-green-600">You save ₹{coupon.discountAmount?.toFixed(2)}</p>
+                    </div>
+                    <button onClick={removeCoupon} className="text-red-500 hover:text-red-700 text-xs font-medium">Remove</button>
+                  </div>
+                ) : (
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={couponInput}
+                      onChange={(e) => setCouponInput(e.target.value.toUpperCase())}
+                      placeholder="Enter coupon code"
+                      className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                      onKeyDown={(e) => e.key === 'Enter' && handleApplyCoupon()}
+                    />
+                    <button
+                      onClick={handleApplyCoupon}
+                      disabled={couponLoading || !couponInput.trim()}
+                      className="bg-green-600 text-white px-3 py-2 rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {couponLoading ? '...' : 'Apply'}
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Price Breakdown */}
+              <div className="bg-white rounded-2xl shadow-soft border border-gray-100 p-4">
+                <h3 className="text-sm font-semibold text-gray-900 mb-3">Price Breakdown</h3>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between text-gray-600">
+                    <span>Items ({summary?.item_count || 0})</span>
+                    <span>₹{subtotal.toFixed(2)}</span>
+                  </div>
+                  {discount > 0 && (
+                    <div className="flex justify-between text-green-600">
+                      <span>Discount ({coupon?.code})</span>
+                      <span>-₹{discount.toFixed(2)}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between text-gray-600">
+                    <span>Tax (8%)</span>
+                    <span>₹{tax.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-gray-600">
+                    <span>Delivery Fee</span>
+                    <span>{deliveryFee === 0 ? <span className="text-green-600">FREE</span> : `₹${deliveryFee}`}</span>
+                  </div>
+                  <div className="border-t border-gray-100 pt-2 flex justify-between font-semibold text-gray-900">
+                    <span>Total</span>
+                    <span>₹{total.toFixed(2)}</span>
+                  </div>
+                </div>
+                {total < MIN_ORDER_AMOUNT && (
+                  <p className="mt-2 text-xs text-red-500">Minimum order amount is ₹{MIN_ORDER_AMOUNT}</p>
+                )}
+              </div>
+
               <CartSummary showCheckoutButton={false} />
             </div>
           </div>

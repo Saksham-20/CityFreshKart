@@ -31,19 +31,24 @@ router.get('/', authenticateToken, async (req, res) => {
       [req.user.id],
     );
 
+    const total = parseInt(totalCount.rows[0].total);
+
     res.json({
-      orders: orders.rows,
+      success: true,
+      data: {
+        orders: orders.rows,
+      },
       pagination: {
-        currentPage: parseInt(page),
-        totalPages: Math.ceil(totalCount.rows[0].total / limit),
-        totalItems: parseInt(totalCount.rows[0].total),
-        itemsPerPage: parseInt(limit),
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total,
+        totalPages: Math.ceil(total / limit),
       },
     });
 
   } catch (error) {
     console.error('Get orders error:', error);
-    res.status(500).json({ message: 'Server error' });
+    res.status(500).json({ success: false, error: { code: 'SERVER_ERROR', message: 'Server error' } });
   }
 });
 
@@ -55,17 +60,13 @@ router.get('/:id', authenticateToken, async (req, res) => {
     const { id } = req.params;
 
     // Get order
-    const order = await query(
-      `SELECT o.*, ua.*, ba.*
-       FROM orders o
-       LEFT JOIN user_addresses ua ON o.shipping_address_id = ua.id
-       LEFT JOIN user_addresses ba ON o.billing_address_id = ba.id
-       WHERE o.id = $1 AND o.user_id = $2`,
+    const orderResult = await query(
+      `SELECT o.* FROM orders o WHERE o.id = $1 AND o.user_id = $2`,
       [id, req.user.id],
     );
 
-    if (order.rows.length === 0) {
-      return res.status(404).json({ message: 'Order not found' });
+    if (orderResult.rows.length === 0) {
+      return res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Order not found' } });
     }
 
     // Get order items
@@ -73,22 +74,25 @@ router.get('/:id', authenticateToken, async (req, res) => {
       SELECT 
         oi.*,
         p.name as product_name,
-        p.sku,
-        pi.image_url as product_image
+        p.image as product_image
       FROM order_items oi
       JOIN products p ON oi.product_id = p.id
-      LEFT JOIN product_images pi ON p.id = pi.product_id AND pi.is_primary = true
       WHERE oi.order_id = $1
     `, [id]);
 
+    const order = orderResult.rows[0];
+
     res.json({
-      order: order.rows[0],
-      items: orderItems.rows,
+      success: true,
+      data: {
+        order,
+        items: orderItems.rows,
+      },
     });
 
   } catch (error) {
     console.error('Get order error:', error);
-    res.status(500).json({ message: 'Server error' });
+    res.status(500).json({ success: false, error: { code: 'SERVER_ERROR', message: 'Server error' } });
   }
 });
 
@@ -96,90 +100,140 @@ router.get('/:id', authenticateToken, async (req, res) => {
 // @desc    Create a new order
 // @access  Private
 router.post('/', authenticateToken, [
-  body('items').isArray().withMessage('Items are required'),
+  body('items').isArray({ min: 1 }).withMessage('Items are required'),
   body('shipping_address').isObject().withMessage('Shipping address is required'),
-  body('billing_address').isObject().withMessage('Billing address is required'),
   body('payment_method').notEmpty().withMessage('Payment method is required'),
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      return res.status(400).json({ errors: errors.array() });
+      return res.status(400).json({
+        success: false,
+        error: { code: 'VALIDATION_ERROR', message: 'Validation failed' },
+        errors: errors.array(),
+      });
     }
 
-    const { items, shipping_address, billing_address, payment_method, notes } = req.body;
+    const { items, shipping_address, billing_address, payment_method, coupon_code, notes } = req.body;
 
     // Start transaction
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
 
-      // Create shipping address
-      const shippingResult = await client.query(`
-        INSERT INTO user_addresses (user_id, address_type, first_name, last_name, company, address_line_1, address_line_2, city, state, postal_code, country, phone, is_default)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+      // Create shipping address (save for records)
+      const addressResult = await client.query(`
+        INSERT INTO user_addresses (user_id, first_name, last_name, address_line, city, state, postal_code, phone, is_default)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
         RETURNING id
       `, [
-        req.user.id, 'shipping', shipping_address.first_name, shipping_address.last_name,
-        shipping_address.company, shipping_address.address_line_1, shipping_address.address_line_2,
-        shipping_address.city, shipping_address.state, shipping_address.postal_code,
-        shipping_address.country, shipping_address.phone, false,
+        req.user.id,
+        shipping_address.firstName || shipping_address.first_name || '', 
+        shipping_address.lastName || shipping_address.last_name || '',
+        shipping_address.addressLine1 || shipping_address.address_line || shipping_address.addressLine || '',
+        shipping_address.city || '', 
+        shipping_address.state || '',
+        shipping_address.postalCode || shipping_address.postal_code || shipping_address.zip || '',
+        shipping_address.phone || '', 
+        false,
       ]);
 
-      // Create billing address
+      const billingAddr = billing_address || shipping_address;
       const billingResult = await client.query(`
-        INSERT INTO user_addresses (user_id, address_type, first_name, last_name, company, address_line_1, address_line_2, city, state, postal_code, country, phone, is_default)
+        INSERT INTO user_addresses ("userId", "addressType", "firstName", "lastName", company, "addressLine1", "addressLine2", city, state, "postalCode", country, phone, "isDefault")
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
         RETURNING id
       `, [
-        req.user.id, 'billing', billing_address.first_name, billing_address.last_name,
-        billing_address.company, billing_address.address_line_1, billing_address.address_line_2,
-        billing_address.city, billing_address.state, billing_address.postal_code,
-        billing_address.country, billing_address.phone, false,
+        req.user.id, 'billing',
+        billingAddr.firstName || billingAddr.first_name || '', billingAddr.lastName || billingAddr.last_name || '',
+        billingAddr.company || null,
+        billingAddr.addressLine1 || billingAddr.address_line_1 || billingAddr.address1 || '',
+        billingAddr.addressLine2 || billingAddr.address_line_2 || billingAddr.address2 || null,
+        billingAddr.city || '', billingAddr.state || '',
+        billingAddr.postalCode || billingAddr.postal_code || billingAddr.zip || '',
+        billingAddr.country || 'India',
+        billingAddr.phone || '', false,
       ]);
 
-      // Calculate totals
+      // Calculate subtotal with weight-based pricing
       let subtotal = 0;
       for (const item of items) {
-        subtotal += item.price * item.quantity;
+        const itemPrice = item.price_per_kg
+          ? (parseFloat(item.price_per_kg) * parseFloat(item.weight || 1) * parseInt(item.quantity || 1))
+          : (parseFloat(item.price || 0) * parseInt(item.quantity || 1));
+        subtotal += itemPrice;
       }
 
-      const taxAmount = subtotal * 0.08; // 8% tax
-      const shippingAmount = subtotal > 100 ? 0 : 9.99; // Free shipping over $100
-      const totalAmount = subtotal + taxAmount + shippingAmount;
+      // Apply coupon if provided (coupons table not available - skip silently)
+      let discountAmount = 0;
+      if (coupon_code) {
+        // Coupon system not configured, skip silently
+      }
+
+      const deliveryFee = subtotal >= 300 ? 0 : 30;
+      const totalAmount = parseFloat((subtotal - discountAmount + deliveryFee).toFixed(2));
 
       // Generate order number
       const orderNumber = `ORD-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
 
       // Create order
       const orderResult = await client.query(`
-        INSERT INTO orders (order_number, user_id, status, subtotal, tax_amount, shipping_amount, total_amount, payment_status, payment_method, shipping_address_id, billing_address_id, notes)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+        INSERT INTO orders (order_number, user_id, status, subtotal, delivery_fee, discount, total, payment_status, payment_method, address_id)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
         RETURNING *
       `, [
-        orderNumber, req.user.id, 'pending', subtotal, taxAmount, shippingAmount,
-        totalAmount, 'pending', payment_method, shippingResult.rows[0].id,
-        billingResult.rows[0].id, notes,
+        orderNumber, req.user.id, 'pending', subtotal.toFixed(2),
+        deliveryFee, discountAmount.toFixed(2), totalAmount,
+        'pending', payment_method, addressResult.rows[0].id,
       ]);
+
+      const order = orderResult.rows[0];
 
       // Create order items
       for (const item of items) {
+        const unitPrice = item.price_per_kg
+          ? parseFloat((parseFloat(item.price_per_kg) * parseFloat(item.weight || 1)).toFixed(2))
+          : parseFloat(item.price_per_kg || 0);
+        const totalPrice = parseFloat((unitPrice * parseInt(item.quantity || 1)).toFixed(2));
+
         await client.query(`
-          INSERT INTO order_items (order_id, product_id, quantity, price, total_price)
-          VALUES ($1, $2, $3, $4, $5)
-        `, [orderResult.rows[0].id, item.product_id, item.quantity, item.price, item.price * item.quantity]);
+          INSERT INTO order_items (order_id, product_id, product_name, quantity, weight, price_per_kg, discount, total_price)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        `, [
+          order.id,
+          item.product_id || item.id,
+          item.name || item.product_name || '',
+          parseInt(item.quantity || 1),
+          item.weight ? parseFloat(item.weight) : null,
+          parseFloat(item.price_per_kg || 0),
+          parseFloat(item.discount || 0),
+          totalPrice,
+        ]);
 
         // Update product stock
         await client.query(`
           UPDATE products SET stock_quantity = stock_quantity - $1 WHERE id = $2
-        `, [item.quantity, item.product_id]);
+        `, [parseInt(item.quantity || 1), item.product_id || item.id]);
       }
+
+      // Clear user's cart
+      await client.query(`
+        DELETE FROM cart_items WHERE cart_id IN (SELECT id FROM carts WHERE user_id = $1)
+      `, [req.user.id]);
 
       await client.query('COMMIT');
 
       res.status(201).json({
         success: true,
-        order: orderResult.rows[0],
+        data: {
+          order,
+          orderNumber: order.orderNumber,
+          subtotal: parseFloat(subtotal.toFixed(2)),
+          discount: parseFloat(discountAmount.toFixed(2)),
+          deliveryFee,
+          total: totalAmount,
+          paymentStatus: 'pending',
+        },
       });
 
     } catch (error) {
@@ -191,7 +245,7 @@ router.post('/', authenticateToken, [
 
   } catch (error) {
     console.error('Create order error:', error);
-    res.status(500).json({ message: 'Server error' });
+    res.status(500).json({ success: false, error: { code: 'SERVER_ERROR', message: 'Server error' } });
   }
 });
 
@@ -247,7 +301,7 @@ router.post('/:id/cancel', authenticateToken, async (req, res) => {
 
       await client.query('COMMIT');
 
-      res.json({ success: true, message: 'Order cancelled successfully' });
+      res.json({ success: true, data: { message: 'Order cancelled successfully' } });
 
     } catch (error) {
       await client.query('ROLLBACK');
@@ -268,7 +322,7 @@ router.post('/:id/cancel', authenticateToken, async (req, res) => {
 router.put('/:id', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
-    const { status, tracking_number, notes } = req.body;
+    const { status, notes } = req.body;
 
     // Check if user is admin
     const user = await query(
@@ -282,15 +336,15 @@ router.put('/:id', authenticateToken, async (req, res) => {
 
     // Update order
     const result = await query(
-      'UPDATE orders SET status = $1, tracking_number = $2, notes = $3, updated_at = CURRENT_TIMESTAMP WHERE id = $4 RETURNING *',
-      [status, tracking_number, notes, id],
+      'UPDATE orders SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 RETURNING *',
+      [status, id],
     );
 
     if (result.rows.length === 0) {
       return res.status(404).json({ message: 'Order not found' });
     }
 
-    res.json({ success: true, order: result.rows[0] });
+    res.json({ success: true, data: { order: result.rows[0] } });
 
   } catch (error) {
     console.error('Update order error:', error);

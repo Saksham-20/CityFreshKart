@@ -1,433 +1,255 @@
 const express = require('express');
-const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
-const crypto = require('crypto');
-const { query } = require('../database/config');
-const { authenticateToken, requireVerified } = require('../middleware/auth');
-const { validateRegistration, validateLogin } = require('../middleware/validation');
-const authController = require('../controllers/authController');
-
 const router = express.Router();
+const otpService = require('../services/otpService');
+const { isFirebaseAdminConfigured, verifyFirebaseIdToken } = require('../services/firebaseAdmin');
+const { syncUserByPhone, createAppSessionToken } = require('../services/authSessionService');
+const { authenticateToken, requireAdmin } = require('../middleware/auth');
+const pool = require('../database/config');
 
-// Test route to verify auth routes are working
-router.get('/test', (req, res) => {
-  console.log('🧪 Auth test route hit');
-  res.json({ message: 'Auth routes are working!', timestamp: new Date().toISOString() });
-});
+const setAuthCookie = (res, token) => {
+  res.cookie('authToken', token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict',
+    maxAge: 7 * 24 * 60 * 60 * 1000,
+    path: '/',
+  });
+};
 
-// @route   POST /api/auth/setup-database
-// @desc    Setup database tables and seed data (for development only)
-// @access  Development only (localhost or SETUP_KEY required)
-router.post('/setup-database', async (req, res) => {
+/**
+ * @route   POST /api/auth/request-otp
+ * @desc    Request OTP for phone number (new user or existing)
+ * @access  Public
+ */
+router.post('/request-otp', async (req, res) => {
   try {
-    // SECURITY: Only allow from localhost or with correct setup key in development
-    const isLocalhost = req.ip === '127.0.0.1' || req.ip === '::1' || req.hostname === 'localhost';
-    const hasValidSetupKey = req.headers['x-setup-key'] === process.env.SETUP_KEY;
-    
-    // Block in production unless localhost
-    if (process.env.NODE_ENV === 'production' && !isLocalhost) {
-      return res.status(403).json({
+    const { phone } = req.body;
+
+    if (!phone || phone.trim().length < 10) {
+      return res.status(400).json({
         success: false,
-        message: 'Setup endpoint not available in production',
+        message: 'Valid phone number required'
       });
     }
 
-    // Block if not localhost and no valid setup key
-    if (!isLocalhost && !hasValidSetupKey) {
-      return res.status(403).json({
-        success: false,
-        message: 'Unauthorized: Setup key required',
-      });
-    }
-
-    console.log('🔧 Starting database setup...');
-
-    // Import setup and seed functions
-    const setupDatabase = require('../database/setup');
-    const seedDatabase = require('../database/seed');
-
-    // Run database setup
-    await setupDatabase();
-    console.log('✅ Database setup completed');
-
-    // Run database seeding
-    await seedDatabase();
-    console.log('✅ Database seeding completed');
+    const result = await otpService.requestOTP(phone);
 
     res.json({
       success: true,
-      message: 'Database setup and seeding completed successfully!',
-      adminCredentials: {
-        email: 'admin@cityfreshkart.in',
-        password: 'admin123',
-      },
+      userId: result.userId,
+      message: 'OTP sent to your phone'
     });
 
   } catch (error) {
-    console.error('❌ Database setup failed:', error);
+    console.error('Request OTP error:', error);
     res.status(500).json({
       success: false,
-      message: 'Database setup failed',
-      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error',
+      message: 'Failed to send OTP. Please try again.'
     });
   }
 });
 
-// @route   POST /api/auth/register
-// @desc    Register a new user (sends verification email)
-// @access  Public
-router.post('/register', validateRegistration, authController.register);
+/**
+ * @route   POST /api/auth/verify-otp
+ * @desc    Verify OTP and login user
+ * @access  Public
+ */
+router.post('/verify-otp', async (req, res) => {
+  try {
+    const { userId, otp } = req.body;
 
-// @route   POST /api/auth/login
-// @desc    Authenticate user & get token
-// @access  Public
-router.post('/login', validateLogin, authController.login);
+    if (!userId || !otp) {
+      return res.status(400).json({
+        success: false,
+        message: 'User ID and OTP required'
+      });
+    }
 
-// @route   GET /api/auth/me
-// @desc    Get current user profile
-// @access  Private
+    const result = await otpService.verifyOTP(userId, otp);
+
+    if (!result.success) {
+      return res.status(400).json(result);
+    }
+
+    setAuthCookie(res, result.token);
+
+    res.json({
+      success: true,
+      message: 'Logged in successfully',
+      data: {
+        user: result.user,
+        token: result.token
+      }
+    });
+
+  } catch (error) {
+    console.error('Verify OTP error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'OTP verification failed'
+    });
+  }
+});
+
+/**
+ * @route   POST /api/auth/provider-session
+ * @desc    Exchange a verified provider token for the app JWT session
+ * @access  Public
+ */
+router.post('/provider-session', async (req, res) => {
+  try {
+    const { provider, idToken } = req.body;
+
+    if (provider !== 'firebase') {
+      return res.status(400).json({
+        success: false,
+        message: 'Unsupported auth provider',
+      });
+    }
+
+    if (!isFirebaseAdminConfigured) {
+      return res.status(500).json({
+        success: false,
+        message: 'Firebase auth is not configured on the server',
+      });
+    }
+
+    if (!idToken) {
+      return res.status(400).json({
+        success: false,
+        message: 'Firebase ID token is required',
+      });
+    }
+
+    const decodedToken = await verifyFirebaseIdToken(idToken);
+    const phone = decodedToken.phone_number;
+
+    if (!phone) {
+      return res.status(400).json({
+        success: false,
+        message: 'Firebase account does not contain a phone number',
+      });
+    }
+
+    const user = await syncUserByPhone({
+      phone,
+      name: decodedToken.name,
+    });
+
+    const token = createAppSessionToken(user.id);
+    setAuthCookie(res, token);
+
+    res.json({
+      success: true,
+      message: 'Logged in successfully',
+      data: {
+        user: {
+          id: user.id,
+          phone: user.phone,
+          name: user.name,
+          is_admin: user.isAdmin,
+        },
+        token,
+      },
+    });
+  } catch (error) {
+    console.error('Provider session error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Provider authentication failed',
+    });
+  }
+});
+
+/**
+ * @route   GET /api/auth/me
+ * @desc    Get current user (verify token/session)
+ * @access  Private
+ */
 router.get('/me', authenticateToken, async (req, res) => {
   try {
-    const result = await query(`
-      SELECT id, email, first_name, last_name, phone, is_admin, is_verified, created_at, updated_at
-      FROM users WHERE id = $1
-    `, [req.user.id]);
-
-    if (result.rows.length === 0) {
-      return res.status(404).json({
-        success: false,
-        message: 'User not found',
-      });
-    }
-
+    // User already authenticated by middleware
     res.json({
       success: true,
       data: {
-        user: result.rows[0],
-      },
+        user: req.user
+      }
     });
-
   } catch (error) {
-    console.error('Get profile error:', error);
-    res.status(500).json({
+    res.status(401).json({
       success: false,
-      message: 'Internal server error',
+      message: 'Not authenticated'
     });
   }
 });
 
-// @route   PUT /api/auth/profile
-// @desc    Update user profile
-// @access  Private
+/**
+ * @route   POST /api/auth/logout
+ * @desc    Logout user (clear session)
+ * @access  Private
+ */
+router.post('/logout', authenticateToken, (req, res) => {
+  res.clearCookie('authToken');
+  res.json({
+    success: true,
+    message: 'Logged out successfully'
+  });
+});
+
+/**
+ * @route   PUT /api/auth/profile
+ * @desc    Update user profile (name, address)
+ * @access  Private
+ */
 router.put('/profile', authenticateToken, async (req, res) => {
   try {
-    const { first_name, last_name, phone } = req.body;
+    const { name } = req.body;
+    const userId = req.user.id;
 
-    // Update user profile
-    const result = await query(`
-      UPDATE users 
-      SET first_name = COALESCE($1, first_name),
-          last_name = COALESCE($2, last_name),
-          phone = COALESCE($3, phone),
-          updated_at = CURRENT_TIMESTAMP
-      WHERE id = $4
-      RETURNING id, email, first_name, last_name, phone, is_admin, is_verified, updated_at
-    `, [first_name, last_name, phone, req.user.id]);
+    if (!name || name.trim().length < 2) {
+      return res.status(400).json({
+        success: false,
+        message: 'Name required (min 2 characters)'
+      });
+    }
+
+    const result = await pool.query(
+      'UPDATE users SET name = $1, updated_at = NOW() WHERE id = $2 RETURNING id, phone, name, is_admin',
+      [name, userId]
+    );
 
     if (result.rows.length === 0) {
       return res.status(404).json({
         success: false,
-        message: 'User not found',
+        message: 'User not found'
       });
     }
 
     res.json({
       success: true,
-      message: 'Profile updated successfully',
+      message: 'Profile updated',
       data: {
-        user: result.rows[0],
-      },
+        user: result.rows[0]
+      }
     });
 
   } catch (error) {
     console.error('Update profile error:', error);
     res.status(500).json({
       success: false,
-      message: 'Internal server error',
+      message: 'Failed to update profile'
     });
   }
 });
 
-// @route   PUT /api/auth/change-password
-// @desc    Change user password
-// @access  Private
-router.put('/change-password', authenticateToken, async (req, res) => {
-  try {
-    const { current_password, new_password } = req.body;
-
-    if (!current_password || !new_password) {
-      return res.status(400).json({
-        success: false,
-        message: 'Current password and new password are required',
-      });
-    }
-
-    if (new_password.length < 8) {
-      return res.status(400).json({
-        success: false,
-        message: 'New password must be at least 8 characters long',
-      });
-    }
-
-    // Get current user with password
-    const userResult = await query(
-      'SELECT password_hash FROM users WHERE id = $1',
-      [req.user.id],
-    );
-
-    if (userResult.rows.length === 0) {
-      return res.status(404).json({
-        success: false,
-        message: 'User not found',
-      });
-    }
-
-    // Verify current password
-    const isCurrentPasswordValid = await bcrypt.compare(
-      current_password,
-      userResult.rows[0].password_hash,
-    );
-
-    if (!isCurrentPasswordValid) {
-      return res.status(400).json({
-        success: false,
-        message: 'Current password is incorrect',
-      });
-    }
-
-    // Hash new password
-    const saltRounds = 12;
-    const newPasswordHash = await bcrypt.hash(new_password, saltRounds);
-
-    // Update password
-    await query(
-      'UPDATE users SET password_hash = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
-      [newPasswordHash, req.user.id],
-    );
-
-    res.json({
-      success: true,
-      message: 'Password changed successfully',
-    });
-
-  } catch (error) {
-    console.error('Change password error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Internal server error',
-    });
-  }
-});
-
-// @route   POST /api/auth/refresh
-// @desc    Refresh JWT token
-// @access  Private
-router.post('/refresh', authenticateToken, async (req, res) => {
-  try {
-    // Generate new JWT token
-    const token = jwt.sign(
-      { userId: req.user.id },
-      process.env.JWT_SECRET,
-      { expiresIn: '7d' },
-    );
-
-    res.json({
-      success: true,
-      message: 'Token refreshed successfully',
-      data: { token },
-    });
-
-  } catch (error) {
-    console.error('Token refresh error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Internal server error',
-    });
-  }
-});
-
-// @route   POST /api/auth/logout
-// @desc    Logout user (clear httpOnly cookie)
-// @access  Private
-router.post('/logout', authenticateToken, (req, res) => {
-  // Clear httpOnly cookie
-  res.clearCookie('authToken', {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'strict',
-    path: '/',
-  });
-
-  res.json({
-    success: true,
-    message: 'Logout successful',
-  });
-});
-
-// @route   POST /api/auth/verify-email
-// @desc    Verify user email with token
-// @access  Public
-router.post('/verify-email', async (req, res) => {
-  try {
-    const { token } = req.body;
-
-    if (!token) {
-      return res.status(400).json({
-        success: false,
-        message: 'Verification token is required',
-      });
-    }
-
-    // Find user with this token and check if it's still valid
-    const result = await query(`
-      SELECT id, email, first_name, last_name, phone, is_admin
-      FROM users 
-      WHERE email_verification_token = $1 
-      AND email_verification_token_expiry > NOW()
-    `, [token]);
-
-    if (result.rows.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid or expired verification token',
-      });
-    }
-
-    const user = result.rows[0];
-
-    // Mark user as verified and clear token
-    await query(`
-      UPDATE users 
-      SET is_verified = true, 
-          email_verification_token = NULL, 
-          email_verification_token_expiry = NULL,
-          updated_at = NOW()
-      WHERE id = $1
-    `, [user.id]);
-
-    // Generate JWT token for auto-login after verification
-    const jwtToken = jwt.sign(
-      { userId: user.id },
-      process.env.JWT_SECRET,
-      { expiresIn: '7d' },
-    );
-
-    // Set httpOnly cookie
-    res.cookie('authToken', jwtToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-      path: '/',
-    });
-
-    res.json({
-      success: true,
-      message: 'Email verified successfully! You are now logged in.',
-      data: {
-        user: {
-          id: user.id,
-          email: user.email,
-          first_name: user.first_name,
-          last_name: user.last_name,
-          phone: user.phone,
-          is_admin: user.is_admin,
-          is_verified: true,
-        },
-      },
-    });
-  } catch (error) {
-    console.error('Email verification error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Internal server error during verification',
-    });
-  }
-});
-
-// @route   POST /api/auth/resend-verification-email
-// @desc    Resend verification email to user
-// @access  Public
-router.post('/resend-verification-email', async (req, res) => {
-  try {
-    const { email } = req.body;
-
-    if (!email) {
-      return res.status(400).json({
-        success: false,
-        message: 'Email is required',
-      });
-    }
-
-    // Find user by email
-    const result = await query(`
-      SELECT id, email, first_name, last_name, is_verified
-      FROM users WHERE email = $1
-    `, [email]);
-
-    if (result.rows.length === 0) {
-      return res.status(404).json({
-        success: false,
-        message: 'User not found',
-      });
-    }
-
-    const user = result.rows[0];
-
-    // Check if user is already verified
-    if (user.is_verified) {
-      return res.status(400).json({
-        success: false,
-        message: 'User email is already verified',
-      });
-    }
-
-    // Generate new verification token
-    const verificationToken = crypto.randomBytes(32).toString('hex');
-    const tokenExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000);
-
-    // Update user with new token
-    await query(`
-      UPDATE users 
-      SET email_verification_token = $1,
-          email_verification_token_expiry = $2,
-          updated_at = NOW()
-      WHERE id = $3
-    `, [verificationToken, tokenExpiry, user.id]);
-
-    // Send verification email
-    const emailService = require('../services/emailService');
-    try {
-      await emailService.sendEmailVerification(user, verificationToken);
-    } catch (emailError) {
-      console.error('Error sending verification email:', emailError);
-      return res.status(500).json({
-        success: false,
-        message: 'Failed to send verification email',
-      });
-    }
-
-    res.json({
-      success: true,
-      message: 'Verification email sent successfully. Please check your inbox.',
-    });
-  } catch (error) {
-    console.error('Resend verification email error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Internal server error',
-    });
-  }
+/**
+ * @route   GET /api/auth/test
+ * @desc    Test route to verify auth routes are working
+ * @access  Public
+ */
+router.get('/test', (req, res) => {
+  console.log('🧪 Auth test route hit');
+  res.json({ message: 'Auth routes are working!', timestamp: new Date().toISOString() });
 });
 
 module.exports = router;

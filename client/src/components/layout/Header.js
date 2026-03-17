@@ -5,13 +5,11 @@ import {
   FiSearch,
   FiUser,
   FiShoppingBag,
-  FiHeart,
   FiMenu,
   FiX
 } from 'react-icons/fi';
 import useAuth from '../../hooks/useAuth';
 import useCart from '../../hooks/useCart';
-import useWishlist from '../../hooks/useWishlist';
 
 const Header = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -22,7 +20,6 @@ const Header = () => {
 
   const { user, logout } = useAuth();
   const { items: cartItems } = useCart();
-  const { items: wishlistItems } = useWishlist();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -61,7 +58,6 @@ const Header = () => {
   };
 
   const cartItemCount = cartItems?.reduce((total, item) => total + item.quantity, 0) || 0;
-  const wishlistItemCount = wishlistItems?.length || 0;
 
   const navigationItems = [
     { name: 'Vegetables', emoji: '🥦', href: '/products?category=sabzi-greens' },
@@ -134,20 +130,6 @@ const Header = () => {
                 <FiSearch className="w-5 h-5" />
               </button>
 
-              {/* Wishlist */}
-              <Link
-                to="/wishlist"
-                className="hidden md:flex relative p-2 text-gray-600 hover:text-fresh-green transition-colors duration-200"
-                aria-label="Wishlist"
-              >
-                <FiHeart className="w-5 h-5" />
-                {wishlistItemCount > 0 && (
-                  <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[9px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
-                    {wishlistItemCount > 9 ? '9+' : wishlistItemCount}
-                  </span>
-                )}
-              </Link>
-
               {/* User */}
               {user ? (
                 <div className="relative hidden md:block" data-dropdown="user">
@@ -169,7 +151,7 @@ const Header = () => {
                       >
                         <div className="px-4 py-2 border-b border-gray-100 mb-1">
                           <p className="text-xs text-gray-500">Signed in as</p>
-                          <p className="text-sm font-semibold text-gray-900 truncate">{user.name || user.email}</p>
+                          <p className="text-sm font-semibold text-gray-900 truncate">{user.name || user.phone}</p>
                         </div>
                         <Link to="/profile" className="flex items-center gap-2.5 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 hover:text-fresh-green transition-colors">
                           <FiUser className="w-4 h-4" /> Profile

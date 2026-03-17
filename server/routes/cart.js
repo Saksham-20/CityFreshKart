@@ -12,7 +12,7 @@ router.get('/', authenticateToken, async (req, res) => {
   try {
     // Get or create cart for user
     const cartResult = await query(
-      'SELECT id FROM cart WHERE user_id = $1',
+      'SELECT id FROM carts WHERE user_id = $1',
       [req.user.id],
     );
 
@@ -20,7 +20,7 @@ router.get('/', authenticateToken, async (req, res) => {
     if (cartResult.rows.length === 0) {
       // Create new cart
       const newCartResult = await query(
-        'INSERT INTO cart (user_id) VALUES ($1) RETURNING id',
+        'INSERT INTO carts (user_id) VALUES ($1) RETURNING id',
         [req.user.id],
       );
       cartId = newCartResult.rows[0].id;
@@ -34,24 +34,16 @@ router.get('/', authenticateToken, async (req, res) => {
         ci.id,
         ci.quantity,
         ci.weight,
-        ci.variant_details,
         ci.created_at,
         p.id as product_id,
         p.name,
         p.slug,
-        p.price,
         p.price_per_kg,
-        p.compare_price,
+        p.discount,
         p.stock_quantity,
-        p.sku,
+        p.image as product_image,
         c.name as category_name,
-        c.slug as category_slug,
-        (
-          SELECT pi.image_url
-          FROM product_images pi
-          WHERE pi.product_id = p.id AND pi.is_primary = true
-          LIMIT 1
-        ) as primary_image
+        c.slug as category_slug
       FROM cart_items ci
       JOIN products p ON ci.product_id = p.id
       LEFT JOIN categories c ON p.category_id = c.id
@@ -77,8 +69,8 @@ router.get('/', authenticateToken, async (req, res) => {
       };
     });
 
-    // FREE delivery above ₹300, else ₹40
-    const deliveryFee = subtotal >= 300 ? 0 : 40;
+    // FREE delivery above ₹300, else ₹30
+    const deliveryFee = subtotal >= 300 ? 0 : 30;
     const estimatedTotal = subtotal + deliveryFee;
 
     // Cart items processed successfully
@@ -116,13 +108,12 @@ router.post('/add', authenticateToken, async (req, res) => {
     console.log('🛒 Request body:', req.body);
     console.log('🛒 User ID:', req.user.id);
 
-    const { product_id, quantity = 1, variant_details, weight } = req.body;
+    const { product_id, quantity = 1, weight } = req.body;
 
     // Adding item to cart
     console.log('🛒 Product ID:', product_id);
     console.log('🛒 Quantity:', quantity);
     console.log('🛒 Weight:', weight);
-    console.log('🛒 Variant details:', variant_details);
 
     if (!product_id) {
       console.log('🛒 ERROR: Product ID is missing');
@@ -142,7 +133,7 @@ router.post('/add', authenticateToken, async (req, res) => {
     // Check if product exists and is active
     console.log('🛒 Checking if product exists:', product_id);
     const productResult = await query(
-      'SELECT id, name, price, price_per_kg, stock_quantity FROM products WHERE id = $1 AND is_active = true',
+      'SELECT id, name, price_per_kg, stock_quantity FROM products WHERE id = $1 AND is_active = true',
       [product_id],
     );
 
@@ -176,14 +167,14 @@ router.post('/add', authenticateToken, async (req, res) => {
 
     // Get or create cart for user
     const cartResult = await query(
-      'SELECT id FROM cart WHERE user_id = $1',
+      'SELECT id FROM carts WHERE user_id = $1',
       [req.user.id],
     );
 
     let cartId;
     if (cartResult.rows.length === 0) {
       const newCartResult = await query(
-        'INSERT INTO cart (user_id) VALUES ($1) RETURNING id',
+        'INSERT INTO carts (user_id) VALUES ($1) RETURNING id',
         [req.user.id],
       );
       cartId = newCartResult.rows[0].id;
@@ -224,10 +215,10 @@ router.post('/add', authenticateToken, async (req, res) => {
     } else {
       // Add new item to cart
       const newItemResult = await query(`
-        INSERT INTO cart_items (cart_id, product_id, quantity, weight, variant_details)
-        VALUES ($1, $2, $3, $4, $5)
+        INSERT INTO cart_items (cart_id, product_id, quantity, weight)
+        VALUES ($1, $2, $3, $4)
         RETURNING id
-      `, [cartId, product_id, quantity, weight || null, variant_details || null]);
+      `, [cartId, product_id, quantity, weight || null]);
 
       res.status(201).json({
         success: true,
@@ -236,7 +227,6 @@ router.post('/add', authenticateToken, async (req, res) => {
           cart_item_id: newItemResult.rows[0].id,
           product_name: product.name,
           quantity,
-          price: product.price,
         },
       });
     }
@@ -273,11 +263,10 @@ router.put('/:item_id', authenticateToken, async (req, res) => {
         ci.weight as current_weight,
         p.id as product_id,
         p.name,
-        p.price,
         p.price_per_kg,
         p.stock_quantity
       FROM cart_items ci
-      JOIN cart c ON ci.cart_id = c.id
+      JOIN carts c ON ci.cart_id = c.id
       JOIN products p ON ci.product_id = p.id
       WHERE ci.id = $1 AND c.user_id = $2 AND p.is_active = true
     `, [item_id, req.user.id]);
@@ -314,7 +303,7 @@ router.put('/:item_id', authenticateToken, async (req, res) => {
     );
 
     // Calculate item total with weight if applicable
-    const unitPrice = item.price_per_kg ? (item.price_per_kg * (weight || item.current_weight || 1)) : item.price;
+    const unitPrice = item.price_per_kg ? (item.price_per_kg * (weight || item.current_weight || 1)) : item.price_per_kg;
     const itemTotal = unitPrice * quantity;
 
     res.json({
@@ -350,7 +339,7 @@ router.delete('/:item_id', authenticateToken, async (req, res) => {
     const result = await query(`
       DELETE FROM cart_items 
       WHERE id = $1 AND cart_id IN (
-        SELECT id FROM cart WHERE user_id = $2
+        SELECT id FROM carts WHERE user_id = $2
       )
       RETURNING id
     `, [item_id, req.user.id]);
@@ -387,7 +376,7 @@ router.delete('/', authenticateToken, async (req, res) => {
     await query(`
       DELETE FROM cart_items 
       WHERE cart_id IN (
-        SELECT id FROM cart WHERE user_id = $1
+        SELECT id FROM carts WHERE user_id = $1
       )
     `, [req.user.id]);
 
@@ -413,9 +402,9 @@ router.get('/count', authenticateToken, async (req, res) => {
     const result = await query(`
       SELECT COALESCE(SUM(ci.quantity), 0) as item_count
       FROM cart_items ci
-      JOIN cart c ON ci.cart_id = c.id
-      JOIN products p ON ci.product_id = p.id
-      WHERE c.user_id = $1 AND p.is_active = true
+      JOIN carts c ON ci."cartId" = c.id
+      JOIN products p ON ci."productId" = p.id
+      WHERE c."userId" = $1 AND p.is_active = true
     `, [req.user.id]);
 
     const itemCount = parseInt(result.rows[0].item_count);
@@ -452,14 +441,14 @@ router.post('/merge', authenticateToken, async (req, res) => {
 
     // Get or create cart for user
     const cartResult = await query(
-      'SELECT id FROM cart WHERE user_id = $1',
+      'SELECT id FROM carts WHERE "userId" = $1',
       [req.user.id],
     );
 
     let cartId;
     if (cartResult.rows.length === 0) {
       const newCartResult = await query(
-        'INSERT INTO cart (user_id) VALUES ($1) RETURNING id',
+        'INSERT INTO carts ("userId") VALUES ($1) RETURNING id',
         [req.user.id],
       );
       cartId = newCartResult.rows[0].id;
@@ -471,11 +460,11 @@ router.post('/merge', authenticateToken, async (req, res) => {
     let skippedCount = 0;
 
     for (const guestItem of guest_items) {
-      const { product_id, quantity, variant_details } = guestItem;
+      const { product_id, quantity } = guestItem;
 
       // Check if product exists and is active
       const productResult = await query(
-        'SELECT id, stock_quantity FROM products WHERE id = $1 AND is_active = true',
+        'SELECT id, price, price_per_kg, stock_quantity FROM products WHERE id = $1 AND is_active = true',
         [product_id],
       );
 
@@ -488,7 +477,7 @@ router.post('/merge', authenticateToken, async (req, res) => {
 
       // Check if item already exists in cart
       const existingItemResult = await query(
-        'SELECT id, quantity FROM cart_items WHERE cart_id = $1 AND product_id = $2',
+        'SELECT id, quantity FROM cart_items WHERE "cartId" = $1 AND "productId" = $2',
         [cartId, product_id],
       );
 
@@ -500,17 +489,18 @@ router.post('/merge', authenticateToken, async (req, res) => {
         );
 
         await query(
-          'UPDATE cart_items SET quantity = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+          'UPDATE cart_items SET quantity = $1, "updatedAt" = CURRENT_TIMESTAMP WHERE id = $2',
           [newQuantity, existingItemResult.rows[0].id],
         );
       } else {
         // Add new item to cart
         const addQuantity = Math.min(quantity, product.stock_quantity);
+        const itemPrice = product.price_per_kg ? product.price_per_kg : product.price;
 
         await query(`
-          INSERT INTO cart_items (cart_id, product_id, quantity, variant_details)
+          INSERT INTO cart_items ("cartId", "productId", quantity, price)
           VALUES ($1, $2, $3, $4)
-        `, [cartId, product_id, addQuantity, variant_details || null]);
+        `, [cartId, product_id, addQuantity, itemPrice]);
       }
 
       mergedCount++;
@@ -532,6 +522,16 @@ router.post('/merge', authenticateToken, async (req, res) => {
       message: 'Internal server error',
     });
   }
+});
+
+// @route   POST /api/cart/coupon
+// @desc    Validate and apply a coupon code to the cart
+// @access  Private
+router.post('/coupon', authenticateToken, async (req, res) => {
+  return res.status(503).json({
+    success: false,
+    error: { code: 'FEATURE_UNAVAILABLE', message: 'Coupon system not available' },
+  });
 });
 
 module.exports = router;

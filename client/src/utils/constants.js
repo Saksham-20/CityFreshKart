@@ -39,9 +39,9 @@ export const API_ENDPOINTS = {
     USERS: '/admin/users',
     ANALYTICS: '/admin/analytics',
   },
-  STRIPE: {
-    CREATE_PAYMENT_INTENT: '/stripe/create-payment-intent',
-    CONFIRM_PAYMENT: '/stripe/confirm-payment',
+  RAZORPAY: {
+    CREATE_ORDER: '/razorpay/create-order',
+    VERIFY_PAYMENT: '/razorpay/verify-payment',
   },
 };
 
@@ -195,10 +195,6 @@ export const SUCCESS_MESSAGES = {
     CART_CLEARED: 'Cart cleared successfully!',
     QUANTITY_UPDATED: 'Quantity updated successfully!',
   },
-  WISHLIST: {
-    ITEM_ADDED: 'Item added to wishlist!',
-    ITEM_REMOVED: 'Item removed from wishlist!',
-  },
   ORDERS: {
     ORDER_CREATED: 'Order placed successfully!',
     ORDER_CANCELLED: 'Order cancelled successfully!',
@@ -210,7 +206,6 @@ export const STORAGE_KEYS = {
   AUTH_TOKEN: 'token',
   USER_DATA: 'userData',
   CART_ITEMS: 'cartItems',
-  WISHLIST_ITEMS: 'wishlistItems',
   THEME: 'theme',
   LANGUAGE: 'language',
 };

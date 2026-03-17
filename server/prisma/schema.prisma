@@ -1,5 +1,6 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
+// CityFreshKart Database Schema - Production Minimal
+// For hyperlocal vegetable & fruit delivery PWA
+// Aggressive simplification: zero unnecessary fields
 
 generator client {
   provider = "prisma-client-js"
@@ -10,85 +11,94 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// Users table
+// Users table - Phone-based OTP auth only
 model User {
   id        String   @id @default(uuid())
-  email     String   @unique
-  password  String
-  firstName String
-  lastName  String
-  phone     String?
-  isAdmin   Boolean  @default(false)
-  isVerified Boolean @default(false)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  phone     String   @unique // Format: +91XXXXXXXXXX - UNIQUE constraint for user lookups
+  name      String   // Full name
+  isAdmin   Boolean  @default(false) @map("is_admin")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relations
-  addresses  UserAddress[]
-  orders     Order[]
-  cart       Cart?
-  wishlist   Wishlist?
+  addresses UserAddress[]
+  orders    Order[]
+  cart      Cart?
 
   @@map("users")
 }
 
-// User addresses
+// User addresses - Simple shipping address (sector info for hyperlocal delivery)
 model UserAddress {
-  id            String   @id @default(uuid())
-  userId        String
-  addressType   String // 'billing' or 'shipping'
-  firstName     String
-  lastName      String
-  company       String?
-  addressLine1  String
-  addressLine2  String?
-  city          String
-  state         String
-  postalCode    String
-  country       String
-  phone         String?
-  isDefault     Boolean  @default(false)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id             String   @id @default(uuid())
+  userId         String   @map("user_id")
+  firstName      String   @map("first_name")
+  lastName       String   @map("last_name")
+  addressLine    String   @map("address_line") // Main address
+  city           String   // City/Sector (e.g., "Sector 22, Chandigarh")
+  state          String   // State
+  postalCode     String   @map("postal_code") // PIN code
+  phone          String   // Delivery contact
+  latitude       Float?   // For location-based delivery
+  longitude      Float?   // For location-based delivery
+  isDefault      Boolean  @default(false) @map("is_default")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("user_addresses")
 }
 
-// Products
+// Categories
+model Category {
+  id          String   @id @default(uuid())
+  name        String
+  slug        String   @unique
+  description String?
+  image       String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  products Product[]
+
+  @@map("categories")
+}
+
+// Products - Minimal fresh produce catalog
 model Product {
   id            String   @id @default(uuid())
   name          String
   slug          String   @unique
   description   String?
-  image         String?
-  category      String
-  pricePerKg    Float    @map("price_per_kg")
-  discount      Float    @default(0)
-  stock         Int      @default(0)
-  rating        Float    @default(0)
-  reviews       Int      @default(0)
-  featured      Boolean  @default(false)
-  active        Boolean  @default(true)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  image         String   // Primary image URL only
+  categoryId    String?  @map("category_id")
+  pricePerKg    Float    @map("price_per_kg") // Price per kg (main pricing model)
+  discount      Float    @default(0) // Discount percentage (optional)
+  stockQuantity Int      @default(0) @map("stock_quantity")
+  isActive      Boolean  @default(true) @map("is_active")
+  isFeatured    Boolean  @default(false) @map("is_featured") // For homepage highlights
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
 
   // Relations
-  cartItems     CartItem[]
-  orderItems    OrderItem[]
+  category  Category?   @relation(fields: [categoryId], references: [id])
+  cartItems CartItem[]
+  orderItems OrderItem[]
 
-  @@index([category])
-  @@index([featured])
+  @@index([categoryId])
+  @@index([isActive])
+  @@index([name]) // For search optimization
   @@map("products")
 }
 
-// Shopping Cart
+// Shopping Cart - Simple guest & user carts
 model Cart {
   id        String   @id @default(uuid())
-  userId    String   @unique
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  userId    String   @unique @map("user_id")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relations
   items CartItem[]
@@ -97,129 +107,78 @@ model Cart {
   @@map("carts")
 }
 
-// Cart Items
+// Cart Items - Weight-based pricing
 model CartItem {
   id        String   @id @default(uuid())
-  cartId    String
-  productId String
+  cartId    String   @map("cart_id")
+  productId String   @map("product_id")
+  weight    Float    // Weight in kg (e.g., 0.5, 1, 2)
   quantity  Int      @default(1)
-  weight    Float    @default(1)
-  price     Float    // Price at time of adding to cart
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relations
   cart    Cart    @relation(fields: [cartId], references: [id], onDelete: Cascade)
-  product Product @relation(fields: [productId], references: [id])
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   @@map("cart_items")
 }
 
-// Orders
+// Orders - Track completed purchases
 model Order {
   id            String   @id @default(uuid())
-  userId        String
-  orderNumber   String   @unique
-  subtotal      Float
-  deliveryFee   Float    @default(0)
-  discount      Float    @default(0)
-  total         Float
-  status        String   @default("pending") // 'pending', 'confirmed', 'delivered', 'cancelled'
-  paymentStatus String   @default("pending") // 'pending', 'paid', 'failed'
-  paymentMethod String?  // 'card', 'upi', 'wallet'
-  notes         String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  userId        String   @map("user_id")
+  orderNumber   String   @unique @map("order_number")
+  subtotal      Float    // Sum of items
+  deliveryFee   Float    @default(0) @map("delivery_fee") // 0 if >= 300, else 30
+  discount      Float    @default(0) // If coupon applied
+  total         Float    // subtotal + deliveryFee - discount
+  status        String   @default("pending") // pending, confirmed, delivered, cancelled
+  paymentStatus String   @default("pending") @map("payment_status") // pending, paid, failed
+  paymentMethod String?  @map("payment_method") // razorpay, cod
+  addressId     String?  @map("address_id") // Shipping address at time of order
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
 
   // Relations
-  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  items       OrderItem[]
-  shipAddress ShippingAddress?
+  user  User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items OrderItem[]
 
   @@index([userId])
   @@index([status])
   @@map("orders")
 }
 
-// Order Items
+// Order Items - What was ordered
 model OrderItem {
-  id            String   @id @default(uuid())
-  orderId       String
-  productId     String
-  productName   String
-  weight        Float
-  quantity      Int
-  pricePerKg    Float    @map("price_per_kg")
-  calculatedPrice Float
-  discount      Float    @default(0)
-  subtotal      Float
-  createdAt     DateTime @default(now())
+  id          String   @id @default(uuid())
+  orderId     String   @map("order_id")
+  productId   String   @map("product_id")
+  productName String   @map("product_name") // Snapshot at time of order
+  weight      Float    // Weight ordered (kg)
+  quantity    Int      @default(1)
+  pricePerKg  Float    @map("price_per_kg") // Price per kg at time of order
+  discount    Float    @default(0) // Discount applied
+  totalPrice  Float    @map("total_price") // (pricePerKg * weight * quantity) - discount
+  createdAt   DateTime @default(now()) @map("created_at")
 
   // Relations
   order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  product Product @relation(fields: [productId], references: [id])
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   @@map("order_items")
 }
 
-// Shipping Address (denormalized for order history)
-model ShippingAddress {
+// OTP Sessions - Phone-based OTP authentication
+model OTPSession {
   id        String   @id @default(uuid())
-  orderId   String   @unique
-  firstName String
-  lastName  String
-  address1  String
-  address2  String?
-  city      String
-  state     String
-  zip       String
-  phone     String
-  createdAt DateTime @default(now())
-
-  // Relations
-  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
-
-  @@map("shipping_addresses")
-}
-
-// Wishlist
-model Wishlist {
-  id        String   @id @default(uuid())
-  userId    String   @unique
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relations
-  items WishlistItem[]
-  user  User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@map("wishlists")
-}
-
-// Wishlist Items
-model WishlistItem {
-  id         String   @id @default(uuid())
-  wishlistId String
-  productId  String
-  createdAt  DateTime @default(now())
-
-  // Relations
-  wishlist Wishlist @relation(fields: [wishlistId], references: [id], onDelete: Cascade)
-
-  @@map("wishlist_items")
-}
-
-// Admin Activity Log
-model ActivityLog {
-  id        String   @id @default(uuid())
-  action    String
-  resource  String   // 'product', 'order', 'user'
-  resourceId String
-  userId    String
-  details   String?  // JSON stringified
-  createdAt DateTime @default(now())
+  userId    String   @map("user_id")
+  phone     String   // Normalized phone number (+91XXXXXXXXXX)
+  otp       String   // 6-digit OTP
+  expiresAt DateTime @map("expires_at") // 5-minute expiry
+  createdAt DateTime @default(now()) @map("created_at")
 
   @@index([userId])
-  @@index([resource])
-  @@map("activity_logs")
+  @@index([expiresAt])
+  @@map("otp_sessions")
 }

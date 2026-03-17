@@ -5,6 +5,14 @@ const { validateUUID } = require('../middleware/validation');
 
 const router = express.Router();
 
+// Helper: get or create wishlist for user
+async function getOrCreateWishlist(userId) {
+  const result = await query('SELECT id FROM wishlists WHERE "userId" = $1', [userId]);
+  if (result.rows.length > 0) return result.rows[0].id;
+  const newResult = await query('INSERT INTO wishlists ("userId") VALUES ($1) RETURNING id', [userId]);
+  return newResult.rows[0].id;
+}
+
 // @route   GET /api/wishlist
 // @desc    Get user's wishlist
 // @access  Private
@@ -13,8 +21,8 @@ router.get('/', authenticateToken, async (req, res) => {
     console.log('Wishlist GET - User ID:', req.user.id);
     const result = await query(`
       SELECT 
-        w.id,
-        w.created_at,
+        wi.id,
+        wi."createdAt",
         p.id as product_id,
         p.name,
         p.slug,
@@ -26,27 +34,16 @@ router.get('/', authenticateToken, async (req, res) => {
         (
           SELECT pi.image_url
           FROM product_images pi
-          WHERE pi.product_id = p.id AND pi.is_primary = true
+          WHERE pi."productId" = p.id AND pi.is_primary = true
           LIMIT 1
         ) as primary_image
-      FROM wishlist w
-      JOIN products p ON w.product_id = p.id
+      FROM wishlists w
+      JOIN wishlist_items wi ON w.id = wi."wishlistId"
+      JOIN products p ON wi."productId" = p.id
       LEFT JOIN categories c ON p.category_id = c.id
-      WHERE w.user_id = $1 AND p.is_active = true
-      ORDER BY w.created_at DESC
+      WHERE w."userId" = $1 AND p.is_active = true
+      ORDER BY wi."createdAt" DESC
     `, [req.user.id]);
-
-    // Clean up wishlist entries for products that no longer exist
-    const cleanupResult = await query(`
-      DELETE FROM wishlist 
-      WHERE user_id = $1 AND product_id NOT IN (
-        SELECT id FROM products WHERE is_active = true
-      )
-    `, [req.user.id]);
-
-    if (cleanupResult.rowCount > 0) {
-      console.log(`Cleaned up ${cleanupResult.rowCount} stale wishlist entries for user ${req.user.id}`);
-    }
 
     res.json({
       success: true,
@@ -71,8 +68,6 @@ router.post('/', authenticateToken, async (req, res) => {
   try {
     const { product_id } = req.body;
 
-    // Adding item to wishlist
-
     if (!product_id) {
       return res.status(400).json({
         success: false,
@@ -87,17 +82,18 @@ router.post('/', authenticateToken, async (req, res) => {
     );
 
     if (productResult.rows.length === 0) {
-
       return res.status(404).json({
         success: false,
         message: 'Product not found',
       });
     }
 
+    const wishlistId = await getOrCreateWishlist(req.user.id);
+
     // Check if item already exists in wishlist
     const existingItem = await query(
-      'SELECT id FROM wishlist WHERE user_id = $1 AND product_id = $2',
-      [req.user.id, product_id],
+      'SELECT id FROM wishlist_items WHERE "wishlistId" = $1 AND "productId" = $2',
+      [wishlistId, product_id],
     );
 
     if (existingItem.rows.length > 0) {
@@ -107,10 +103,10 @@ router.post('/', authenticateToken, async (req, res) => {
       });
     }
 
-    // Add to wishlist
+    // Add to wishlist_items
     const result = await query(
-      'INSERT INTO wishlist (user_id, product_id) VALUES ($1, $2) RETURNING id',
-      [req.user.id, product_id],
+      'INSERT INTO wishlist_items ("wishlistId", "productId") VALUES ($1, $2) RETURNING id',
+      [wishlistId, product_id],
     );
 
     res.status(201).json({
@@ -132,25 +128,30 @@ router.post('/', authenticateToken, async (req, res) => {
 });
 
 // @route   DELETE /api/wishlist/:id
-// @desc    Remove item from wishlist
+// @desc    Remove item from wishlist (by wishlist_item id or product id)
 // @access  Private
 router.delete('/:id', authenticateToken, validateUUID, async (req, res) => {
   try {
     const { id } = req.params;
 
-    // Removing item from wishlist
+    // Get user's wishlist
+    const wishlistResult = await query('SELECT id FROM wishlists WHERE "userId" = $1', [req.user.id]);
+    if (wishlistResult.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Wishlist item not found' });
+    }
+    const wishlistId = wishlistResult.rows[0].id;
 
-    // First try to delete by wishlist item ID
+    // Try to delete by wishlist item ID
     let result = await query(
-      'DELETE FROM wishlist WHERE id = $1 AND user_id = $2 RETURNING id',
-      [id, req.user.id],
+      'DELETE FROM wishlist_items WHERE id = $1 AND "wishlistId" = $2 RETURNING id',
+      [id, wishlistId],
     );
 
     // If no rows affected, try to delete by product ID
     if (result.rows.length === 0) {
       result = await query(
-        'DELETE FROM wishlist WHERE product_id = $1 AND user_id = $2 RETURNING id',
-        [id, req.user.id],
+        'DELETE FROM wishlist_items WHERE "productId" = $1 AND "wishlistId" = $2 RETURNING id',
+        [id, wishlistId],
       );
     }
 
@@ -180,11 +181,10 @@ router.delete('/:id', authenticateToken, validateUUID, async (req, res) => {
 // @access  Private
 router.delete('/', authenticateToken, async (req, res) => {
   try {
-    // Clear all items from user's wishlist
-    await query(
-      'DELETE FROM wishlist WHERE user_id = $1',
-      [req.user.id],
-    );
+    const wishlistResult = await query('SELECT id FROM wishlists WHERE "userId" = $1', [req.user.id]);
+    if (wishlistResult.rows.length > 0) {
+      await query('DELETE FROM wishlist_items WHERE "wishlistId" = $1', [wishlistResult.rows[0].id]);
+    }
 
     res.json({
       success: true,

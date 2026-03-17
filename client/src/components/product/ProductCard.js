@@ -2,16 +2,14 @@ import React, { useMemo, useCallback, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import useCart from '../../hooks/useCart';
-import useWishlist from '../../hooks/useWishlist';
 import { formatCurrency as formatPrice } from '../../utils/formatters';
-import { getImageUrl, getPlaceholderImage } from '../../utils/imageUtils';
+import { getImageUrl } from '../../utils/imageUtils';
 import QuantitySelector from '../ui/QuantitySelector';
 
 const WEIGHT_OPTIONS = [0.5, 1, 1.5, 2]; // Default weight options in kg
 
 const ProductCard = React.memo(({ product, className = '' }) => {
-  const { addToCart, isItemInCart, removeFromCart, items: cartItems, updateItemQuantity } = useCart();
-  const { addToWishlist, removeFromWishlist, isItemInWishlist } = useWishlist();
+  const { addToCart, removeItem, updateItem, items: cartItems } = useCart();
   
   // For weight-based pricing
   const [selectedWeight, setSelectedWeight] = useState(1);
@@ -37,14 +35,12 @@ const ProductCard = React.memo(({ product, className = '' }) => {
 
   const productId = product.product_id || product.id;
 
-  const isInCartState = useMemo(() => isItemInCart(productId), [isItemInCart, productId]);
-  const isInWishlistState = useMemo(() => isItemInWishlist(productId), [isItemInWishlist, productId]);
-
-  // Get cart item to read quantity
+  // Get cart item to check if in cart and read quantity
   const cartItem = useMemo(
     () => cartItems?.find(i => (i.product_id || i.id) === productId),
     [cartItems, productId]
   );
+  const isInCart = !!cartItem;
   const cartQty = cartItem?.quantity || 1;
 
   const handleAddToCart = useCallback(() => {
@@ -60,31 +56,23 @@ const ProductCard = React.memo(({ product, className = '' }) => {
       category_name: product.category_name,
       category_slug: product.category_slug
     };
-    addToCart(cartProduct);
+    addToCart(cartProduct, 1, selectedWeight);
   }, [addToCart, product, productId, totalPrice, pricePerKg, selectedWeight, discountPercent]);
 
   const handleIncrease = useCallback(() => {
     if (cartItem) {
-      updateItemQuantity(cartItem.id, cartQty + 1);
+      updateItem(cartItem.id, { quantity: cartQty + 1 });
     }
-  }, [cartItem, cartQty, updateItemQuantity]);
+  }, [cartItem, cartQty, updateItem]);
 
   const handleDecrease = useCallback(() => {
     if (!cartItem) return;
     if (cartQty <= 1) {
-      removeFromCart(cartItem.id);
+      removeItem(cartItem.id);
     } else {
-      updateItemQuantity(cartItem.id, cartQty - 1);
+      updateItem(cartItem.id, { quantity: cartQty - 1 });
     }
-  }, [cartItem, cartQty, removeFromCart, updateItemQuantity]);
-
-  const handleToggleWishlist = useCallback(() => {
-    if (isInWishlistState) {
-      removeFromWishlist(productId);
-    } else {
-      addToWishlist(product);
-    }
-  }, [isInWishlistState, removeFromWishlist, addToWishlist, product, productId]);
+  }, [cartItem, cartQty, removeItem, updateItem]);
 
   if (!product) return null;
 
@@ -97,57 +85,30 @@ const ProductCard = React.memo(({ product, className = '' }) => {
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -20 }}
       transition={{ duration: 0.3 }}
-      className={`group bg-white rounded-2xl shadow-soft hover:shadow-medium transition-all duration-300 overflow-hidden ${className}`}
+      className={`group bg-white rounded-2xl shadow-md hover:shadow-2xl transition-all duration-300 overflow-hidden border border-gray-100 hover:border-fresh-green-200 ${className}`}
     >
       {/* Product Image */}
-      <div className="relative aspect-square overflow-hidden bg-gray-50">
-        <Link to={`/products/${product.slug || product.id}`} tabIndex={-1} aria-hidden="true">
+      <div className="relative aspect-square overflow-hidden bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center">
+        <Link to={`/products/${product.slug || product.id}`} tabIndex={-1} aria-hidden="true" className="w-full h-full flex items-center justify-center">
           <img
-            src={getImageUrl(product.primary_image)}
+            src={getImageUrl(product.image || product.primary_image)}
             alt={product.name}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
             loading="lazy"
-            onError={(e) => { e.target.src = getPlaceholderImage(); }}
           />
         </Link>
 
         {/* Discount Badge */}
         {discountPercent > 0 && (
-          <div className="absolute top-2 left-2 bg-saffron text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm">
+          <div className="absolute top-3 left-3 bg-gradient-to-r from-red-500 to-red-600 text-white text-[11px] font-bold px-2.5 py-1 rounded-full shadow-lg animate-pulse">
             -{discountPercent}%
           </div>
         )}
 
-        {/* Wishlist Button */}
-        <motion.button
-          whileTap={{ scale: 0.85 }}
-          onClick={handleToggleWishlist}
-          className={`absolute top-2 right-2 w-8 h-8 rounded-full shadow-md flex items-center justify-center transition-colors duration-200 ${
-            isInWishlistState
-              ? 'bg-red-50 text-red-500'
-              : 'bg-white/90 text-gray-400 hover:text-red-400 opacity-0 group-hover:opacity-100'
-          }`}
-          aria-label={isInWishlistState ? 'Remove from wishlist' : 'Add to wishlist'}
-        >
-          <svg
-            className="w-4 h-4"
-            fill={isInWishlistState ? 'currentColor' : 'none'}
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
-            />
-          </svg>
-        </motion.button>
-
         {/* Out of Stock Overlay */}
         {outOfStock && (
-          <div className="absolute inset-0 bg-white/60 flex items-center justify-center">
-            <span className="bg-gray-800 text-white text-xs font-semibold px-3 py-1.5 rounded-full">
+          <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+            <span className="bg-gray-900 text-white text-xs font-bold px-4 py-2 rounded-full">
               Out of Stock
             </span>
           </div>
@@ -155,46 +116,30 @@ const ProductCard = React.memo(({ product, className = '' }) => {
       </div>
 
       {/* Product Info */}
-      <div className="p-3 sm:p-4">
-        {/* Category */}
+      <div className="p-3.5 sm:p-4">
+        {/* Category Badge */}
         {product.category_name && (
-          <div className="text-[10px] text-fresh-green font-semibold uppercase tracking-wide mb-1">
+          <div className="text-[10px] text-fresh-green-600 font-bold uppercase tracking-wider mb-1.5 bg-fresh-green-50 inline-block px-2 py-0.5 rounded-full">
             {product.category_name}
           </div>
         )}
 
         {/* Product Name */}
         <Link to={`/products/${product.slug || product.id}`}>
-          <h3 className="text-sm font-semibold text-gray-800 mb-1.5 line-clamp-2 hover:text-fresh-green transition-colors duration-200 leading-snug">
+          <h3 className="text-sm font-semibold text-gray-800 mb-2 line-clamp-2 hover:text-fresh-green-600 transition-colors duration-200 leading-snug">
             {product.name}
           </h3>
         </Link>
 
-        {/* Rating */}
-        {product.average_rating > 0 && (
-          <div className="flex items-center gap-1 mb-2">
-            {[...Array(5)].map((_, i) => (
-              <svg
-                key={i}
-                className={`w-3 h-3 ${i < Math.floor(product.average_rating) ? 'text-yellow-400 fill-current' : 'text-gray-200 fill-current'}`}
-                viewBox="0 0 20 20"
-              >
-                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-              </svg>
-            ))}
-            <span className="text-[10px] text-gray-400">({product.review_count || 0})</span>
-          </div>
-        )}
-
         {/* Price and Weight Selector for weight-based products */}
         {isWeightBased ? (
-          <div className="space-y-2 mt-3">
+          <div className="space-y-3 mt-3">
             {/* Price per kg display */}
-            <div className="flex items-baseline justify-between gap-2">
-              <span className="text-xs text-gray-500">₹{pricePerKg.toFixed(0)}/kg</span>
+            <div className="flex items-baseline justify-between gap-2 pb-2 border-b border-gray-100">
+              <span className="text-xs text-gray-600 font-semibold">₹{pricePerKg.toFixed(0)}<span className="text-gray-500">/kg</span></span>
               {discountPercent > 0 && (
-                <span className="text-xs bg-red-50 text-red-600 px-1.5 py-0.5 rounded">
-                  {discountPercent}% OFF
+                <span className="text-xs bg-red-50 text-red-600 px-2 py-0.5 rounded-full font-semibold">
+                  Save {discountPercent}%
                 </span>
               )}
             </div>
@@ -204,7 +149,7 @@ const ProductCard = React.memo(({ product, className = '' }) => {
               <select
                 value={selectedWeight}
                 onChange={(e) => setSelectedWeight(parseFloat(e.target.value))}
-                className="flex-1 px-2 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-fresh-green"
+                className="flex-1 px-2 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-fresh-green-500 focus:border-fresh-green-500 bg-white hover:border-fresh-green-400 transition-all duration-200"
               >
                 {WEIGHT_OPTIONS.map((w) => (
                   <option key={w} value={w}>
@@ -212,7 +157,7 @@ const ProductCard = React.memo(({ product, className = '' }) => {
                   </option>
                 ))}
               </select>
-              <span className="text-sm font-semibold text-gray-900 whitespace-nowrap">
+              <span className="text-sm font-bold text-gray-900 whitespace-nowrap text-fresh-green-600">
                 ₹{totalPrice.toFixed(0)}
               </span>
             </div>
@@ -222,11 +167,11 @@ const ProductCard = React.memo(({ product, className = '' }) => {
               {outOfStock ? (
                 <button
                   disabled
-                  className="w-full text-xs text-gray-400 border border-gray-200 rounded-xl px-3 py-1.5 cursor-not-allowed"
+                  className="w-full text-xs text-gray-400 border border-gray-200 rounded-lg px-3 py-2 cursor-not-allowed bg-gray-50 font-semibold"
                 >
                   Out of Stock
                 </button>
-              ) : isInCartState ? (
+              ) : isInCart ? (
                 <QuantitySelector
                   quantity={cartQty}
                   onIncrease={handleIncrease}
@@ -236,13 +181,13 @@ const ProductCard = React.memo(({ product, className = '' }) => {
                 />
               ) : (
                 <motion.button
-                  whileTap={{ scale: 0.92 }}
+                  whileTap={{ scale: 0.95 }}
                   onClick={handleAddToCart}
-                  className="w-full flex items-center justify-center gap-1 bg-fresh-green text-white text-xs font-semibold px-3 py-1.5 rounded-xl hover:bg-fresh-green-dark transition-colors duration-200 shadow-sm"
+                  className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-fresh-green-500 to-fresh-green-600 text-white text-xs font-bold px-3 py-2 rounded-lg hover:from-fresh-green-600 hover:to-fresh-green-700 transition-all duration-200 shadow-md hover:shadow-lg"
                   aria-label={`Add ${product.name} to cart`}
                 >
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                   </svg>
                   Add
                 </motion.button>
@@ -251,9 +196,9 @@ const ProductCard = React.memo(({ product, className = '' }) => {
           </div>
         ) : (
           /* Original price display for non-weight-based products */
-          <div className="flex items-center justify-between gap-2 mt-2">
+          <div className="flex items-center justify-between gap-3 mt-3 pt-3 border-t border-gray-100">
             <div className="flex flex-col">
-              <span className="text-base font-bold text-gray-900 leading-tight">
+              <span className="text-base font-bold text-fresh-green-600 leading-tight">
                 {formattedPrice}
               </span>
             </div>
@@ -262,11 +207,11 @@ const ProductCard = React.memo(({ product, className = '' }) => {
             {outOfStock ? (
               <button
                 disabled
-                className="text-xs text-gray-400 border border-gray-200 rounded-xl px-3 py-1.5 cursor-not-allowed"
+                className="text-xs text-gray-400 border border-gray-200 rounded-lg px-3 py-1.5 cursor-not-allowed bg-gray-50 font-semibold"
               >
                 Unavailable
               </button>
-            ) : isInCartState ? (
+            ) : isInCart ? (
               <QuantitySelector
                 quantity={cartQty}
                 onIncrease={handleIncrease}
@@ -275,13 +220,13 @@ const ProductCard = React.memo(({ product, className = '' }) => {
               />
             ) : (
               <motion.button
-                whileTap={{ scale: 0.92 }}
+                whileTap={{ scale: 0.95 }}
                 onClick={handleAddToCart}
-                className="flex items-center gap-1 bg-fresh-green text-white text-xs font-semibold px-3 py-1.5 rounded-xl hover:bg-fresh-green-dark transition-colors duration-200 shadow-sm"
+                className="flex items-center gap-1.5 bg-gradient-to-r from-fresh-green-500 to-fresh-green-600 text-white text-xs font-bold px-3 py-1.5 rounded-lg hover:from-fresh-green-600 hover:to-fresh-green-700 transition-all duration-200 shadow-md hover:shadow-lg"
                 aria-label={`Add ${product.name} to cart`}
               >
                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                 </svg>
                 Add
               </motion.button>

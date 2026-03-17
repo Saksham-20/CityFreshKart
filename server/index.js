@@ -11,9 +11,9 @@ const productRoutes = require('./routes/products');
 const orderRoutes = require('./routes/orders');
 const userRoutes = require('./routes/users');
 const adminRoutes = require('./routes/admin');
-const stripeRoutes = require('./routes/stripe');
-const wishlistRoutes = require('./routes/wishlist');
+const razorpayRoutes = require('./routes/razorpay');
 const cartRoutes = require('./routes/cart');
+const addressRoutes = require('./routes/addresses');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -104,19 +104,22 @@ app.use('/api/users', userRoutes);
 console.log('✅ User routes registered at /api/users');
 app.use('/api/admin', adminRoutes);
 console.log('✅ Admin routes registered at /api/admin');
-app.use('/api/stripe', stripeRoutes);
-console.log('✅ Stripe routes registered at /api/stripe');
-app.use('/api/wishlist', wishlistRoutes);
-console.log('✅ Wishlist routes registered at /api/wishlist');
+app.use('/api/razorpay', razorpayRoutes);
+console.log('✅ Razorpay routes registered at /api/razorpay');
 app.use('/api/cart', cartRoutes);
 console.log('✅ Cart routes registered at /api/cart');
+app.use('/api/addresses', addressRoutes);
+console.log('✅ Address routes registered at /api/addresses');
 
 // Error handling middleware
 app.use((err, req, res, next) => {
   console.error(err.stack);
-  res.status(500).json({
-    message: 'Something went wrong!',
-    error: process.env.NODE_ENV === 'development' ? err.message : 'Internal server error',
+  res.status(err.status || 500).json({
+    success: false,
+    error: {
+      code: err.code || 'SERVER_ERROR',
+      message: process.env.NODE_ENV === 'development' ? err.message : 'Internal server error',
+    },
   });
 });
 
