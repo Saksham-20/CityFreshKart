@@ -1,17 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import useAuth from '../../hooks/useAuth';
 
 const LoginForm = ({ onSwitchToRegister }) => {
   const navigate = useNavigate();
+  const { login } = useAuth();
   const [formData, setFormData] = useState({
     phone: '',
     password: ''
   });
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
-  const [otpExpiry, setOtpExpiry] = useState(null);
-  const [timeLeft, setTimeLeft] = useState(0);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -32,7 +31,6 @@ const LoginForm = ({ onSwitchToRegister }) => {
         [name]: ''
       }));
     }
-    setErrors({});
     return true;
   };
 
@@ -55,25 +53,21 @@ const LoginForm = ({ onSwitchToRegister }) => {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleRequestOtp = async (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!validateForm()) return;
     setIsLoading(true);
     try {
       const result = await login(formData.phone, formData.password);
-      if (result.success) {
+      if (result && result.success) {
         if (result.user && result.user.is_admin) {
           navigate('/admin');
         } else {
           navigate('/');
         }
+      } else {
+        setErrors({ general: result?.message || 'Login failed' });
       }
-
-      setConfirmationResult(result.confirmationResult);
-      setStep('otp');
-      setOtpExpiry(new Date().getTime() + 5 * 60 * 1000);
-
-      toast.success('OTP sent to your phone!');
     } catch (error) {
       setErrors({
         general: error.message || 'Login failed'
@@ -81,60 +75,6 @@ const LoginForm = ({ onSwitchToRegister }) => {
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const validateOtp = () => {
-    if (!otp || otp.length !== 6) {
-      setErrors({ otp: 'Enter a valid 6-digit OTP' });
-      return false;
-    }
-    setErrors({});
-    return true;
-  };
-
-  const handleOtpChange = (e) => {
-    const val = e.target.value.replace(/\D/g, '').slice(0, 6);
-    setOtp(val);
-    if (errors.otp) setErrors({});
-  };
-
-  const handleVerifyOtp = async (e) => {
-    e.preventDefault();
-    if (!validateOtp()) return;
-
-    setIsLoading(true);
-    try {
-      const result = await verifyOTP(confirmationResult, otp);
-
-      if (!result?.success) {
-        setErrors({ general: result?.message || 'Invalid OTP. Please try again.' });
-        return;
-      }
-
-      toast.success('Logged in successfully!');
-
-      setTimeout(() => {
-        if (result.user?.is_admin) {
-          navigate('/admin');
-        } else {
-          navigate('/');
-        }
-      }, 500);
-    } catch (error) {
-      console.error('Verify OTP error:', error);
-      setErrors({ general: error.message || 'Invalid OTP. Please try again.' });
-      toast.error('Invalid OTP');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleBackToPhone = () => {
-    setStep('phone');
-    setOtp('');
-    setConfirmationResult(null);
-    setOtpExpiry(null);
-    setErrors({});
   };
 
   return (

@@ -75,10 +75,7 @@ CREATE INDEX IF NOT EXISTS idx_products_is_active ON products(is_active);
 CREATE INDEX IF NOT EXISTS idx_products_price_per_kg ON products(price_per_kg);
 CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id);
 CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
-CREATE INDEX IF NOT EXISTS idx_orders_payment_status ON orders(payment_status);
-CREATE INDEX IF NOT EXISTS idx_orders_created_at ON orders(created_at);
-CREATE INDEX IF NOT EXISTS idx_orders_payment_intent_id ON orders(payment_intent_id);
-CREATE INDEX IF NOT EXISTS idx_orders_idempotency_key ON orders(idempotency_key);
+
 CREATE INDEX IF NOT EXISTS idx_order_items_order_id ON order_items(order_id);
 CREATE INDEX IF NOT EXISTS idx_cart_user_id ON cart(user_id);
 CREATE INDEX IF NOT EXISTS idx_users_phone ON users(phone);

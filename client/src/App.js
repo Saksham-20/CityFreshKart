@@ -4,6 +4,8 @@ import { Toaster } from 'react-hot-toast';
 
 // Layout Components
 import AdminLayout from './components/layout/AdminLayout';
+import Header from './components/layout/Header';
+import Footer from './components/layout/Footer';
 
 // Auth Components
 import ProtectedRoute from './components/auth/ProtectedRoute';
@@ -21,8 +23,6 @@ const AdminDashboardPage = lazy(() => import('./pages/AdminDashboardPage'));
 const AdminProductsPage = lazy(() => import('./pages/AdminProductsPage'));
 const AdminOrdersPage = lazy(() => import('./pages/AdminOrdersPage'));
 const AdminUsersPage = lazy(() => import('./pages/AdminUsersPage'));
-const AdminAnalyticsPage = lazy(() => import('./pages/AdminAnalyticsPage'));
-const AdminSettingsPage = lazy(() => import('./pages/AdminSettingsPage'));
 
 // Loading component
 const PageLoader = () => (
@@ -125,8 +125,6 @@ function App() {
                         <Route path="/products" element={<AdminProductsPage />} />
                         <Route path="/orders" element={<AdminOrdersPage />} />
                         <Route path="/users" element={<AdminUsersPage />} />
-                        <Route path="/analytics" element={<AdminAnalyticsPage />} />
-                        <Route path="/settings" element={<AdminSettingsPage />} />
                         <Route path="*" element={<Navigate to="/admin" replace />} />
                       </Routes>
                     </AdminLayout>

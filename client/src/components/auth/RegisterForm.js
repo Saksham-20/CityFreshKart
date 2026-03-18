@@ -15,8 +15,6 @@ const RegisterForm = ({ onSwitchToLogin }) => {
   
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
-  const [otpExpiry, setOtpExpiry] = useState(null);
-  const [timeLeft, setTimeLeft] = useState(0);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -35,7 +33,6 @@ const RegisterForm = ({ onSwitchToLogin }) => {
     if (errors[name]) {
       setErrors(prev => ({ ...prev, [name]: '' }));
     }
-    setErrors({});
     return true;
   };
 
@@ -68,77 +65,33 @@ const RegisterForm = ({ onSwitchToLogin }) => {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleRequestOtp = async (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!validatePhone(phone)) return;
+    if (!validateForm()) return;
 
     setIsLoading(true);
     try {
-      setLoading(true);
       const serverData = {
         name: formData.name,
         phone: formData.phone,
         password: formData.password
       };
-      await register(serverData);
-      navigate('/login', { 
-        state: { message: 'Registration successful! Please log in.' }
-      });
+      
+      const result = await register(serverData);
+      
+      if (result && result.success) {
+        navigate('/login', { 
+          state: { message: 'Registration successful! Please log in.' }
+        });
+        if (onSwitchToLogin) onSwitchToLogin();
+      } else {
+        setErrors({ submit: result?.message || 'Registration failed' });
+      }
     } catch (error) {
       setErrors({ submit: error.message || 'Registration failed' });
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const validateOtp = () => {
-    if (!otp || otp.length !== 6) {
-      setErrors({ otp: 'Enter a valid 6-digit OTP' });
-      return false;
-    }
-    setErrors({});
-    return true;
-  };
-
-  const handleOtpChange = (e) => {
-    const val = e.target.value.replace(/\D/g, '').slice(0, 6);
-    setOtp(val);
-    if (errors.otp) setErrors({});
-  };
-
-  const handleVerifyOtp = async (e) => {
-    e.preventDefault();
-    if (!validateOtp()) return;
-
-    setIsLoading(true);
-    try {
-      const result = await verifyOTP(otpContext, otp);
-
-      if (!result?.success) {
-        setErrors({ general: result?.message || 'Invalid OTP. Please try again.' });
-        return;
-      }
-
-      toast.success('Account created and logged in!');
-
-      setTimeout(() => {
-        navigate('/');
-      }, 500);
-    } catch (error) {
-      console.error('Verify OTP error:', error);
-      setErrors({ general: error.message || 'Invalid OTP. Please try again.' });
-      toast.error('Invalid OTP');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleBackToPhone = () => {
-    setStep('phone');
-    setOtp('');
-    setOtpContext(null);
-    setOtpExpiry(null);
-    setErrors({});
   };
 
   return (
@@ -223,10 +176,10 @@ const RegisterForm = ({ onSwitchToLogin }) => {
 
         <button
           type="submit"
-          disabled={loading}
+          disabled={isLoading}
           className="w-full bg-fresh-green hover:bg-fresh-green/90 text-white font-semibold py-2 rounded text-sm transition"
         >
-          {loading ? 'Creating Account...' : 'Sign Up'}
+          {isLoading ? 'Creating Account...' : 'Sign Up'}
         </button>
       </form>
 
