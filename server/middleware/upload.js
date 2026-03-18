@@ -33,11 +33,14 @@ const diskStorage = multer.diskStorage({
   destination: (req, file, cb) => {
     let uploadPath = 'uploads/';
 
-    // Determine upload path based on file type or route
-    if (req.baseUrl.includes('products')) {
+    // Determine upload path based on the route path (req.path) or baseUrl
+    const fullPath = (req.baseUrl + req.path).toLowerCase();
+    if (fullPath.includes('products')) {
       uploadPath += 'products/';
-    } else if (req.baseUrl.includes('users')) {
+    } else if (fullPath.includes('users')) {
       uploadPath += 'users/';
+    } else {
+      uploadPath += 'general/';
     }
 
     cb(null, uploadPath);
@@ -50,8 +53,10 @@ const diskStorage = multer.diskStorage({
   },
 });
 
-// Use Cloudinary if configured, otherwise use disk storage
-const finalStorage = process.env.CLOUDINARY_CLOUD_NAME ? storage : diskStorage;
+// Use Cloudinary only if it's actually configured (not a placeholder)
+const isCloudinaryConfigured = process.env.CLOUDINARY_CLOUD_NAME &&
+  !process.env.CLOUDINARY_CLOUD_NAME.startsWith('your_');
+const finalStorage = isCloudinaryConfigured ? storage : diskStorage;
 
 // File filter function
 const fileFilter = (req, file, cb) => {

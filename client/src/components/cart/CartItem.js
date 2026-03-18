@@ -3,22 +3,29 @@ import useCart from '../../hooks/useCart';
 import { getImageUrl, getPlaceholderImage } from '../../utils/imageUtils';
 import QuantitySelector from '../ui/QuantitySelector';
 
+const WEIGHT_STEP = 0.5;
+
 const CartItem = ({ item }) => {
   const { updateItemQuantity, removeFromCart } = useCart();
 
-  const handleIncrease = () => updateItemQuantity(item.id, item.quantity + 1);
+  const handleIncrease = () => updateItemQuantity(item.id, parseFloat((item.quantity + WEIGHT_STEP).toFixed(2)));
   const handleDecrease = () => {
-    if (item.quantity <= 1) {
+    const newQty = parseFloat((item.quantity - WEIGHT_STEP).toFixed(2));
+    if (newQty <= 0) {
       removeFromCart(item.id);
     } else {
-      updateItemQuantity(item.id, item.quantity - 1);
+      updateItemQuantity(item.id, newQty);
     }
   };
   const handleRemove = () => removeFromCart(item.id);
 
-  const lineTotal = (item.price * item.quantity).toLocaleString('en-IN', {
+  const pricePerKg = item.price_per_kg || 0;
+  const discountedPricePerKg = item.discount
+    ? pricePerKg * (1 - item.discount / 100)
+    : pricePerKg;
+  const lineTotal = (discountedPricePerKg * item.quantity).toLocaleString('en-IN', {
     minimumFractionDigits: 2,
-    maximumFractionDigits: 2
+    maximumFractionDigits: 2,
   });
 
   return (
@@ -26,7 +33,7 @@ const CartItem = ({ item }) => {
       {/* Image */}
       <div className="flex-shrink-0">
         <img
-          src={getImageUrl(item.primary_image)}
+          src={getImageUrl(item.image_url)}
           alt={item.name}
           className="w-16 h-16 sm:w-20 sm:h-20 object-cover rounded-xl border border-gray-100"
           onError={(e) => { e.target.src = getPlaceholderImage(); }}
@@ -50,9 +57,7 @@ const CartItem = ({ item }) => {
           </button>
         </div>
 
-        {item.variant && (
-          <p className="text-xs text-gray-500 mt-0.5">{item.variant}</p>
-        )}
+        <p className="text-xs text-gray-500 mt-0.5">₹{pricePerKg}/kg{item.discount > 0 ? ` · ${item.discount}% off` : ''}</p>
 
         <div className="flex items-center justify-between mt-2 gap-2">
           <QuantitySelector
@@ -61,12 +66,9 @@ const CartItem = ({ item }) => {
             onDecrease={handleDecrease}
             size="sm"
           />
-
           <div className="text-right flex-shrink-0">
             <div className="text-sm font-bold text-gray-900">₹{lineTotal}</div>
-            <div className="text-[10px] text-gray-400">
-              ₹{item.price.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} each
-            </div>
+            <div className="text-[10px] text-gray-400">{item.quantity} kg</div>
           </div>
         </div>
       </div>

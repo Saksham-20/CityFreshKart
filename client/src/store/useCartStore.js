@@ -1,5 +1,4 @@
 import { create } from 'zustand';
-import api from '../services/api';
 
 const useCartStore = create((set, get) => ({
   // State
@@ -7,18 +6,19 @@ const useCartStore = create((set, get) => ({
   loading: false,
   error: null,
 
-  // Calculate cart summary (price_per_kg × quantity_kg, apply discount if exists)
+  // Calculate cart summary (price_per_kg × quantity kg, apply discount if exists)
   calculateSummary: () => {
     const items = get().items;
-    
+
     const subtotal = items.reduce((sum, item) => {
-      const price = item.price_per_kg * item.quantity;
+      // quantity is stored in kg (e.g. 0.5, 1, 1.5, 2)
+      const price = (item.price_per_kg || 0) * (item.quantity || 0);
       const discountedPrice = item.discount ? price * (1 - item.discount / 100) : price;
       return sum + discountedPrice;
     }, 0);
 
     // Free delivery above ₹300
-    const deliveryFee = subtotal >= 300 ? 0 : 50; // or your actual delivery fee
+    const deliveryFee = subtotal >= 300 ? 0 : 50;
 
     return {
       subtotal: parseFloat(subtotal.toFixed(2)),
@@ -40,28 +40,27 @@ const useCartStore = create((set, get) => ({
     }
   },
 
-  // Add item to cart (or update quantity if exists)
+  // Add item to cart (quantity = kg amount, e.g. 0.5, 1, 1.5, 2)
   addToCart: (product, quantity = 1) => {
     const items = get().items;
     const existingItem = items.find(i => i.id === product.id);
 
     if (existingItem) {
-      // Update quantity if product already in cart
+      // Accumulate kg quantity
       const updated = items.map(i =>
         i.id === product.id
-          ? { ...i, quantity: i.quantity + quantity }
+          ? { ...i, quantity: parseFloat((i.quantity + quantity).toFixed(2)) }
           : i
       );
       set({ items: updated });
       localStorage.setItem('cart', JSON.stringify(updated));
     } else {
-      // Add new product to cart
       const newItem = {
         id: product.id,
         name: product.name,
-        price_per_kg: product.price,
+        price_per_kg: product.price_per_kg,
         discount: product.discount || 0,
-        image: product.image || product.image_url,
+        image_url: product.image_url || '',
         quantity,
       };
       const updated = [...items, newItem];

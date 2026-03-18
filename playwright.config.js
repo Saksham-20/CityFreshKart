@@ -4,20 +4,30 @@ module.exports = defineConfig({
   testDir: './tests',
   fullyParallel: false,
   forbidOnly: !!process.env.CI,
-  retries: 0,
+  retries: 1,
   workers: 1,
-  reporter: 'html',
+  reporter: [['html', { outputFolder: 'playwright-report' }], ['list']],
+
   use: {
     baseURL: 'http://localhost:3000',
     trace: 'off',
-    screenshot: 'only-on-failure',
+    video: 'off',
+    screenshot: 'on',
   },
 
   projects: [
     {
-      name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
+      name: 'desktop',
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 1280, height: 800 },
+      },
+    },
+    {
+      name: 'mobile',
+      use: {
+        ...devices['Pixel 5'],
+      },
     },
   ],
-
 });

@@ -33,63 +33,37 @@ const Dashboard = () => {
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('token');
-      
-      // Fetch dashboard stats
-      const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000';
-      const dashboardResponse = await fetch(`${apiUrl}/api/admin/dashboard`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
 
-      // Fetch analytics data
-      const analyticsResponse = await fetch(`${apiUrl}/api/admin/analytics?period=30d`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
+      const [dashboardResponse, analyticsResponse] = await Promise.allSettled([
+        api.get('/admin/dashboard'),
+        api.get('/admin/analytics', { params: { period: '30d' } }),
+      ]);
 
-      if (dashboardResponse.ok) {
-        const data = await dashboardResponse.json();
-        console.log('Dashboard data received:', data);
-        console.log('Stats data:', data.stats);
-        console.log('Total Products:', data.stats?.totalProducts);
-        console.log('Total Users:', data.stats?.totalUsers);
-        
-        // Safely set data with fallbacks
+      if (dashboardResponse.status === 'fulfilled') {
+        const data = dashboardResponse.value.data;
         setStats(data.stats || {});
         setRecentOrders(Array.isArray(data.recentOrders) ? data.recentOrders : []);
-        // Handle both possible field names
         const lowStockProducts = data.lowStockProducts || data.LowStockProducts || [];
         setRecentProducts(Array.isArray(lowStockProducts) ? lowStockProducts : []);
       } else {
-        console.error('Failed to fetch dashboard data:', dashboardResponse.status, dashboardResponse.statusText);
-        // Set empty data on error
+        console.error('Failed to fetch dashboard data:', dashboardResponse.reason);
         setStats({});
         setRecentOrders([]);
         setRecentProducts([]);
       }
 
-      if (analyticsResponse.ok) {
-        const analyticsData = await analyticsResponse.json();
-        setTopProducts(analyticsData.topProducts || []);
-        // setAnalyticsData(analyticsData);
+      if (analyticsResponse.status === 'fulfilled') {
+        setTopProducts(analyticsResponse.value.data.topProducts || []);
       } else {
-        console.error('Failed to fetch analytics data:', analyticsResponse.status);
+        console.error('Failed to fetch analytics data:', analyticsResponse.reason);
         setTopProducts([]);
-        // setAnalyticsData(null);
       }
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
-      // Set empty data on error
       setStats({});
       setRecentOrders([]);
       setRecentProducts([]);
       setTopProducts([]);
-      // setAnalyticsData(null);
     } finally {
       setLoading(false);
     }
@@ -104,7 +78,7 @@ const Dashboard = () => {
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Admin Dashboard</h1>
             <p className="mt-2 text-gray-600">
-              Welcome back, {user?.first_name || 'Admin'}! Here's what's happening with your store.
+              Welcome back, {user?.name || 'Admin'}! Here's what's happening with your store.
             </p>
           </div>
           <div className="text-right">
@@ -115,7 +89,7 @@ const Dashboard = () => {
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
         <StatCard
           title="Total Revenue"
           value={`₹${safeToFixed(stats?.totalRevenue)}`}
@@ -143,6 +117,13 @@ const Dashboard = () => {
           change={0}
           icon="🛍️"
           color="orange"
+        />
+        <StatCard
+          title="Categories"
+          value={stats?.totalCategories || 0}
+          change={0}
+          icon="🏷️"
+          color="indigo"
         />
       </div>
 

@@ -54,10 +54,10 @@ app.use(cors(corsOptions));
 // Cookie parser - for accessing httpOnly cookies
 app.use(cookieParser());
 
-// Rate limiting - applied after CORS
+// Rate limiting - applied after CORS (relaxed in development for automated testing)
 const limiter = rateLimit({
   windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // 15 minutes
-  max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100, // limit each IP to 100 requests per windowMs
+  max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || (process.env.NODE_ENV === 'production' ? 100 : 10000),
   message: 'Too many requests from this IP, please try again later.',
 });
 app.use('/api/', limiter);

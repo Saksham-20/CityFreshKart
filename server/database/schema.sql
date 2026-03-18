@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS products (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     name VARCHAR(255) NOT NULL,
     description TEXT,
+    category VARCHAR(100) DEFAULT 'Uncategorized',
     price_per_kg DECIMAL(10,2) NOT NULL,
     discount DECIMAL(10,2) DEFAULT 0,
     image_url VARCHAR(500),
@@ -89,8 +90,15 @@ BEGIN
 END;
 $$ language 'plpgsql';
 
--- Create triggers for updated_at columns
+-- Create triggers for updated_at columns (drop first so re-runs are idempotent)
+DROP TRIGGER IF EXISTS update_users_updated_at ON users;
 CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+DROP TRIGGER IF EXISTS update_products_updated_at ON products;
 CREATE TRIGGER update_products_updated_at BEFORE UPDATE ON products FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+DROP TRIGGER IF EXISTS update_orders_updated_at ON orders;
 CREATE TRIGGER update_orders_updated_at BEFORE UPDATE ON orders FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+DROP TRIGGER IF EXISTS update_cart_updated_at ON cart;
 CREATE TRIGGER update_cart_updated_at BEFORE UPDATE ON cart FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();

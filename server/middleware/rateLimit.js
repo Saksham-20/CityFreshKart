@@ -1,9 +1,9 @@
 const rateLimit = require('express-rate-limit');
 
-// General API rate limiting
+// General API rate limiting (relaxed in development/test for automated testing)
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // Limit each IP to 100 requests per windowMs
+  max: process.env.NODE_ENV === 'production' ? 100 : 10000,
   message: {
     message: 'Too many requests from this IP, please try again later.',
   },
@@ -11,10 +11,10 @@ const apiLimiter = rateLimit({
   legacyHeaders: false, // Disable the `X-RateLimit-*` headers
 });
 
-// Stricter rate limiting for auth endpoints
+// Stricter rate limiting for auth endpoints (relaxed in development/test)
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 5, // Limit each IP to 5 requests per windowMs
+  max: process.env.NODE_ENV === 'production' ? 5 : 1000,
   message: {
     message: 'Too many authentication attempts, please try again later.',
   },
@@ -33,10 +33,10 @@ const uploadLimiter = rateLimit({
   legacyHeaders: false,
 });
 
-// Rate limiting for checkout/payment endpoints
+// Rate limiting for checkout/payment endpoints (relaxed in development/test)
 const checkoutLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 3, // Limit each IP to 3 checkout attempts per 15 minutes
+  max: process.env.NODE_ENV === 'production' ? 3 : 1000,
   message: {
     message: 'Too many checkout attempts, please try again later.',
   },

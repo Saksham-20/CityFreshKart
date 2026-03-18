@@ -16,7 +16,7 @@ router.use(authenticateToken, requireAdmin);
 router.get('/dashboard', async (req, res) => {
   try {
     // Get total products
-    const totalProducts = await pool.query('SELECT COUNT(*) as count FROM products');
+    const totalProducts = await pool.query('SELECT COUNT(*) as count FROM products WHERE is_active = true');
 
     // Get total orders
     const totalOrders = await pool.query('SELECT COUNT(*) as count FROM orders');
@@ -26,9 +26,18 @@ router.get('/dashboard', async (req, res) => {
 
     // Get total revenue
     const totalRevenue = await pool.query(`
-      SELECT COALESCE(SUM(total), 0) as revenue 
+      SELECT COALESCE(SUM(total_price), 0) as revenue 
       FROM orders 
       WHERE status IN ('delivered', 'confirmed', 'pending')
+    `);
+
+    // Get category breakdown
+    const categoryStats = await pool.query(`
+      SELECT category, COUNT(*) as count 
+      FROM products 
+      WHERE is_active = true 
+      GROUP BY category 
+      ORDER BY count DESC
     `);
 
     // Get recent orders
@@ -43,9 +52,9 @@ router.get('/dashboard', async (req, res) => {
     // Get low stock products
     const lowStockProducts = await pool.query(`
       SELECT * FROM products 
-      WHERE stock_quantity <= 5 
+      WHERE quantity_available <= 5 
       AND is_active = true
-      ORDER BY stock_quantity ASC
+      ORDER BY quantity_available ASC
       LIMIT 5
     `);
 
@@ -55,7 +64,9 @@ router.get('/dashboard', async (req, res) => {
         totalOrders: parseInt(totalOrders.rows[0].count),
         totalUsers: parseInt(totalUsers.rows[0].count),
         totalRevenue: parseFloat(totalRevenue.rows[0].revenue),
+        totalCategories: categoryStats.rows.length,
       },
+      categoryStats: categoryStats.rows,
       recentOrders: recentOrders.rows,
       lowStockProducts: lowStockProducts.rows,
     };
@@ -80,67 +91,43 @@ router.get('/products', async (req, res) => {
     const { page = 1, limit = 20, search, category, status } = req.query;
     const offset = (page - 1) * limit;
 
-    let query = `
-      SELECT 
-        p.*,
-        c.name as category_name
-      FROM products p
-      LEFT JOIN categories c ON p.category_id = c.id
-      WHERE 1=1
-    `;
+    let query = `SELECT * FROM products WHERE 1=1`;
 
     const queryParams = [];
     let paramCount = 0;
 
     if (search) {
       paramCount++;
-      query += ` AND (p.name ILIKE $${paramCount} OR p.sku ILIKE $${paramCount})`;
+      query += ` AND name ILIKE $${paramCount}`;
       queryParams.push(`%${search}%`);
-    }
-
-    if (category) {
-      paramCount++;
-      query += ` AND c.slug = $${paramCount}`;
-      queryParams.push(category);
     }
 
     if (status) {
       paramCount++;
-      query += ` AND p.is_active = $${paramCount}`;
+      query += ` AND is_active = $${paramCount}`;
       queryParams.push(status === 'active');
     }
 
-    query += ` ORDER BY p.created_at DESC LIMIT $${paramCount + 1} OFFSET $${paramCount + 2}`;
+    query += ` ORDER BY created_at DESC LIMIT $${paramCount + 1} OFFSET $${paramCount + 2}`;
     queryParams.push(parseInt(limit), offset);
 
     const products = await pool.query(query, queryParams);
 
     // Get total count
-    let countQuery = `
-      SELECT COUNT(*) as total
-      FROM products p
-      LEFT JOIN categories c ON p.category_id = c.id
-      WHERE 1=1
-    `;
+    let countQuery = `SELECT COUNT(*) as total FROM products WHERE 1=1`;
 
     const countParams = [];
     paramCount = 0;
 
     if (search) {
       paramCount++;
-      countQuery += ` AND (p.name ILIKE $${paramCount} OR p.sku ILIKE $${paramCount})`;
+      countQuery += ` AND name ILIKE $${paramCount}`;
       countParams.push(`%${search}%`);
-    }
-
-    if (category) {
-      paramCount++;
-      countQuery += ` AND c.slug = $${paramCount}`;
-      countParams.push(category);
     }
 
     if (status) {
       paramCount++;
-      countQuery += ` AND p.is_active = $${paramCount}`;
+      countQuery += ` AND is_active = $${paramCount}`;
       countParams.push(status === 'active');
     }
 
@@ -167,45 +154,41 @@ router.get('/products', async (req, res) => {
 // @access  Admin
 router.post('/products', upload.array('images', 10), handleUploadError, async (req, res) => {
   try {
-    const {
-      name, description, price_per_kg, discount, category_id,
-      stock_quantity, is_active, is_featured,
-    } = req.body;
+    const { name, description, price_per_kg, discount, category, stock_quantity, is_active } = req.body;
 
     // Validate required fields
-    if (!name || !price_per_kg || !category_id) {
+    if (!name || !price_per_kg) {
       return res.status(400).json({
-        message: 'Missing required fields: name, price_per_kg, category_id',
+        message: 'Missing required fields: name, price_per_kg',
       });
     }
 
-    // Generate slug from name
-    const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
-
-    // Check if slug already exists
-    const existingSlug = await pool.query('SELECT id FROM products WHERE slug = $1', [slug]);
-    if (existingSlug.rows.length > 0) {
+    // Check if product name already exists
+    const existingProduct = await pool.query('SELECT id FROM products WHERE LOWER(name) = LOWER($1)', [name]);
+    if (existingProduct.rows.length > 0) {
       return res.status(400).json({ message: 'Product with this name already exists' });
     }
 
-    // Get image URL from uploaded file
-    let imageUrl = '';
+    // Get image URL: prefer uploaded file, fall back to direct URL from form
+    let imageUrl = req.body.image_url || '';
     if (req.files && req.files.length > 0) {
       const primaryImage = req.files[0];
-      imageUrl = primaryImage.path.startsWith('http') ? primaryImage.path : 
+      imageUrl = primaryImage.path.startsWith('http') ? primaryImage.path :
                 (primaryImage.secure_url || primaryImage.url || primaryImage.path);
     }
 
     // Create product
     const newProduct = await pool.query(`
       INSERT INTO products (
-        name, slug, description, image, price_per_kg, discount, category_id,
-        stock_quantity, is_active, is_featured
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        name, description, category, image_url, price_per_kg, discount,
+        quantity_available, is_active, created_at, updated_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW())
       RETURNING *
     `, [
-      name, slug, description, imageUrl, parseFloat(price_per_kg) || 0, parseFloat(discount) || 0, category_id,
-      parseInt(stock_quantity) || 0, is_active !== false, is_featured === true,
+      name, description || '', category || 'Uncategorized', imageUrl,
+      parseFloat(price_per_kg) || 0, parseFloat(discount) || 0,
+      parseFloat(stock_quantity) || 0,
+      is_active !== 'false' && is_active !== false,
     ]);
 
     const product = newProduct.rows[0];
@@ -248,17 +231,22 @@ router.put('/products/:id', upload.array('images', 1), handleUploadError, [
       return res.status(404).json({ message: 'Product not found' });
     }
 
-    // Generate slug if name changed
-    if (updateData.name) {
-      updateData.slug = updateData.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
-    }
-
     // Handle new image if uploaded
     if (req.files && req.files.length > 0) {
       const imageFile = req.files[0];
-      updateData.image = imageFile.path.startsWith('http') ? imageFile.path : 
-                        (imageFile.secure_url || imageFile.url || imageFile.path);
+      updateData.image_url = imageFile.path.startsWith('http') ? imageFile.path :
+                             (imageFile.secure_url || imageFile.url || imageFile.path);
     }
+
+    // Map stock_quantity form field to quantity_available column
+    if (updateData.stock_quantity !== undefined) {
+      updateData.quantity_available = parseFloat(updateData.stock_quantity) || 0;
+      delete updateData.stock_quantity;
+    }
+
+    // Columns that don't exist in the schema — skip them
+    const skipKeys = new Set(['id', 'slug', 'image', 'category_id', 'sku', 'weight',
+      'is_featured', 'is_bestseller', 'is_new_arrival', 'images', 'remaining_image_ids']);
 
     // Build update query dynamically
     const updateFields = [];
@@ -266,7 +254,7 @@ router.put('/products/:id', upload.array('images', 1), handleUploadError, [
     let paramCount = 0;
 
     Object.keys(updateData).forEach(key => {
-      if (key !== 'id' && updateData[key] !== undefined && updateData[key] !== null && key !== 'images' && key !== 'remaining_image_ids') {
+      if (!skipKeys.has(key) && updateData[key] !== undefined && updateData[key] !== null) {
         paramCount++;
         updateFields.push(`${key} = $${paramCount}`);
         updateValues.push(updateData[key]);
@@ -346,7 +334,7 @@ router.get('/orders', async (req, res) => {
             JSON_BUILD_OBJECT(
               'id', oi.id,
               'product_name', oi.product_name,
-              'quantity', oi.quantity,
+              'quantity_kg', oi.quantity_kg,
               'price_per_kg', oi.price_per_kg,
               'total_price', oi.total_price
             )
@@ -424,7 +412,7 @@ router.get('/orders', async (req, res) => {
 // @desc    Update order status
 // @access  Admin
 router.put('/orders/:id/status', [
-  body('status').isIn(['pending', 'processing', 'shipped', 'delivered', 'cancelled']).withMessage('Invalid status'),
+  body('status').isIn(['pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled']).withMessage('Invalid status'),
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -456,11 +444,12 @@ router.put('/orders/:id/status', [
 });
 
 // @route   POST /api/admin/users
-// @desc    Create new user for admin (phone-based OTP app - users are created via OTP flow)
+// @desc    Create new user from admin panel
 // @access  Admin
 router.post('/users', [
   body('name').trim().notEmpty().withMessage('Name is required'),
   body('phone').trim().notEmpty().withMessage('Phone number is required'),
+  body('password').trim().isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -468,22 +457,23 @@ router.post('/users', [
       return res.status(400).json({ errors: errors.array() });
     }
 
-    const { name, phone, is_admin } = req.body;
+    const { name, phone, password, is_admin } = req.body;
 
-    // Normalize phone number
-    const normalizedPhone = phone.startsWith('+') ? phone : `+91${phone.replace(/\D/g, '').slice(-10)}`;
+    const normalizedPhone = phone.replace(/\D/g, '').slice(-10);
 
-    // Check if phone already exists
     const existingUser = await pool.query('SELECT id FROM users WHERE phone = $1', [normalizedPhone]);
     if (existingUser.rows.length > 0) {
       return res.status(400).json({ message: 'Phone number already exists' });
     }
 
+    const bcrypt = require('bcryptjs');
+    const passwordHash = await bcrypt.hash(password, 10);
+
     const newUser = await pool.query(`
-      INSERT INTO users (phone, first_name, last_name, email, password_hash, is_admin)
-      VALUES ($1, $2, $3, $4, $5, $6)
+      INSERT INTO users (phone, name, password_hash, is_admin, created_at, updated_at)
+      VALUES ($1, $2, $3, $4, NOW(), NOW())
       RETURNING id, phone, name, is_admin, created_at
-    `, [normalizedPhone, name.split(' ')[0] || name, name.split(' ').slice(1).join(' ') || '', `${normalizedPhone}@placeholder.local`, 'N/A', is_admin || false]);
+    `, [normalizedPhone, name, passwordHash, is_admin || false]);
 
     res.status(201).json({
       message: 'User created successfully',
@@ -618,17 +608,21 @@ router.put('/users/:id', [
       return res.status(404).json({ message: 'User not found' });
     }
 
-    // Update user
+    // Update user — name and/or is_admin toggle
     await pool.query(`
       UPDATE users 
-      SET first_name = COALESCE(SPLIT_PART($1, ' ', 1), first_name), 
-          last_name = COALESCE(NULLIF(SUBSTRING($1 FROM POSITION(' ' IN $1) + 1), ''), last_name),
+      SET name = COALESCE($1, name),
           is_admin = COALESCE($2, is_admin),
           updated_at = CURRENT_TIMESTAMP
       WHERE id = $3
-    `, [name, is_admin, id]);
+    `, [name || null, is_admin !== undefined ? is_admin : null, id]);
 
-    res.json({ message: 'User updated successfully' });
+    const updated = await pool.query(
+      'SELECT id, phone, name, is_admin, created_at, updated_at FROM users WHERE id = $1',
+      [id]
+    );
+
+    res.json({ message: 'User updated successfully', user: updated.rows[0] });
 
   } catch (error) {
     console.error('Update admin user error:', error);
@@ -693,7 +687,7 @@ router.put('/products/:id/stock', [
 
     // Update stock quantity
     const updatedProduct = await pool.query(
-      'UPDATE products SET stock_quantity = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 RETURNING *',
+      'UPDATE products SET quantity_available = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 RETURNING *',
       [quantity, id],
     );
 
@@ -747,8 +741,8 @@ router.get('/analytics', async (req, res) => {
       SELECT 
         ${groupBy} as period,
         COUNT(*) as orders,
-        SUM(total) as revenue,
-        AVG(total) as average_order
+        SUM(total_price) as revenue,
+        AVG(total_price) as average_order
       FROM orders o
       WHERE status != 'cancelled' ${dateFilter}
       GROUP BY ${groupBy}
@@ -761,17 +755,15 @@ router.get('/analytics', async (req, res) => {
         p.id,
         p.name,
         p.price_per_kg,
-        p.image,
-        c.name as category_name,
+        p.image_url,
         COUNT(oi.id) as order_count,
-        SUM(oi.quantity) as total_quantity,
+        SUM(oi.quantity_kg) as total_quantity,
         SUM(oi.total_price) as total_revenue
       FROM products p
       LEFT JOIN order_items oi ON p.id = oi.product_id
       LEFT JOIN orders o ON oi.order_id = o.id
-      LEFT JOIN categories c ON p.category_id = c.id
       WHERE o.status != 'cancelled' ${dateFilter}
-      GROUP BY p.id, p.name, p.price_per_kg, p.image, c.name
+      GROUP BY p.id, p.name, p.price_per_kg, p.image_url
       ORDER BY total_quantity DESC
       LIMIT 10
     `);
@@ -781,7 +773,7 @@ router.get('/analytics', async (req, res) => {
       SELECT 
         o.id,
         o.order_number,
-        o.total,
+        o.total_price,
         o.status,
         o.created_at,
         u.name,
@@ -793,22 +785,8 @@ router.get('/analytics', async (req, res) => {
       LIMIT 10
     `);
 
-    // Get category performance
-    const categoryData = await pool.query(`
-      SELECT 
-        c.id,
-        c.name,
-        COUNT(DISTINCT p.id) as product_count,
-        COUNT(oi.id) as order_count,
-        COALESCE(SUM(oi.total_price), 0) as revenue
-      FROM categories c
-      LEFT JOIN products p ON c.id = p.category_id
-      LEFT JOIN order_items oi ON p.id = oi.product_id
-      LEFT JOIN orders o ON oi.order_id = o.id
-      WHERE o.status IS NULL OR o.status != 'cancelled'
-      GROUP BY c.id, c.name
-      ORDER BY revenue DESC
-    `);
+    // Category performance not applicable with current schema (no categories table)
+    const categoryData = { rows: [] };
 
     // Get order status breakdown
     const orderStatusBreakdown = await pool.query(`
@@ -825,7 +803,7 @@ router.get('/analytics', async (req, res) => {
     const totalUsers = await pool.query('SELECT COUNT(*) as count FROM users WHERE is_admin = false');
     const totalOrders = await pool.query('SELECT COUNT(*) as count FROM orders');
     const totalRevenue = await pool.query(`
-      SELECT COALESCE(SUM(total), 0) as revenue 
+      SELECT COALESCE(SUM(total_price), 0) as revenue 
       FROM orders 
       WHERE status IN ('delivered', 'confirmed', 'pending')
     `);

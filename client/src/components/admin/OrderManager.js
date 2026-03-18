@@ -15,6 +15,7 @@ const OrderManager = () => {
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [statusFilter, setStatusFilter] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedStatus, setSelectedStatus] = useState('pending');
 
   useEffect(() => {
     fetchOrders();
@@ -23,21 +24,8 @@ const OrderManager = () => {
   const fetchOrders = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('token');
-      const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000';
-      const response = await fetch(`${apiUrl}/api/admin/orders?limit=100`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setOrders(data.orders || []);
-      } else {
-        console.error('Failed to fetch orders:', response.status);
-      }
+      const response = await api.get('/admin/orders', { params: { limit: 100 } });
+      setOrders(response.data.orders || []);
     } catch (error) {
       console.error('Failed to fetch orders:', error);
     } finally {
@@ -48,27 +36,12 @@ const OrderManager = () => {
   const handleStatusUpdate = async (orderId, newStatus) => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('token');
-      const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000';
-      const response = await fetch(`${apiUrl}/api/admin/orders/${orderId}/status`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ status: newStatus })
-      });
-
-      if (response.ok) {
-        setShowStatusModal(false);
-        setSelectedOrder(null);
-        fetchOrders();
-      } else {
-        const errorData = await response.json();
-        console.error('Failed to update order status:', errorData.message);
-      }
+      await api.put(`/admin/orders/${orderId}/status`, { status: newStatus });
+      setShowStatusModal(false);
+      setSelectedOrder(null);
+      fetchOrders();
     } catch (error) {
-      console.error('Failed to update order status:', error);
+      console.error('Failed to update order status:', error.response?.data?.message || error.message);
     } finally {
       setLoading(false);
     }
@@ -81,6 +54,7 @@ const OrderManager = () => {
 
   const openStatusModal = (order) => {
     setSelectedOrder(order);
+    setSelectedStatus(order.status || 'pending');
     setShowStatusModal(true);
   };
 
@@ -326,7 +300,8 @@ const OrderManager = () => {
                 New Status
               </label>
               <select
-                id="newStatus"
+                value={selectedStatus}
+                onChange={(e) => setSelectedStatus(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="pending">Pending</option>
@@ -335,7 +310,6 @@ const OrderManager = () => {
                 <option value="shipped">Shipped</option>
                 <option value="delivered">Delivered</option>
                 <option value="cancelled">Cancelled</option>
-                <option value="refunded">Refunded</option>
               </select>
             </div>
             <div className="flex justify-end space-x-3">
@@ -346,10 +320,7 @@ const OrderManager = () => {
                 Cancel
               </Button>
               <Button
-                onClick={() => {
-                  const newStatus = document.getElementById('newStatus').value;
-                  handleStatusUpdate(selectedOrder.id, newStatus);
-                }}
+                onClick={() => handleStatusUpdate(selectedOrder.id, selectedStatus)}
                 disabled={loading}
               >
                 {loading ? 'Updating...' : 'Update Status'}

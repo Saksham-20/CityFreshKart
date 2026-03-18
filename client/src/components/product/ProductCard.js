@@ -1,246 +1,155 @@
 import React, { useMemo, useCallback, useState } from 'react';
-import { motion } from 'framer-motion';
-import { Link } from 'react-router-dom';
 import useCart from '../../hooks/useCart';
-import { formatCurrency as formatPrice } from '../../utils/formatters';
 import { getImageUrl } from '../../utils/imageUtils';
-import QuantitySelector from '../ui/QuantitySelector';
 
-const WEIGHT_OPTIONS = [0.5, 1, 1.5, 2]; // Default weight options in kg
+const WEIGHT_OPTIONS = [0.5, 1, 1.5, 2];
 
 const ProductCard = React.memo(({ product, className = '' }) => {
-  const { addToCart, isItemInCart, removeFromCart, items: cartItems, updateItemQuantity } = useCart();
-  const [selectedWeight, setSelectedWeight] = useState(1);
+  const { addToCart, removeFromCart, items: cartItems, updateItemQuantity } = useCart();
+  const [selectedWeight, setSelectedWeight] = useState(0.5);
 
-  const isWeightBased = useMemo(() => product.price_per_kg || product.pricePerKg, [product]);
-  
-  // Price per kg for display
-  const pricePerKg = useMemo(() => {
-    const price = product.price_per_kg || product.pricePerKg || product.price;
-    return Number(price) || 0;
-  }, [product]);
-  
-  // Apply discount if exists
-  const discountPercent = useMemo(() => product.discount || 0, [product.discount]);
-  
-  // Calculate total price based on weight and discount
-  const totalPrice = useMemo(() => {
-    let price = (pricePerKg || 0) * selectedWeight;
-    if (discountPercent > 0) {
-      price = price - (price * (discountPercent / 100));
-    }
-    return price;
+  const pricePerKg = useMemo(() => Number(product.price_per_kg || product.pricePerKg || product.price) || 0, [product]);
+  const discountPercent = useMemo(() => Number(product.discount) || 0, [product.discount]);
+  const effectivePrice = useMemo(() => {
+    const base = pricePerKg * selectedWeight;
+    return discountPercent > 0 ? base * (1 - discountPercent / 100) : base;
   }, [pricePerKg, selectedWeight, discountPercent]);
-
-  const formattedPrice = useMemo(() => formatPrice(pricePerKg), [pricePerKg]);
+  const originalPrice = useMemo(() => pricePerKg * selectedWeight, [pricePerKg, selectedWeight]);
 
   const productId = product.product_id || product.id;
-
-  const isInCartState = useMemo(() => isItemInCart(productId), [isItemInCart, productId]);
-
-  // Get cart item to read quantity
-  const cartItem = useMemo(
-    () => cartItems?.find(i => (i.product_id || i.id) === productId),
-    [cartItems, productId]
-  );
+  const cartItem = useMemo(() => cartItems?.find(i => (i.product_id || i.id) === productId), [cartItems, productId]);
   const isInCart = !!cartItem;
-  const cartQty = cartItem?.quantity || 1;
+  const cartQty = cartItem?.quantity || 0;
+  const outOfStock = (product.quantity_available !== undefined && parseFloat(product.quantity_available) <= 0) ||
+                     (product.stock_quantity !== undefined && product.stock_quantity <= 0);
 
   const handleAddToCart = useCallback(() => {
-    const cartProduct = {
+    addToCart({
       id: productId,
       name: product.name,
-      slug: product.slug,
-      price: totalPrice,
       price_per_kg: pricePerKg,
-      weight: selectedWeight,
       discount: discountPercent,
-      primary_image: product.primary_image,
-      category_name: product.category_name,
-      category_slug: product.category_slug
-    };
-    addToCart(cartProduct, 1, selectedWeight);
-  }, [addToCart, product, productId, totalPrice, pricePerKg, selectedWeight, discountPercent]);
+      image_url: product.image_url,
+    }, selectedWeight);
+  }, [addToCart, product, productId, pricePerKg, selectedWeight, discountPercent]);
 
   const handleIncrease = useCallback(() => {
-    if (cartItem) {
-      updateItemQuantity(cartItem.id, { quantity: cartQty + 1 });
-    }
-  }, [cartItem, cartQty, updateItemQuantity]);
+    if (cartItem) updateItemQuantity(cartItem.id, parseFloat((cartQty + selectedWeight).toFixed(2)));
+  }, [cartItem, cartQty, selectedWeight, updateItemQuantity]);
 
   const handleDecrease = useCallback(() => {
     if (!cartItem) return;
-    if (cartQty <= 1) {
-      removeFromCart(cartItem.id);
-    } else {
-      updateItemQuantity(cartItem.id, { quantity: cartQty - 1 });
-    }
-  }, [cartItem, cartQty, removeFromCart, updateItemQuantity]);
+    const newQty = parseFloat((cartQty - selectedWeight).toFixed(2));
+    if (newQty <= 0) removeFromCart(cartItem.id);
+    else updateItemQuantity(cartItem.id, newQty);
+  }, [cartItem, cartQty, selectedWeight, removeFromCart, updateItemQuantity]);
 
   if (!product) return null;
 
-  const outOfStock = product.stock_quantity !== undefined && product.stock_quantity <= 0;
-
   return (
-    <motion.div
-      layout
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -20 }}
-      transition={{ duration: 0.3 }}
-      className={`group bg-white rounded-2xl shadow-md hover:shadow-2xl transition-all duration-300 overflow-hidden border border-gray-100 hover:border-fresh-green-200 ${className}`}
-    >
-      {/* Product Image */}
-      <div className="relative aspect-square overflow-hidden bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center">
-        <Link to={`/products/${product.slug || product.id}`} tabIndex={-1} aria-hidden="true" className="w-full h-full flex items-center justify-center">
-          <img
-            src={getImageUrl(product.image || product.primary_image)}
-            alt={product.name}
-            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-            loading="lazy"
-          />
-        </Link>
+    <div className={`group bg-white rounded-2xl border border-gray-100 hover:border-green-200 hover:shadow-lg transition-all duration-200 overflow-hidden flex flex-col ${className}`}>
+      
+      {/* Image container */}
+      <div className="relative bg-gray-50 overflow-hidden" style={{ aspectRatio: '1 / 1' }}>
+        <img
+          src={getImageUrl(product.image_url)}
+          alt={product.name}
+          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+          loading="lazy"
+          onError={(e) => {
+            e.target.onerror = null;
+            e.target.src = `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200' viewBox='0 0 200 200'%3E%3Crect width='200' height='200' fill='%23f3f4f6'/%3E%3Ctext x='50%25' y='45%25' font-size='40' text-anchor='middle' dominant-baseline='middle'%3E%F0%9F%A5%A6%3C/text%3E%3Ctext x='50%25' y='72%25' font-size='13' fill='%239ca3af' text-anchor='middle' font-family='Arial'%3ENo Image%3C/text%3E%3C/svg%3E`;
+          }}
+        />
 
-        {/* Discount Badge */}
+        {/* Discount badge */}
         {discountPercent > 0 && (
-          <div className="absolute top-3 left-3 bg-gradient-to-r from-red-500 to-red-600 text-white text-[11px] font-bold px-2.5 py-1 rounded-full shadow-lg animate-pulse">
-            -{discountPercent}%
+          <div className="absolute top-2 left-2 bg-red-500 text-white text-[10px] font-extrabold px-1.5 py-0.5 rounded-md shadow">
+            {discountPercent}% OFF
           </div>
         )}
 
-        {/* Out of Stock Overlay */}
+        {/* Out of stock overlay */}
         {outOfStock && (
-          <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-            <span className="bg-gray-900 text-white text-xs font-bold px-4 py-2 rounded-full">
+          <div className="absolute inset-0 bg-white/70 flex items-center justify-center">
+            <span className="bg-gray-800 text-white text-[11px] font-bold px-3 py-1.5 rounded-full">
               Out of Stock
             </span>
           </div>
         )}
       </div>
 
-      {/* Product Info */}
-      <div className="p-3.5 sm:p-4">
-        {/* Category Badge */}
-        {product.category_name && (
-          <div className="text-[10px] text-fresh-green-600 font-bold uppercase tracking-wider mb-1.5 bg-fresh-green-50 inline-block px-2 py-0.5 rounded-full">
-            {product.category_name}
-          </div>
-        )}
+      {/* Info */}
+      <div className="flex flex-col flex-1 px-2.5 pt-2 pb-2.5 gap-1.5">
+        {/* Name */}
+        <h3 className="text-xs font-semibold text-gray-800 leading-snug line-clamp-2 min-h-[2.5em]">
+          {product.name}
+        </h3>
 
-        {/* Product Name */}
-        <Link to={`/products/${product.slug || product.id}`}>
-          <h3 className="text-sm font-semibold text-gray-800 mb-2 line-clamp-2 hover:text-fresh-green-600 transition-colors duration-200 leading-snug">
-            {product.name}
-          </h3>
-        </Link>
+        {/* Weight selector */}
+        <div className="flex gap-1 flex-wrap">
+          {WEIGHT_OPTIONS.map(w => (
+            <button
+              key={w}
+              onClick={() => setSelectedWeight(w)}
+              className={`text-[10px] font-semibold px-1.5 py-0.5 rounded border transition-colors ${
+                selectedWeight === w
+                  ? 'bg-green-600 text-white border-green-600'
+                  : 'text-gray-500 border-gray-200 hover:border-green-400 hover:text-green-700'
+              }`}
+            >
+              {w}kg
+            </button>
+          ))}
+        </div>
 
-        {/* Price and Weight Selector for weight-based products */}
-        {isWeightBased ? (
-          <div className="space-y-3 mt-3">
-            {/* Price per kg display */}
-            <div className="flex items-baseline justify-between gap-2 pb-2 border-b border-gray-100">
-              <span className="text-xs text-gray-600 font-semibold">₹{pricePerKg.toFixed(0)}<span className="text-gray-500">/kg</span></span>
-              {discountPercent > 0 && (
-                <span className="text-xs bg-red-50 text-red-600 px-2 py-0.5 rounded-full font-semibold">
-                  Save {discountPercent}%
-                </span>
-              )}
-            </div>
+        {/* Price row */}
+        <div className="flex items-baseline gap-1.5">
+          <span className="text-sm font-extrabold text-gray-900">₹{effectivePrice.toFixed(0)}</span>
+          {discountPercent > 0 && (
+            <span className="text-[11px] text-gray-400 line-through">₹{originalPrice.toFixed(0)}</span>
+          )}
+          <span className="text-[10px] text-gray-400 ml-auto">/ {selectedWeight}kg</span>
+        </div>
 
-            {/* Weight Selector */}
-            <div className="flex items-center gap-2">
-              <select
-                value={selectedWeight}
-                onChange={(e) => setSelectedWeight(parseFloat(e.target.value))}
-                className="flex-1 px-2 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-fresh-green-500 focus:border-fresh-green-500 bg-white hover:border-fresh-green-400 transition-all duration-200"
-              >
-                {WEIGHT_OPTIONS.map((w) => (
-                  <option key={w} value={w}>
-                    {w} kg
-                  </option>
-                ))}
-              </select>
-              <span className="text-sm font-bold text-gray-900 whitespace-nowrap text-fresh-green-600">
-                ₹{totalPrice.toFixed(0)}
-              </span>
-            </div>
-
-            {/* Add to Cart Button */}
-            <div>
-              {outOfStock ? (
-                <button
-                  disabled
-                  className="w-full text-xs text-gray-400 border border-gray-200 rounded-lg px-3 py-2 cursor-not-allowed bg-gray-50 font-semibold"
-                >
-                  Out of Stock
-                </button>
-              ) : isInCart ? (
-                <QuantitySelector
-                  quantity={cartQty}
-                  onIncrease={handleIncrease}
-                  onDecrease={handleDecrease}
-                  size="sm"
-                  className="w-full"
-                />
-              ) : (
-                <motion.button
-                  whileTap={{ scale: 0.95 }}
-                  onClick={handleAddToCart}
-                  className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-fresh-green-500 to-fresh-green-600 text-white text-xs font-bold px-3 py-2 rounded-lg hover:from-fresh-green-600 hover:to-fresh-green-700 transition-all duration-200 shadow-md hover:shadow-lg"
-                  aria-label={`Add ${product.name} to cart`}
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                  </svg>
-                  Add
-                </motion.button>
-              )}
-            </div>
-          </div>
-        ) : (
-          /* Original price display for non-weight-based products */
-          <div className="flex items-center justify-between gap-3 mt-3 pt-3 border-t border-gray-100">
-            <div className="flex flex-col">
-              <span className="text-base font-bold text-fresh-green-600 leading-tight">
-                {formattedPrice}
-              </span>
-            </div>
-
-            {/* Add to Cart / Quantity Selector */}
-            {outOfStock ? (
+        {/* Add to cart / quantity control */}
+        {!outOfStock && (
+          <div className="mt-auto pt-1">
+            {!isInCart ? (
               <button
-                disabled
-                className="text-xs text-gray-400 border border-gray-200 rounded-lg px-3 py-1.5 cursor-not-allowed bg-gray-50 font-semibold"
-              >
-                Unavailable
-              </button>
-            ) : isInCart ? (
-              <QuantitySelector
-                quantity={cartQty}
-                onIncrease={handleIncrease}
-                onDecrease={handleDecrease}
-                size="sm"
-              />
-            ) : (
-              <motion.button
-                whileTap={{ scale: 0.95 }}
                 onClick={handleAddToCart}
-                className="flex items-center gap-1.5 bg-gradient-to-r from-fresh-green-500 to-fresh-green-600 text-white text-xs font-bold px-3 py-1.5 rounded-lg hover:from-fresh-green-600 hover:to-fresh-green-700 transition-all duration-200 shadow-md hover:shadow-lg"
-                aria-label={`Add ${product.name} to cart`}
+                className="w-full flex items-center justify-center gap-1 bg-green-600 hover:bg-green-700 active:bg-green-800 text-white text-xs font-bold py-2 rounded-xl transition-colors shadow-sm"
               >
                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
                 </svg>
                 Add
-              </motion.button>
+              </button>
+            ) : (
+              <div className="flex items-center justify-between bg-green-600 rounded-xl overflow-hidden shadow-sm">
+                <button
+                  onClick={handleDecrease}
+                  className="w-9 h-8 flex items-center justify-center text-white hover:bg-green-700 active:bg-green-800 transition-colors text-base font-bold"
+                >
+                  −
+                </button>
+                <span className="text-white text-xs font-extrabold flex-1 text-center">
+                  {cartQty % 1 === 0 ? cartQty : cartQty.toFixed(1)} kg
+                </span>
+                <button
+                  onClick={handleIncrease}
+                  className="w-9 h-8 flex items-center justify-center text-white hover:bg-green-700 active:bg-green-800 transition-colors text-base font-bold"
+                >
+                  +
+                </button>
+              </div>
             )}
           </div>
         )}
       </div>
-    </motion.div>
+    </div>
   );
 });
 
 ProductCard.displayName = 'ProductCard';
-
 export default ProductCard;

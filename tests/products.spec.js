@@ -1,242 +1,154 @@
+/**
+ * products.spec.js
+ * Product browsing tests — updated for the new Blinkit-style ProductCard UI.
+ *
+ * Key changes vs original:
+ * - No product detail page navigation (cards are inline add-to-cart only)
+ * - Weight selection uses chip buttons, not a number input
+ * - Category filtering uses chip buttons at the top of ProductsPage
+ * - Login required; redirects to /login when unauthenticated
+ */
+
 const { test, expect } = require('@playwright/test');
+const { loginAsUser, addFirstProductToCart } = require('./fixtures');
 
-test.describe('Product Browsing & Management', () => {
+test.describe('Product Browsing', () => {
   test.beforeEach(async ({ page }) => {
-    // Start from home page
-    await page.goto('/');
-    // Wait for page to load
+    await loginAsUser(page);
+    await page.goto('/products');
     await page.waitForLoadState('networkidle');
+    // Wait for products to render
+    await page.waitForSelector('button:has-text("Add")', { timeout: 10000 });
   });
 
-  test('should display home page with products', async ({ page }) => {
-    // Check for main heading
-    await expect(page.locator('text=/CityFreshKart|Fresh|Produce|Products/i')).toBeVisible();
-    
-    // Check for product grid/list
-    const products = page.locator('[class*="product"]');
-    await expect(products.first()).toBeVisible();
+  // ── Page structure ─────────────────────────────────────────────────────────
+
+  test('should display CityFreshKart header', async ({ page }) => {
+    await expect(page.locator('header')).toBeVisible();
+    await expect(page.locator('text=/CityFreshKart/i').first()).toBeVisible();
   });
 
-  test('should display product list with prices', async ({ page }) => {
-    // Look for products with prices
-    const productItems = page.locator('text=/₹|Rs|rupees/i');
-    
-    // Should have at least one product with price
-    const count = await productItems.count();
+  test('should display delivery strip', async ({ page }) => {
+    await expect(page.locator('text=/30 min/i').first()).toBeVisible();
+  });
+
+  test('should display category chips', async ({ page }) => {
+    await expect(page.locator('button:has-text("All")')).toBeVisible();
+    await expect(page.locator('button:has-text("Vegetables")')).toBeVisible();
+    await expect(page.locator('button:has-text("Fruits")')).toBeVisible();
+  });
+
+  test('should display product grid with prices', async ({ page }) => {
+    // At least one ₹ price visible
+    const prices = page.locator('text=/₹/');
+    await expect(prices.first()).toBeVisible();
+    const count = await prices.count();
     expect(count).toBeGreaterThan(0);
   });
 
-  test('should display product image', async ({ page }) => {
-    // Check for product images
-    const productImages = page.locator('[class*="product"] img, [class*="image"] img');
-    await expect(productImages.first()).toBeVisible();
+  test('should display product images', async ({ page }) => {
+    const images = page.locator('img[alt]');
+    await expect(images.first()).toBeVisible();
   });
 
-  test('should display product name', async ({ page }) => {
-    // Look for product names/titles
-    await expect(page.locator('[class*="product"] [class*="name"], [class*="product"] [class*="title"], [class*="product-name"]').first()).toBeVisible();
+  test('should display product names', async ({ page }) => {
+    const names = page.locator('h3');
+    await expect(names.first()).toBeVisible();
   });
 
-  test('should navigate to product details', async ({ page }) => {
-    // Click on first product
-    const firstProduct = page.locator('[class*="product"]').first();
-    await firstProduct.click();
-    
-    // Wait for navigation and product details to load
-    await page.waitForNavigation();
-    
-    // Should see product details
-    await expect(page.locator('text=/Add to Cart|Details|Price|Description/i')).toBeVisible();
+  // ── Weight selector ────────────────────────────────────────────────────────
+
+  test('should display weight chip buttons (0.5kg, 1kg, 1.5kg, 2kg)', async ({ page }) => {
+    await expect(page.locator('button:has-text("0.5kg")').first()).toBeVisible();
+    await expect(page.locator('button:has-text("1kg")').first()).toBeVisible();
   });
 
-  test('should display product details page', async ({ page }) => {
-    // Navigate to product details
-    const firstProduct = page.locator('[class*="product"]').first();
-    await firstProduct.click();
-    await page.waitForNavigation();
-    
-    // Should show detailed product information
-    await expect(page.locator('text=/Add to Cart|Add|Cart/i')).toBeVisible();
+  test('should change selected weight when chip clicked', async ({ page }) => {
+    const chip1kg = page.locator('button:has-text("1kg")').first();
+    await chip1kg.click();
+    // The 1kg chip should now have the active (green) style
+    await expect(chip1kg).toHaveClass(/bg-green-600/);
   });
 
-  test('should display product with weight-based pricing', async ({ page }) => {
-    // Navigate to product details
-    const firstProduct = page.locator('[class*="product"]').first();
-    await firstProduct.click();
-    await page.waitForNavigation();
-    
-    // Should show price per kg
-    await expect(page.locator('text=/₹|Rs/i').first()).toBeVisible();
-    
-    // Should have weight selection option
-    const weightInput = page.locator('input[type="number"], input[placeholder*="kg" i], input[placeholder*="weight" i]');
-    if (await weightInput.count() > 0) {
-      expect(await weightInput.first().isVisible()).toBeTruthy();
+  // ── Add to cart ────────────────────────────────────────────────────────────
+
+  test('should add product to cart with inline Add button', async ({ page }) => {
+    await addFirstProductToCart(page);
+    // Cart badge should appear
+    const badge = page.locator('[data-testid="cart-badge"]');
+    await expect(badge).toBeVisible({ timeout: 5000 });
+  });
+
+  test('should show +/- quantity controls after adding to cart', async ({ page }) => {
+    await addFirstProductToCart(page);
+    // Increment/decrement buttons should replace the Add button on that card
+    const minusBtn = page.locator('button:has-text("−")').first();
+    await expect(minusBtn).toBeVisible({ timeout: 5000 });
+  });
+
+  // ── Category filtering ─────────────────────────────────────────────────────
+
+  test('should filter by Vegetables category', async ({ page }) => {
+    await page.click('button:has-text("Vegetables")');
+    await page.waitForTimeout(600);
+
+    // The Vegetables chip should be active
+    const vegChip = page.locator('button:has-text("Vegetables")');
+    await expect(vegChip).toHaveClass(/bg-green-600/);
+
+    // Should still have products (or show empty state gracefully)
+    const grid = page.locator('h3');
+    if (await grid.count() > 0) {
+      await expect(grid.first()).toBeVisible();
     }
   });
 
-  test('should display product description', async ({ page }) => {
-    // Navigate to product details
-    const firstProduct = page.locator('[class*="product"]').first();
-    await firstProduct.click();
-    await page.waitForNavigation();
-    
-    // Should show description
-    const description = page.locator('[class*="description"], p:not(:empty)');
-    if (await description.count() > 0) {
-      await expect(description.first()).toBeVisible();
-    }
+  test('should clear category filter with All chip', async ({ page }) => {
+    await page.click('button:has-text("Vegetables")');
+    await page.waitForTimeout(400);
+    await page.click('button:has-text("All")');
+    await page.waitForTimeout(400);
+
+    const allChip = page.locator('button:has-text("All")');
+    await expect(allChip).toHaveClass(/bg-green-600/);
   });
 
-  test('should show product discount if applicable', async ({ page }) => {
-    // Look for discount badge or text
-    const discounts = page.locator('text=/discount|off|save|% off|deal/i');
-    
-    if (await discounts.count() > 0) {
-      await expect(discounts.first()).toBeVisible();
-    }
+  test('should show product count', async ({ page }) => {
+    await expect(page.locator('text=/products/i').first()).toBeVisible();
   });
 
-  test('should allow searching for products', async ({ page }) => {
-    // Look for search input
-    const searchInput = page.locator('input[placeholder*="Search" i], input[placeholder*="search" i], [aria-label*="search" i]');
-    
-    if (await searchInput.count() > 0) {
-      await searchInput.first().fill('Tomato');
-      await page.waitForLoadState('networkidle');
-      
-      // Products should be filtered
-      const results = page.locator('[class*="product"]');
-      const count = await results.count();
-      expect(count).toBeGreaterThan(0);
-    }
+  // ── Sort ───────────────────────────────────────────────────────────────────
+
+  test('should sort by price ascending', async ({ page }) => {
+    await page.click('button:has-text("Price ↑")');
+    await page.waitForTimeout(600);
+    const sortBtn = page.locator('button:has-text("Price ↑")');
+    await expect(sortBtn).toHaveClass(/bg-gray-900/);
   });
 
-  test('should clear search and show all products', async ({ page }) => {
-    // Search for product
-    const searchInput = page.locator('input[placeholder*="Search" i]');
-    
-    if (await searchInput.count() > 0) {
-      await searchInput.first().fill('Tomato');
-      await page.waitForLoadState('networkidle');
-      
-      // Clear search
-      await searchInput.first().clear();
-      await page.waitForLoadState('networkidle');
-      
-      // Should show products again
-      const results = page.locator('[class*="product"]');
-      const count = await results.count();
-      expect(count).toBeGreaterThan(0);
-    }
+  // ── Search ─────────────────────────────────────────────────────────────────
+
+  test('should search via header search bar', async ({ page }) => {
+    const searchInput = page.locator('input[placeholder*="Search"]');
+    await searchInput.fill('tomato');
+    await searchInput.press('Enter');
+    await page.waitForTimeout(600);
+    // Either finds results or shows empty state
+    const empty = page.locator('text=/No products found/i');
+    const results = page.locator('button:has-text("Add")');
+    const hasResults = await results.count() > 0;
+    const hasEmpty = await empty.isVisible().catch(() => false);
+    expect(hasResults || hasEmpty).toBeTruthy();
   });
 
-  test('should allow filtering by category', async ({ page }) => {
-    // Look for category filter
-    const categoryFilter = page.locator('[class*="category"], [class*="filter"], [aria-label*="category" i]');
-    
-    if (await categoryFilter.count() > 0) {
-      const firstCategory = categoryFilter.first();
-      await firstCategory.click();
-      await page.waitForLoadState('networkidle');
-      
-      // Results should be filtered
-      const products = page.locator('[class*="product"]');
-      await expect(products.first()).toBeVisible();
-    }
-  });
+  // ── URL-based category (from footer links) ─────────────────────────────────
 
-  test('should navigate between product pages', async ({ page }) => {
-    // Look for pagination
-    const nextButton = page.locator('button:has-text("Next"), a:has-text("Next"), [aria-label*="next" i]');
-    
-    if (await nextButton.count() > 0) {
-      await nextButton.first().click();
-      await page.waitForLoadState('networkidle');
-      
-      // Page should change
-      const products = page.locator('[class*="product"]');
-      await expect(products.first()).toBeVisible();
-    }
-  });
+  test('should filter by category from URL param', async ({ page }) => {
+    await page.goto('/products?category=Fruits');
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(500);
 
-  test('should have working back button on product details', async ({ page }) => {
-    // Navigate to product details
-    const firstProduct = page.locator('[class*="product"]').first();
-    await firstProduct.click();
-    await page.waitForNavigation();
-    
-    // Look for back button
-    const backButton = page.locator('button:has-text(/Back|← Back/i), a:has-text(/Back|← Back/i)');
-    
-    if (await backButton.count() > 0) {
-      await backButton.first().click();
-      
-      // Should go back to products list
-      const products = page.locator('[class*="product"]');
-      await expect(products.first()).toBeVisible();
-    }
-  });
-
-  test('should display price per kg clearly', async ({ page }) => {
-    // Navigate to product details
-    const firstProduct = page.locator('[class*="product"]').first();
-    await firstProduct.click();
-    await page.waitForNavigation();
-    
-    // Look for price per kg
-    const pricePerKg = page.locator('text=/₹.*\/kg|₹.*per kg|price.*kg/i');
-    
-    if (await pricePerKg.count() > 0) {
-      await expect(pricePerKg.first()).toBeVisible();
-    }
-  });
-
-  test('should calculate total price based on weight', async ({ page }) => {
-    // Navigate to product details
-    const firstProduct = page.locator('[class*="product"]').first();
-    await firstProduct.click();
-    await page.waitForNavigation();
-    
-    // Fill weight
-    const weightInput = page.locator('input[type="number"], input[placeholder*="kg" i]');
-    if (await weightInput.count() > 0) {
-      await weightInput.first().fill('2');
-      
-      // Total price should be displayed
-      await expect(page.locator('text=/₹|Rs/i')).toBeVisible();
-    }
-  });
-
-  test.describe('Mobile Product Browsing', () => {
-    test.use({ viewport: { width: 390, height: 844 } });
-
-    test('should display products on mobile', async ({ page }) => {
-      const products = page.locator('[class*="product"]');
-      await expect(products.first()).toBeVisible();
-    });
-
-    test('should navigate to product details on mobile', async ({ page }) => {
-      const firstProduct = page.locator('[class*="product"]').first();
-      await firstProduct.click();
-      
-      await page.waitForNavigation();
-      
-      // Should see product details
-      await expect(page.locator('text=/Add to Cart|Details/i')).toBeVisible();
-    });
-
-    test('should perform search on mobile', async ({ page }) => {
-      const searchInput = page.locator('input[placeholder*="Search" i]');
-      
-      if (await searchInput.count() > 0) {
-        await searchInput.first().fill('Tomato');
-        await page.waitForLoadState('networkidle');
-        
-        const results = page.locator('[class*="product"]');
-        const count = await results.count();
-        expect(count).toBeGreaterThan(0);
-      }
-    });
+    const fruitsChip = page.locator('button:has-text("Fruits")');
+    await expect(fruitsChip).toHaveClass(/bg-green-600/);
   });
 });

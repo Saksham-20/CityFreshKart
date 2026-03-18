@@ -34,14 +34,13 @@ const useAuthStore = create((set, get) => ({
   },
 
   // Register with phone + password
-  register: async (phone, password, firstName, lastName) => {
+  register: async (phone, password, name) => {
     set({ loading: true, error: null });
     try {
       const response = await api.post('/auth/register', {
         phone,
         password,
-        first_name: firstName,
-        last_name: lastName || '',
+        name: name || '',
       });
 
       if (response.data.success && response.data.data) {

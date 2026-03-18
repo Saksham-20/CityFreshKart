@@ -6,6 +6,7 @@ import { Toaster } from 'react-hot-toast';
 import AdminLayout from './components/layout/AdminLayout';
 import Header from './components/layout/Header';
 import Footer from './components/layout/Footer';
+import MobileBottomNav from './components/layout/MobileBottomNav';
 
 // Auth Components
 import ProtectedRoute from './components/auth/ProtectedRoute';
@@ -23,6 +24,9 @@ const AdminDashboardPage = lazy(() => import('./pages/AdminDashboardPage'));
 const AdminProductsPage = lazy(() => import('./pages/AdminProductsPage'));
 const AdminOrdersPage = lazy(() => import('./pages/AdminOrdersPage'));
 const AdminUsersPage = lazy(() => import('./pages/AdminUsersPage'));
+const AdminAnalyticsPage = lazy(() => import('./pages/AdminAnalyticsPage'));
+const AdminSettingsPage = lazy(() => import('./pages/AdminSettingsPage'));
+const OrdersPage = lazy(() => import('./pages/OrdersPage'));
 
 // Loading component
 const PageLoader = () => (
@@ -54,69 +58,7 @@ function App() {
                 {/* Auth Routes - No Header */}
                 <Route path="/login" element={<LoginPage />} />
 
-          {/* Admin Routes */}
-          <Route path="/admin" element={
-            <AdminRoute>
-              <AdminLayout>
-                <AdminDashboardPage />
-              </AdminLayout>
-            </AdminRoute>
-          } />
-          <Route path="/admin/products" element={
-            <AdminRoute>
-              <AdminLayout>
-                <AdminProductsPage />
-              </AdminLayout>
-            </AdminRoute>
-          } />
-          <Route path="/admin/orders" element={
-            <AdminRoute>
-              <AdminLayout>
-                <AdminOrdersPage />
-              </AdminLayout>
-            </AdminRoute>
-          } />
-          <Route path="/admin/users" element={
-            <AdminRoute>
-              <AdminLayout>
-                <AdminUsersPage />
-              </AdminLayout>
-            </AdminRoute>
-          } />
-
-                {/* Main App Routes - With Header, authenticated users only */}
-                <Route path="/*" element={
-                  isAuthenticated ? (
-                    <div className="min-h-screen bg-white flex flex-col">
-                      <Header />
-                      <main className="flex-1">
-                        <Routes>
-                          {/* Redirect root to products */}
-                          <Route path="/" element={<ProductsPage />} />
-                          <Route path="/products" element={<ProductsPage />} />
-                          <Route path="/cart" element={<CartPage />} />
-                          <Route path="/checkout" element={
-                            <ProtectedRoute>
-                              <CheckoutPage />
-                            </ProtectedRoute>
-                          } />
-                          <Route path="/orders/:orderId/confirmation" element={
-                            <ProtectedRoute>
-                              <OrderConfirmationPage />
-                            </ProtectedRoute>
-                          } />
-                          {/* Catch all - redirect to products */}
-                          <Route path="*" element={<Navigate to="/products" replace />} />
-                        </Routes>
-                      </main>
-                      <Footer />
-                    </div>
-                  ) : (
-                    <Navigate to="/login" replace />
-                  )
-                } />
-
-                {/* Admin Routes - No Header */}
+                {/* Admin Routes - must be before /* to prevent wildcard capture */}
                 <Route path="/admin/*" element={
                   <AdminRoute>
                     <AdminLayout>
@@ -125,10 +67,48 @@ function App() {
                         <Route path="/products" element={<AdminProductsPage />} />
                         <Route path="/orders" element={<AdminOrdersPage />} />
                         <Route path="/users" element={<AdminUsersPage />} />
+                        <Route path="/analytics" element={<AdminAnalyticsPage />} />
+                        <Route path="/settings" element={<AdminSettingsPage />} />
                         <Route path="*" element={<Navigate to="/admin" replace />} />
                       </Routes>
                     </AdminLayout>
                   </AdminRoute>
+                } />
+
+                {/* Main App Routes - With Header, authenticated users only */}
+                <Route path="/*" element={
+                  isAuthenticated ? (
+                    <div className="min-h-screen bg-white flex flex-col">
+                      <Header />
+                      <main className="flex-1 pb-16 md:pb-0">
+                        <Routes>
+                          <Route path="/" element={<ProductsPage />} />
+                          <Route path="/products" element={<ProductsPage />} />
+                          <Route path="/cart" element={<CartPage />} />
+                          <Route path="/checkout" element={
+                            <ProtectedRoute>
+                              <CheckoutPage />
+                            </ProtectedRoute>
+                          } />
+                          <Route path="/orders" element={
+                            <ProtectedRoute>
+                              <OrdersPage />
+                            </ProtectedRoute>
+                          } />
+                          <Route path="/orders/:orderId/confirmation" element={
+                            <ProtectedRoute>
+                              <OrderConfirmationPage />
+                            </ProtectedRoute>
+                          } />
+                          <Route path="*" element={<Navigate to="/products" replace />} />
+                        </Routes>
+                      </main>
+                      <Footer />
+                      <MobileBottomNav />
+                    </div>
+                  ) : (
+                    <Navigate to="/login" replace />
+                  )
                 } />
 
                 {/* Catch all unmatched routes */}

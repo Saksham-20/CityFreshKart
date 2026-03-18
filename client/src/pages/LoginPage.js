@@ -7,17 +7,18 @@ import { useAuthStore } from '../store/useAuthStore';
 const LoginPage = () => {
   const [isLogin, setIsLogin] = useState(true);
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const user = useAuthStore((s) => s.user);
 
-  // If already logged in, redirect to products
+  // If already logged in, redirect appropriately
   if (isAuthenticated) {
-    return <Navigate to="/products" replace />;
+    return <Navigate to={user?.is_admin ? '/admin' : '/products'} replace />;
   }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 to-green-100 flex flex-col justify-center py-8 px-4 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <div className="text-center mb-6">
-          <h1 className="text-3xl font-bold text-green-900 mb-2">🥬 FreshCart</h1>
+          <h1 className="text-3xl font-bold text-green-900 mb-2">CityFreshKart</h1>
           <p className="text-green-700 text-base">
             {isLogin ? 'Sign in to shop fresh vegetables' : 'Create your account'}
           </p>
@@ -34,9 +35,6 @@ const LoginPage = () => {
         </div>
       </div>
 
-      <div className="mt-6 text-center text-sm text-green-700">
-        <p>Admin Login: Phone +919999999999 • Password: admin123</p>
-      </div>
     </div>
   );
 };

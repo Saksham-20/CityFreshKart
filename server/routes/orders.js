@@ -1,7 +1,6 @@
 const express = require('express');
 const { query, pool } = require('../database/config');
 const { authenticateToken } = require('../middleware/auth');
-const { body, validationResult } = require('express-validator');
 
 const router = express.Router();
 
@@ -71,12 +70,11 @@ router.get('/:id', authenticateToken, async (req, res) => {
 
     // Get order items
     const orderItems = await query(`
-      SELECT 
+      SELECT
         oi.*,
-        p.name as product_name,
-        p.image as product_image
+        p.image_url as product_image
       FROM order_items oi
-      JOIN products p ON oi.product_id = p.id
+      LEFT JOIN products p ON oi.product_id = p.id
       WHERE oi.order_id = $1
     `, [id]);
 
@@ -99,125 +97,85 @@ router.get('/:id', authenticateToken, async (req, res) => {
 // @route   POST /api/orders
 // @desc    Create a new order
 // @access  Private
-router.post('/', authenticateToken, [
-  body('items').isArray({ min: 1 }).withMessage('Items are required'),
-  body('shipping_address').isObject().withMessage('Shipping address is required'),
-  body('payment_method').notEmpty().withMessage('Payment method is required'),
-], async (req, res) => {
+router.post('/', authenticateToken, async (req, res) => {
   try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({
-        success: false,
-        error: { code: 'VALIDATION_ERROR', message: 'Validation failed' },
-        errors: errors.array(),
-      });
+    const { items, delivery_address, payment_method = 'cod', subtotal: clientSubtotal, delivery_fee: clientDeliveryFee, total_price: clientTotal } = req.body;
+
+    if (!items || !Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Items are required' } });
     }
 
-    const { items, shipping_address, billing_address, payment_method, coupon_code, notes } = req.body;
+    if (!delivery_address || !delivery_address.trim()) {
+      return res.status(400).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Delivery address is required' } });
+    }
 
-    // Start transaction
+    // Recalculate totals server-side for integrity
+    let subtotal = 0;
+    for (const item of items) {
+      const pricePerKg = parseFloat(item.price_per_kg || 0);
+      const quantityKg = parseFloat(item.quantity_kg || 0);
+      const discount = parseFloat(item.discount || 0);
+      const itemTotal = pricePerKg * quantityKg * (1 - discount / 100);
+      subtotal += itemTotal;
+    }
+    subtotal = parseFloat(subtotal.toFixed(2));
+
+    const deliveryFee = subtotal >= 300 ? 0 : 50;
+    const totalPrice = parseFloat((subtotal + deliveryFee).toFixed(2));
+
+    const orderNumber = `ORD-${Date.now()}-${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
+
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
 
-      // Create shipping address (save for records)
-      const addressResult = await client.query(`
-        INSERT INTO user_addresses (user_id, first_name, last_name, address_line, city, state, postal_code, phone, is_default)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-        RETURNING id
-      `, [
-        req.user.id,
-        shipping_address.firstName || shipping_address.first_name || '', 
-        shipping_address.lastName || shipping_address.last_name || '',
-        shipping_address.addressLine1 || shipping_address.address_line || shipping_address.addressLine || '',
-        shipping_address.city || '', 
-        shipping_address.state || '',
-        shipping_address.postalCode || shipping_address.postal_code || shipping_address.zip || '',
-        shipping_address.phone || '', 
-        false,
-      ]);
-
-      const billingAddr = billing_address || shipping_address;
-      // Billing address uses same table with snake_case columns
-      const billingResult = await client.query(`
-        INSERT INTO user_addresses (user_id, first_name, last_name, address_line, city, state, postal_code, phone, is_default)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-        RETURNING id
-      `, [
-        req.user.id,
-        billingAddr.firstName || billingAddr.first_name || '', billingAddr.lastName || billingAddr.last_name || '',
-        billingAddr.addressLine1 || billingAddr.address_line_1 || billingAddr.address1 || billingAddr.address_line || '',
-        billingAddr.city || '', billingAddr.state || '',
-        billingAddr.postalCode || billingAddr.postal_code || billingAddr.zip || '',
-        billingAddr.phone || '', false,
-      ]);
-
-      // Calculate subtotal with weight-based pricing
-      let subtotal = 0;
-      for (const item of items) {
-        const itemPrice = item.price_per_kg
-          ? (parseFloat(item.price_per_kg) * parseFloat(item.weight || 1) * parseInt(item.quantity || 1))
-          : (parseFloat(item.price || 0) * parseInt(item.quantity || 1));
-        subtotal += itemPrice;
-      }
-
-      // Apply coupon if provided (coupons table not available - skip silently)
-      let discountAmount = 0;
-      if (coupon_code) {
-        // Coupon system not configured, skip silently
-      }
-
-      const deliveryFee = subtotal >= 300 ? 0 : 30;
-      const totalAmount = parseFloat((subtotal - discountAmount + deliveryFee).toFixed(2));
-
-      // Generate order number
-      const orderNumber = `ORD-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
-
-      // Create order
+      // Insert order — columns match schema.sql exactly
       const orderResult = await client.query(`
-        INSERT INTO orders (order_number, user_id, status, subtotal, delivery_fee, discount, total, payment_status, payment_method, address_id)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        INSERT INTO orders (order_number, user_id, phone, delivery_address, subtotal, delivery_fee, total_price, payment_method, status)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
         RETURNING *
       `, [
-        orderNumber, req.user.id, 'pending', subtotal.toFixed(2),
-        deliveryFee, discountAmount.toFixed(2), totalAmount,
-        'pending', payment_method, addressResult.rows[0].id,
+        orderNumber,
+        req.user.id,
+        req.user.phone,
+        delivery_address.trim(),
+        subtotal,
+        deliveryFee,
+        totalPrice,
+        payment_method,
+        'pending',
       ]);
 
       const order = orderResult.rows[0];
 
-      // Create order items
+      // Insert order items — columns match schema.sql exactly
       for (const item of items) {
-        const unitPrice = item.price_per_kg
-          ? parseFloat((parseFloat(item.price_per_kg) * parseFloat(item.weight || 1)).toFixed(2))
-          : parseFloat(item.price_per_kg || 0);
-        const totalPrice = parseFloat((unitPrice * parseInt(item.quantity || 1)).toFixed(2));
+        const pricePerKg = parseFloat(item.price_per_kg || 0);
+        const quantityKg = parseFloat(item.quantity_kg || 0);
+        const discount = parseFloat(item.discount || 0);
+        const itemTotal = parseFloat((pricePerKg * quantityKg * (1 - discount / 100)).toFixed(2));
 
         await client.query(`
-          INSERT INTO order_items (order_id, product_id, product_name, quantity, weight, price_per_kg, discount, total_price)
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+          INSERT INTO order_items (order_id, product_id, product_name, quantity_kg, price_per_kg, total_price)
+          VALUES ($1, $2, $3, $4, $5, $6)
         `, [
           order.id,
-          item.product_id || item.id,
-          item.name || item.product_name || '',
-          parseInt(item.quantity || 1),
-          item.weight ? parseFloat(item.weight) : null,
-          parseFloat(item.price_per_kg || 0),
-          parseFloat(item.discount || 0),
-          totalPrice,
+          item.product_id,
+          item.product_name || '',
+          quantityKg,
+          pricePerKg,
+          itemTotal,
         ]);
 
-        // Update product stock
-        await client.query(`
-          UPDATE products SET stock_quantity = stock_quantity - $1 WHERE id = $2
-        `, [parseInt(item.quantity || 1), item.product_id || item.id]);
+        // Decrement available stock (quantity_available matches schema.sql)
+        await client.query(
+          'UPDATE products SET quantity_available = quantity_available - $1 WHERE id = $2 AND quantity_available >= $1',
+          [quantityKg, item.product_id],
+        );
       }
 
-      // Clear user's cart
-      await client.query(`
-        DELETE FROM cart_items WHERE cart_id IN (SELECT id FROM carts WHERE user_id = $1)
-      `, [req.user.id]);
+      // Clear user's cart — flat `cart` table matches schema.sql
+      await client.query('DELETE FROM cart WHERE user_id = $1', [req.user.id]);
 
       await client.query('COMMIT');
 
@@ -226,11 +184,9 @@ router.post('/', authenticateToken, [
         data: {
           order,
           orderNumber: order.order_number,
-          subtotal: parseFloat(subtotal.toFixed(2)),
-          discount: parseFloat(discountAmount.toFixed(2)),
+          subtotal,
           deliveryFee,
-          total: totalAmount,
-          paymentStatus: 'pending',
+          total: totalPrice,
         },
       });
 
@@ -286,14 +242,14 @@ router.post('/:id/cancel', authenticateToken, async (req, res) => {
 
       // Restore product stock
       const orderItems = await client.query(
-        'SELECT product_id, quantity FROM order_items WHERE order_id = $1',
+        'SELECT product_id, quantity_kg FROM order_items WHERE order_id = $1',
         [id],
       );
 
       for (const item of orderItems.rows) {
         await client.query(
-          'UPDATE products SET stock_quantity = stock_quantity + $1 WHERE id = $2',
-          [item.quantity, item.product_id],
+          'UPDATE products SET quantity_available = quantity_available + $1 WHERE id = $2',
+          [item.quantity_kg, item.product_id],
         );
       }
 

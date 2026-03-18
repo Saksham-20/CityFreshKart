@@ -1,5 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import { FiExternalLink, FiLogOut } from 'react-icons/fi';
 import useAuth from '../../hooks/useAuth';
 
 const AdminLayout = ({ children }) => {
@@ -34,21 +35,23 @@ const AdminLayout = ({ children }) => {
               </Link>
             </div>
             
-            <div className="flex items-center space-x-4">
-              <span className="text-sm text-gray-700">
-                Welcome, {user?.first_name || 'Admin'}
+            <div className="flex items-center space-x-3">
+              <span className="text-sm text-gray-500 hidden sm:block">
+                {user?.name || user?.first_name || 'Admin'}
               </span>
               <Link
                 to="/"
-                className="text-sm text-indigo-600 hover:text-indigo-500"
+                className="flex items-center gap-1.5 text-sm font-medium text-green-700 bg-green-50 hover:bg-green-100 border border-green-200 px-3 py-1.5 rounded-lg transition-colors"
               >
+                <FiExternalLink className="w-3.5 h-3.5" />
                 View Store
               </Link>
               <button
                 onClick={logout}
-                className="text-sm text-gray-500 hover:text-gray-700"
+                className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-red-600 hover:bg-red-50 px-3 py-1.5 rounded-lg transition-colors"
               >
-                Logout
+                <FiLogOut className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Logout</span>
               </button>
             </div>
           </div>

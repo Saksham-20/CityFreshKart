@@ -1,30 +1,22 @@
 import React from 'react';
-import { Link, useLocation } from 'react-router-dom';
-import { FiHome, FiGrid, FiShoppingBag, FiUser } from 'react-icons/fi';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { FiHome, FiShoppingBag, FiList, FiLogOut } from 'react-icons/fi';
+import useAuth from '../../hooks/useAuth';
 import useCart from '../../hooks/useCart';
 
 /**
- * MobileBottomNav — sticky bottom navigation for minimal PWA
+ * MobileBottomNav — sticky bottom navigation bar for PWA / mobile
  */
-const MobileBottomNav = ({ onCartClick }) => {
+const MobileBottomNav = () => {
   const location = useLocation();
+  const navigate = useNavigate();
+  const { isAuthenticated, logout } = useAuth();
   const { items: cartItems } = useCart();
 
-  const cartCount = cartItems?.reduce((t, i) => t + i.quantity, 0) || 0;
+  const cartCount = cartItems?.length || 0;
 
-  const isActive = (path) => location.pathname === path || location.pathname.startsWith(path + '?');
-
-  const navItems = [
-    { label: 'Home', icon: FiHome, href: '/' },
-    { label: 'Shop', icon: FiGrid, href: '/products' },
-    {
-      label: 'Cart',
-      icon: FiShoppingBag,
-      href: '/cart',
-      badge: cartCount > 0 ? cartCount : null
-    },
-    { label: 'Account', icon: FiUser, href: '/profile' }
-  ];
+  const isActive = (path) =>
+    location.pathname === path || location.pathname.startsWith(path + '/');
 
   // Don't show on admin or auth pages
   if (
@@ -41,51 +33,70 @@ const MobileBottomNav = ({ onCartClick }) => {
   };
 
   return (
-    <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-gradient-to-r from-white to-gray-50 border-t border-gray-100 safe-area-inset-bottom shadow-[0_-2px_10px_rgba(0,0,0,0.08)]">
-      <div className="flex justify-around items-center h-16 px-2 sm:px-3">
-        
-        {/* Products */}
+    <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-gray-100 shadow-[0_-2px_10px_rgba(0,0,0,0.08)]">
+      <div className="flex justify-around items-center h-16 px-2">
+
+        {/* Shop */}
         <Link
           to="/products"
-          className={`flex flex-col items-center py-2 px-3 rounded-lg transition-all duration-200 ${
-            isActive('/products') || isActive('/')
-              ? 'text-fresh-green-600 bg-fresh-green-50'
-              : 'text-gray-600 hover:text-fresh-green-600 hover:bg-fresh-green-50'
+          className={`flex flex-col items-center py-2 px-4 rounded-xl transition-all duration-200 ${
+            isActive('/products') || location.pathname === '/'
+              ? 'text-green-600 bg-green-50'
+              : 'text-gray-500 hover:text-green-600 hover:bg-green-50'
           }`}
         >
-          <FiHome size={24} strokeWidth={1.5} />
+          <FiHome size={22} strokeWidth={isActive('/products') || location.pathname === '/' ? 2.5 : 1.5} />
           <span className="text-xs mt-0.5 font-medium">Shop</span>
         </Link>
 
         {/* Cart */}
-        <button
-          onClick={onCartClick}
-          className="flex flex-col items-center py-2 px-3 rounded-lg transition-all duration-200 text-gray-600 hover:text-fresh-green-600 hover:bg-fresh-green-50 relative group"
+        <Link
+          to="/cart"
+          className={`flex flex-col items-center py-2 px-4 rounded-xl transition-all duration-200 relative ${
+            isActive('/cart')
+              ? 'text-green-600 bg-green-50'
+              : 'text-gray-500 hover:text-green-600 hover:bg-green-50'
+          }`}
         >
-          <FiShoppingBag size={24} strokeWidth={1.5} />
-          {cartCount > 0 && (
-            <span className="absolute -top-1 -right-1 bg-gradient-to-r from-red-500 to-red-600 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold shadow-md group-hover:scale-110 transition-transform duration-200">
-              {cartCount > 99 ? '99+' : cartCount}
-            </span>
-          )}
+          <div className="relative">
+            <FiShoppingBag size={22} strokeWidth={isActive('/cart') ? 2.5 : 1.5} />
+            {cartCount > 0 && (
+              <span className="absolute -top-1.5 -right-2 bg-red-500 text-white text-[10px] rounded-full w-4 h-4 flex items-center justify-center font-bold">
+                {cartCount > 9 ? '9+' : cartCount}
+              </span>
+            )}
+          </div>
           <span className="text-xs mt-0.5 font-medium">Cart</span>
-        </button>
+        </Link>
 
-        {/* Account */}
+        {/* Orders */}
+        <Link
+          to="/orders"
+          className={`flex flex-col items-center py-2 px-4 rounded-xl transition-all duration-200 ${
+            isActive('/orders')
+              ? 'text-green-600 bg-green-50'
+              : 'text-gray-500 hover:text-green-600 hover:bg-green-50'
+          }`}
+        >
+          <FiList size={22} strokeWidth={isActive('/orders') ? 2.5 : 1.5} />
+          <span className="text-xs mt-0.5 font-medium">Orders</span>
+        </Link>
+
+        {/* Account / Logout */}
         {isAuthenticated ? (
           <button
             onClick={handleLogout}
-            className="flex flex-col items-center py-2 px-3 rounded-lg transition-all duration-200 text-gray-600 hover:text-red-600 hover:bg-red-50"
+            className="flex flex-col items-center py-2 px-4 rounded-xl transition-all duration-200 text-gray-500 hover:text-red-600 hover:bg-red-50"
           >
-            <FiUser size={24} strokeWidth={1.5} />
+            <FiLogOut size={22} strokeWidth={1.5} />
             <span className="text-xs mt-0.5 font-medium">Logout</span>
           </button>
         ) : (
           <Link
             to="/login"
-            className="flex flex-col items-center py-2 px-3 rounded-lg transition-all duration-200 text-gray-600 hover:text-fresh-green-600 hover:bg-fresh-green-50"
+            className="flex flex-col items-center py-2 px-4 rounded-xl transition-all duration-200 text-gray-500 hover:text-green-600 hover:bg-green-50"
           >
-            <FiUser size={24} strokeWidth={1.5} />
+            <FiLogOut size={22} strokeWidth={1.5} />
             <span className="text-xs mt-0.5 font-medium">Login</span>
           </Link>
         )}

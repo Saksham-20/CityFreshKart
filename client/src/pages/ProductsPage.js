@@ -1,43 +1,57 @@
-import React, { useState, useEffect } from 'react';
-import { useParams, useSearchParams } from 'react-router-dom';
+import React, { useState, useEffect, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import ProductGrid from '../components/product/ProductGrid';
 import ProductCardSkeleton from '../components/product/ProductCardSkeleton';
-import Carousel from '../components/product/Carousel';
-import SearchBar from '../components/common/SearchBar';
 import api from '../services/api';
 
-const ProductsPage = ({ category: propCategory, onCartClick }) => {
-  const { subcategory } = useParams();
+const CATEGORIES = ['All', 'Vegetables', 'Fruits', 'Dairy', 'Bakery', 'Grains', 'Herbs & Spices', 'Other'];
+
+const SORT_OPTIONS = [
+  { value: 'newest', label: 'Newest' },
+  { value: 'price-low', label: 'Price ↑' },
+  { value: 'price-high', label: 'Price ↓' },
+];
+
+const ProductsPage = () => {
   const [searchParams] = useSearchParams();
-  const category = propCategory || subcategory || searchParams.get('category') || '';
   const [products, setProducts] = useState([]);
   const [filteredProducts, setFilteredProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [searchQuery, setSearchQuery] = useState(searchParams.get('search') || '');
   const [sortBy, setSortBy] = useState('newest');
-  const [selectedCategory, setSelectedCategory] = useState(category);
+  const [activeCategory, setActiveCategory] = useState('All');
+  const categoryRef = useRef(null);
 
   useEffect(() => {
     fetchProducts();
-  }, [category]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     applyFilters();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [products, sortBy, searchQuery, selectedCategory]);
+  }, [products, sortBy, searchQuery, activeCategory]);
+
+  // Sync search query and category from URL params
+  useEffect(() => {
+    const q = searchParams.get('search') || '';
+    const cat = searchParams.get('category') || '';
+    setSearchQuery(q);
+    if (cat && CATEGORIES.includes(cat)) {
+      setActiveCategory(cat);
+    } else if (q) {
+      setActiveCategory('All');
+    }
+  }, [searchParams]);
 
   const fetchProducts = async () => {
     try {
       setLoading(true);
       const response = await api.get('/products?page=1&limit=100');
-      if (response.data) {
-        const items = response.data.data?.products || response.data.products || [];
-        setProducts(items);
-        setError(null);
-      } else {
-        throw new Error('Failed to fetch products');
-      }
+      const items = response.data?.data?.products || response.data?.products || [];
+      setProducts(items);
+      setError(null);
     } catch (err) {
       setError('Failed to load products. Please try again.');
       console.error(err);
@@ -49,26 +63,26 @@ const ProductsPage = ({ category: propCategory, onCartClick }) => {
   const applyFilters = () => {
     let filtered = [...products];
 
-    // Search filter
-    if (searchQuery) {
-      filtered = filtered.filter(product =>
-        product.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (product.description && product.description.toLowerCase().includes(searchQuery.toLowerCase()))
+    if (activeCategory !== 'All') {
+      filtered = filtered.filter(p =>
+        (p.category || '').toLowerCase() === activeCategory.toLowerCase()
       );
     }
 
-    // Category filter
-    if (selectedCategory) {
-      filtered = filtered.filter(product => product.category === selectedCategory);
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      filtered = filtered.filter(p =>
+        p.name?.toLowerCase().includes(q) ||
+        p.description?.toLowerCase().includes(q)
+      );
     }
 
-    // Sorting
     switch (sortBy) {
       case 'price-low':
-        filtered.sort((a, b) => parseFloat(a.price || 0) - parseFloat(b.price || 0));
+        filtered.sort((a, b) => parseFloat(a.price_per_kg || 0) - parseFloat(b.price_per_kg || 0));
         break;
       case 'price-high':
-        filtered.sort((a, b) => parseFloat(b.price || 0) - parseFloat(a.price || 0));
+        filtered.sort((a, b) => parseFloat(b.price_per_kg || 0) - parseFloat(a.price_per_kg || 0));
         break;
       case 'newest':
       default:
@@ -79,84 +93,116 @@ const ProductsPage = ({ category: propCategory, onCartClick }) => {
     setFilteredProducts(filtered);
   };
 
-  const categories = ['All', ...Array.from(new Set(products.map(p => p.category).filter(Boolean)))];
-
   return (
-    <div className="min-h-screen bg-white pt-16 sm:pt-20">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8">
-        {/* Carousel */}
-        <Carousel />
+    <div className="min-h-screen bg-gray-50 pt-14">
 
-        {/* Header */}
-        <div className="mb-6">
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">Fresh Products</h1>
-          <p className="text-gray-600">
-            {!loading && `${filteredProducts.length} products available`}
-          </p>
-        </div>
-
-        {/* Minimal Filter Bar */}
-        <div className="flex flex-col sm:flex-row gap-3 mb-6 items-stretch sm:items-center">
-          {/* Search */}
-          <div className="flex-1 min-w-0">
-            <SearchBar
-              onSearch={setSearchQuery}
-              initialValue={searchQuery}
-              placeholder="Search products..."
-              className="w-full"
-              size="sm"
-            />
+      {/* Hero delivery strip */}
+      <div className="bg-green-600 text-white">
+        <div className="max-w-7xl mx-auto px-4 py-2.5 flex items-center justify-between text-sm">
+          <div className="flex items-center gap-2 font-semibold">
+            <span className="text-base">⚡</span>
+            <span>Delivery in <strong>30 minutes</strong></span>
           </div>
+          <div className="text-green-100 text-xs hidden sm:block">
+            Fresh produce · Quality guaranteed · Free delivery over ₹300
+          </div>
+        </div>
+      </div>
 
-          {/* Category Filter */}
-          <select
-            value={selectedCategory}
-            onChange={(e) => setSelectedCategory(e.target.value)}
-            className="px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 bg-white focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors"
-          >
-            {categories.map((cat) => (
-              <option key={cat} value={cat === 'All' ? '' : cat}>
-                {cat}
-              </option>
-            ))}
-          </select>
-
-          {/* Sort */}
-          <select
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value)}
-            className="px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 bg-white focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors"
-          >
-            <option value="newest">Newest First</option>
-            <option value="price-low">Price: Low to High</option>
-            <option value="price-high">Price: High to Low</option>
-          </select>
+      {/* Sticky category + filter bar */}
+      <div className="bg-white border-b border-gray-100 sticky top-14 z-30 shadow-sm">
+        {/* Category chips */}
+        <div
+          ref={categoryRef}
+          className="flex items-center gap-2 overflow-x-auto no-scrollbar px-3 sm:px-4 pt-2.5 pb-0"
+          style={{ scrollbarWidth: 'none' }}
+        >
+          {CATEGORIES.map(cat => (
+            <button
+              key={cat}
+              onClick={() => { setActiveCategory(cat); setSearchQuery(''); }}
+              className={`flex-shrink-0 text-xs font-semibold px-3.5 py-1.5 rounded-full border transition-all whitespace-nowrap ${
+                activeCategory === cat
+                  ? 'bg-green-600 text-white border-green-600 shadow-sm'
+                  : 'text-gray-600 border-gray-200 bg-white hover:border-green-400 hover:text-green-700'
+              }`}
+            >
+              {cat}
+            </button>
+          ))}
         </div>
 
-        {/* Products Grid */}
+        {/* Sort + item count row */}
+        <div className="flex items-center justify-between px-3 sm:px-4 py-2">
+          <span className="text-xs text-gray-400 font-medium">
+            {loading ? '' : `${filteredProducts.length} products`}
+          </span>
+          <div className="flex items-center gap-1.5">
+            {SORT_OPTIONS.map(opt => (
+              <button
+                key={opt.value}
+                onClick={() => setSortBy(opt.value)}
+                className={`text-xs px-2.5 py-1 rounded-lg font-medium transition-colors ${
+                  sortBy === opt.value
+                    ? 'bg-gray-900 text-white'
+                    : 'text-gray-500 bg-gray-100 hover:bg-gray-200'
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Products Grid */}
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6 py-4">
         {loading ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4">
-            <ProductCardSkeleton count={20} />
+            <ProductCardSkeleton count={12} />
           </div>
         ) : error ? (
-          <div className="text-center py-16">
-            <p className="text-gray-500 mb-4">{error}</p>
+          <div className="text-center py-20">
+            <div className="text-4xl mb-3">😕</div>
+            <p className="text-gray-500 mb-4 text-sm">{error}</p>
             <button
               onClick={fetchProducts}
-              className="text-sm text-green-600 font-medium hover:text-green-700"
+              className="text-sm text-white bg-green-600 hover:bg-green-700 font-medium px-5 py-2 rounded-lg"
             >
               Try again
             </button>
           </div>
         ) : filteredProducts.length === 0 ? (
-          <div className="text-center py-16">
-            <p className="text-gray-500 text-lg">No products found</p>
-            <p className="text-gray-400 text-sm mt-1">Try adjusting your filters</p>
+          <div className="text-center py-20">
+            <div className="text-5xl mb-3">🥦</div>
+            <p className="text-gray-600 font-semibold">No products found</p>
+            <p className="text-gray-400 text-sm mt-1">
+              {searchQuery ? `No results for "${searchQuery}"` : `Nothing in "${activeCategory}" yet`}
+            </p>
+            {(searchQuery || activeCategory !== 'All') && (
+              <button
+                onClick={() => { setSearchQuery(''); setActiveCategory('All'); }}
+                className="mt-4 text-sm text-green-600 font-semibold hover:underline"
+              >
+                Show all products
+              </button>
+            )}
           </div>
         ) : (
-          <ProductGrid products={filteredProducts} loading={false} error={null} />
+          <>
+            {activeCategory !== 'All' && (
+              <h2 className="text-base font-bold text-gray-800 mb-3">{activeCategory}</h2>
+            )}
+            <ProductGrid products={filteredProducts} loading={false} error={null} />
+          </>
         )}
       </div>
+
+      {/* Global style for hiding scrollbar */}
+      <style>{`
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+      `}</style>
     </div>
   );
 };

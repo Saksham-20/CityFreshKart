@@ -3,84 +3,49 @@ const { query } = require('../database/config');
 
 const router = express.Router();
 
-/**
- * SEARCH ENDPOINT - FAST, SIMPLE, OPTIMIZED
- * @route   GET /api/products/search?q=keyword
- * @desc    Fast product search by name and category
- * @access  Public
- * @performance Uses indexed columns (name, category) for instant results
- */
+// @route   GET /api/products/search?q=keyword
+// @desc    Fast product search by name
+// @access  Public
 router.get('/search', async (req, res) => {
   try {
     const { q = '', limit = 20 } = req.query;
-    
-    // Minimum 2 characters required for search
+
     if (!q || q.trim().length < 2) {
-      return res.json({
-        success: true,
-        data: {
-          products: [],
-          query: q
-        }
-      });
+      return res.json({ success: true, data: { products: [], query: q } });
     }
 
     const searchQuery = `%${q.toLowerCase()}%`;
-    
-    // Use indexed columns for performance: name, category
+
     const result = await query(`
-      SELECT 
-        p.id,
-        p.name,
-        p.slug,
-        p.description,
-        p.price_per_kg,
-        p.discount,
-        p.stock_quantity,
-        p.image,
-        c.name as category_name,
-        c.slug as category_slug
-      FROM products p
-      LEFT JOIN categories c ON p.category_id = c.id
-      WHERE p.is_active = true 
-        AND (
-          LOWER(p.name) LIKE $1 
-          OR LOWER(c.name) LIKE $1
-        )
-      ORDER BY 
-        CASE WHEN LOWER(p.name) LIKE $1 THEN 0 ELSE 1 END,
-        p.name ASC
+      SELECT
+        id,
+        name,
+        description,
+        category,
+        price_per_kg,
+        discount,
+        image_url,
+        is_active,
+        quantity_available
+      FROM products
+      WHERE is_active = true
+        AND LOWER(name) LIKE $1
+      ORDER BY name ASC
       LIMIT $2
     `, [searchQuery, parseInt(limit || 20)]);
-
-    // Format response
-    const products = result.rows.map(p => ({
-      id: p.id,
-      name: p.name,
-      slug: p.slug,
-      pricePerKg: p.price_per_kg,
-      discount: p.discount,
-      image: p.image,
-      category: p.category_name,
-      categorySlug: p.category_slug,
-      inStock: p.stock_quantity > 0
-    }));
 
     res.json({
       success: true,
       data: {
-        products,
+        products: result.rows,
         query: q,
-        count: products.length
-      }
+        count: result.rows.length,
+      },
     });
 
   } catch (error) {
     console.error('Search products error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Search failed'
-    });
+    res.status(500).json({ success: false, message: 'Search failed' });
   }
 });
 
@@ -114,12 +79,12 @@ router.get('/', async (req, res) => {
     const countResult = await query(countQuery, queryParams);
     const total = parseInt(countResult.rows[0].total);
 
-    // Get products with pagination (simplified schema - no categories, reviews, images)
     const productsQuery = `
       SELECT 
         id,
         name,
         description,
+        category,
         price_per_kg,
         discount,
         image_url,

@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import Navbar from '../components/layout/Navbar';
 import { orderService } from '../services/orderService';
 import Button from '../components/ui/Button';
 import Loading from '../components/ui/Loading';
@@ -76,7 +75,6 @@ const OrdersPage = () => {
 
   return (
     <>
-      <Navbar onCartClick={() => navigate('/cart')} />
       <div className="min-h-screen bg-gray-50 pt-20 pb-24 md:pb-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
           <Breadcrumb />
@@ -158,7 +156,7 @@ const OrdersPage = () => {
                     <div>
                       <p className="text-xs text-gray-500 uppercase font-semibold">Total</p>
                       <p className="text-lg font-bold text-gray-900 mt-1">
-                        {formatPrice(order.total_amount || order.total || 0)}
+                        {formatPrice(order.total_price || order.total_amount || 0)}
                       </p>
                     </div>
                     <div>

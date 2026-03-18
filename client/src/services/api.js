@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { useAuthStore } from '../store/useAuthStore';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL
   ? `${process.env.REACT_APP_API_URL}/api`
@@ -26,9 +27,7 @@ apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      localStorage.removeItem('token');
-      // Don't reject 401 errors - they're expected for unauthenticated requests
-      // Return a safe response that allows the app to continue
+      useAuthStore.getState().logout();
       return Promise.reject(error);
     }
     return Promise.reject(error);

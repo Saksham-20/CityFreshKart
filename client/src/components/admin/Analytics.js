@@ -30,61 +30,47 @@ const Analytics = () => {
   });
   const [topProducts, setTopProducts] = useState([]);
   const [recentOrders, setRecentOrders] = useState([]);
-  // const [salesChart, setSalesChart] = useState([]);
+  const [salesData, setSalesData] = useState([]);
   const [categoryData, setCategoryData] = useState([]);
 
   useEffect(() => {
     fetchAnalytics();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [timeRange]);
 
   const fetchAnalytics = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('token');
-      const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000';
-      const response = await fetch(`${apiUrl}/api/admin/analytics?period=${timeRange}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
+      const response = await api.get('/admin/analytics', { params: { period: timeRange } });
+      const data = response.data;
+
+      setAnalyticsData({
+        revenue: {
+          total: data.stats?.totalRevenue || data.salesData.reduce((sum, item) => sum + parseFloat(item.revenue || 0), 0),
+          change: 0,
+          trend: 'up'
+        },
+        orders: {
+          total: data.stats?.totalOrders || data.salesData.reduce((sum, item) => sum + parseInt(item.orders || 0), 0),
+          change: 0,
+          trend: 'up'
+        },
+        customers: {
+          total: data.stats?.totalUsers || 0,
+          change: 0,
+          trend: 'up'
+        },
+        products: {
+          total: data.stats?.totalProducts || 0,
+          change: 0,
+          trend: 'up'
         }
       });
-      
-      if (response.ok) {
-        const data = await response.json();
-        console.log('Analytics data received:', data);
-        console.log('Stats from analytics:', data.stats);
-        
-        // Transform the data to match the expected format
-        setAnalyticsData({
-          revenue: {
-            total: data.stats?.totalRevenue || data.salesData.reduce((sum, item) => sum + parseFloat(item.revenue || 0), 0),
-            change: 0, // TODO: Calculate change from previous period
-            trend: 'up'
-          },
-          orders: {
-            total: data.stats?.totalOrders || data.salesData.reduce((sum, item) => sum + parseInt(item.orders || 0), 0),
-            change: 0, // TODO: Calculate change from previous period
-            trend: 'up'
-          },
-          customers: {
-            total: data.stats?.totalUsers || 0,
-            change: 0,
-            trend: 'up'
-          },
-          products: {
-            total: data.stats?.totalProducts || 0,
-            change: 0,
-            trend: 'up'
-          }
-        });
-        
-        setTopProducts(data.topProducts || []);
-        setRecentOrders(data.recentOrders || []);
-        // setSalesChart(data.salesData || []);
-        setCategoryData(data.categoryData || []);
-      } else {
-        console.error('Failed to fetch analytics:', response.status);
-      }
+
+      setTopProducts(data.topProducts || []);
+      setRecentOrders(data.recentOrders || []);
+      setSalesData(data.salesData || []);
+      setCategoryData(data.categoryData || []);
     } catch (error) {
       console.error('Error fetching analytics:', error);
     } finally {
@@ -345,25 +331,30 @@ const Analytics = () => {
           <h3 className="text-lg font-medium text-gray-900">Sales Trend</h3>
         </div>
         <div className="p-6">
-          {analyticsData.salesData && analyticsData.salesData.length > 0 ? (
+          {salesData.length > 0 ? (
             <div className="h-64 bg-gray-50 rounded-lg p-4">
               <div className="flex items-end justify-between h-full space-x-2">
-                {analyticsData.salesData.map((data, index) => (
-                  <div key={index} className="flex flex-col items-center flex-1">
-                    <div 
-                      className="bg-blue-500 rounded-t w-full min-h-4"
-                      style={{ 
-                        height: `${Math.max(20, (data.revenue / Math.max(...analyticsData.salesData.map(d => d.revenue))) * 200)}px` 
-                      }}
-                    ></div>
-                    <div className="text-xs text-gray-600 mt-2 text-center">
-                      {data.period}
+                {salesData.map((item, index) => {
+                  const maxRevenue = Math.max(...salesData.map(d => parseFloat(d.revenue || 0)));
+                  const revenue = parseFloat(item.revenue || 0);
+                  return (
+                    <div key={index} className="flex flex-col items-center flex-1 min-w-0">
+                      <div
+                        className="bg-blue-500 rounded-t w-full min-h-[4px]"
+                        style={{
+                          height: `${Math.max(4, maxRevenue > 0 ? (revenue / maxRevenue) * 200 : 0)}px`
+                        }}
+                        title={`₹${formatNumber(revenue)}`}
+                      />
+                      <div className="text-xs text-gray-600 mt-2 text-center truncate w-full">
+                        {item.period || item.date || ''}
+                      </div>
+                      <div className="text-xs text-gray-500 mt-0.5 truncate w-full text-center">
+                        ₹{formatNumber(revenue)}
+                      </div>
                     </div>
-                    <div className="text-xs text-gray-500 mt-1">
-                      ₹{formatNumber(data.revenue)}
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           ) : (

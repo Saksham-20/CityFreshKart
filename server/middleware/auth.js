@@ -5,7 +5,12 @@ const { query } = require('../database/config');
 const authenticateToken = async (req, res, next) => {
   try {
     const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
+    let token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
+
+    // Fall back to httpOnly cookie if no Authorization header
+    if (!token) {
+      token = req.cookies?.authToken;
+    }
 
     if (!token) {
       return res.status(401).json({
@@ -84,7 +89,7 @@ const optionalAuth = async (req, res, next) => {
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
       const result = await query(
         'SELECT id, phone, name, is_admin FROM users WHERE id = $1',
-        [decoded.userId],
+        [decoded.id],
       );
 
       if (result.rows.length > 0) {

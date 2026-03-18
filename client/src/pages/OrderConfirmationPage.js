@@ -18,6 +18,7 @@ const OrderConfirmationPage = () => {
     if (orderId && user) {
       fetchOrderDetails();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orderId, user]);
 
   const fetchOrderDetails = async () => {
@@ -100,7 +101,7 @@ const OrderConfirmationPage = () => {
             <div className="ml-3">
               <h3 className="text-sm font-medium text-green-800">Order Placed Successfully!</h3>
               <div className="mt-2 text-sm text-green-700">
-                <p>Your order has been received and is being processed. You will receive a confirmation email shortly.</p>
+                <p>Your order has been received and is being processed. You will be notified when your order status is updated.</p>
               </div>
             </div>
           </div>
@@ -132,7 +133,7 @@ const OrderConfirmationPage = () => {
                 <div>
                   <p className="text-gray-500">Total Amount</p>
                   <p className="font-medium text-gray-900">
-                    ₹{(order.total || order.total_amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    ₹{(order.total_price || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </p>
                 </div>
               </div>
@@ -145,23 +146,18 @@ const OrderConfirmationPage = () => {
                 {(order.items || []).map((item, index) => (
                   <div key={index} className="flex items-center space-x-4 p-4 bg-gray-50 rounded-lg">
                     <img
-                      src={item.image || item.product?.image || '/default-product.png'}
-                      alt={item.name || item.product?.name}
+                      src={item.product_image || '/default-product.png'}
+                      alt={item.product_name}
                       className="w-16 h-16 rounded object-cover"
+                      onError={(e) => { e.target.src = '/default-product.png'; }}
                     />
                     <div className="flex-1">
-                      <p className="font-medium text-gray-900">{item.name || item.product?.name}</p>
-                      <p className="text-sm text-gray-500">Quantity: {item.quantity}</p>
-                      {item.variant && (
-                        <p className="text-sm text-gray-500">Variant: {item.variant.name}</p>
-                      )}
+                      <p className="font-medium text-gray-900">{item.product_name}</p>
+                      <p className="text-sm text-gray-500">{item.quantity_kg} kg × ₹{(item.price_per_kg || 0).toLocaleString('en-IN')}/kg</p>
                     </div>
                     <div className="text-right">
                       <p className="font-medium text-gray-900">
-                        ₹{(item.price || item.unit_price || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                      </p>
-                      <p className="text-sm text-gray-500">
-                        Total: ₹{((item.price || item.unit_price || 0) * item.quantity).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        ₹{(item.total_price || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </p>
                     </div>
                   </div>
@@ -169,15 +165,11 @@ const OrderConfirmationPage = () => {
               </div>
             </div>
 
-            {/* Shipping Address */}
-            {order.shippingAddress && (
+            {/* Delivery Address */}
+            {order.delivery_address && (
               <div className="bg-white rounded-lg shadow p-6">
-                <h3 className="text-lg font-medium text-gray-900 mb-4">Shipping Address</h3>
-                <div className="text-sm text-gray-700">
-                  <p>{order.shippingAddress.street}</p>
-                  <p>{order.shippingAddress.city}, {order.shippingAddress.state} {order.shippingAddress.zipCode}</p>
-                  <p>{order.shippingAddress.country}</p>
-                </div>
+                <h3 className="text-lg font-medium text-gray-900 mb-4">Delivery Address</h3>
+                <p className="text-sm text-gray-700 whitespace-pre-line">{order.delivery_address}</p>
               </div>
             )}
           </div>
@@ -190,24 +182,20 @@ const OrderConfirmationPage = () => {
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600">Items ({(order.items || []).length})</span>
                   <span className="text-gray-900">
-                    ₹{((order.subtotal || order.total || 0) * 0.92).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    ₹{(order.subtotal || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Shipping</span>
-                  <span className="text-gray-900">Free</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Tax</span>
+                  <span className="text-gray-600">Delivery</span>
                   <span className="text-gray-900">
-                    ₹{((order.subtotal || order.total || 0) * 0.08).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    {(order.delivery_fee || 0) === 0 ? 'Free' : `₹${(order.delivery_fee || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
                   </span>
                 </div>
                 <div className="border-t pt-3">
                   <div className="flex justify-between text-lg font-semibold">
                     <span className="text-gray-900">Total</span>
                     <span className="text-gray-900">
-                      ₹{(order.total || order.total_amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      ₹{(order.total_price || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </span>
                   </div>
                 </div>
