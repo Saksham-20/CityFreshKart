@@ -5,16 +5,13 @@ import { IoArrowForward, IoStar, IoLeaf, IoTime, IoCheckmarkCircle } from 'react
 import { getFeaturedProducts } from '../data/vegetableProducts';
 import LazyImage from '../components/common/LazyImage';
 import useCart from '../hooks/useCart';
-import useWishlist from '../hooks/useWishlist';
 import QuantitySelector from '../components/ui/QuantitySelector';
 
 const FeaturedProductCard = ({ product }) => {
   const { addToCart, isItemInCart, items: cartItems, updateItemQuantity, removeFromCart } = useCart();
-  const { addToWishlist, removeFromWishlist, isItemInWishlist } = useWishlist();
 
   const productId = product.id;
   const inCart = isItemInCart(productId);
-  const inWishlist = isItemInWishlist(productId);
   const cartItem = cartItems?.find(i => (i.product_id || i.id) === productId);
   const qty = cartItem?.quantity || 1;
 
@@ -48,16 +45,6 @@ const FeaturedProductCard = ({ product }) => {
           alt={product.name}
           className="w-full h-full group-hover:scale-105 transition-transform duration-500"
         />
-        <button
-          onClick={() => inWishlist ? removeFromWishlist(productId) : addToWishlist({ id: productId, name: product.name, price: product.price, primary_image: product.image })}
-          className={`absolute top-3 right-3 w-8 h-8 rounded-full flex items-center justify-center shadow-sm transition-all duration-200 ${
-            inWishlist ? 'bg-red-50 text-red-500' : 'bg-white/90 text-gray-400 hover:text-red-400 opacity-0 group-hover:opacity-100'
-          }`}
-        >
-          <svg className="w-4 h-4" fill={inWishlist ? 'currentColor' : 'none'} stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-          </svg>
-        </button>
         {product.weight && (
           <span className="absolute bottom-3 left-3 bg-fresh-green text-white text-[10px] font-semibold px-2 py-0.5 rounded-full">
             {product.weight}

@@ -1,5 +1,5 @@
 import React from 'react';
-import { useCart } from '../../context/CartContext';
+import useCart from '../../hooks/useCart';
 import { getImageUrl, getPlaceholderImage } from '../../utils/imageUtils';
 import QuantitySelector from '../ui/QuantitySelector';
 

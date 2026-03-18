@@ -1,19 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import useCart from '../../hooks/useCart';
-import useWishlist from '../../hooks/useWishlist';
 import Button from '../ui/Button';
 import Loading from '../ui/Loading';
 import ProductImages from './ProductImages';
 import ProductVariants from './ProductVariants';
-import ProductReviews from './ProductReviews';
-import RelatedProducts from './RelatedProducts';
 import api from '../../services/api';
 
 const ProductDetail = () => {
   const { id } = useParams();
   const { addToCart } = useCart();
-  const { addToWishlist, removeFromWishlist, isItemInWishlist } = useWishlist();
   
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -56,14 +52,6 @@ const ProductDetail = () => {
         quantity,
         variant: selectedVariant
       });
-    }
-  };
-
-  const handleWishlistToggle = () => {
-    if (isItemInWishlist(product.id)) {
-      removeFromWishlist(product.id);
-    } else {
-      addToWishlist(product);
     }
   };
 
@@ -143,13 +131,6 @@ const ProductDetail = () => {
             >
               Add to Cart
             </Button>
-            <Button
-              onClick={handleWishlistToggle}
-              variant={isItemInWishlist(product.id) ? "outline" : "secondary"}
-              size="lg"
-            >
-              {isItemInWishlist(product.id) ? 'Remove from Wishlist' : 'Add to Wishlist'}
-            </Button>
           </div>
 
           {/* Product Details */}
@@ -173,19 +154,6 @@ const ProductDetail = () => {
             </dl>
           </div>
         </div>
-      </div>
-
-      {/* Reviews */}
-      <div className="mt-16">
-        <ProductReviews productId={product.id} />
-      </div>
-
-      {/* Related Products */}
-      <div className="mt-16">
-        <RelatedProducts 
-          categoryId={product.category_id} 
-          currentProductId={product.id} 
-        />
       </div>
     </div>
   );

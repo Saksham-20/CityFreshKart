@@ -3,15 +3,15 @@ const cors = require('cors');
 const helmet = require('helmet');
 const compression = require('compression');
 const rateLimit = require('express-rate-limit');
-require('dotenv').config();
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 
 const authRoutes = require('./routes/auth');
 const productRoutes = require('./routes/products');
 const orderRoutes = require('./routes/orders');
 const userRoutes = require('./routes/users');
 const adminRoutes = require('./routes/admin');
-const stripeRoutes = require('./routes/stripe');
-const wishlistRoutes = require('./routes/wishlist');
+const razorpayRoutes = require('./routes/razorpay');
 const cartRoutes = require('./routes/cart');
 
 const app = express();
@@ -98,10 +98,8 @@ app.use('/api/users', userRoutes);
 console.log('✅ User routes registered at /api/users');
 app.use('/api/admin', adminRoutes);
 console.log('✅ Admin routes registered at /api/admin');
-app.use('/api/stripe', stripeRoutes);
-console.log('✅ Stripe routes registered at /api/stripe');
-app.use('/api/wishlist', wishlistRoutes);
-console.log('✅ Wishlist routes registered at /api/wishlist');
+app.use('/api/razorpay', razorpayRoutes);
+console.log('✅ Razorpay routes registered at /api/razorpay');
 app.use('/api/cart', cartRoutes);
 console.log('✅ Cart routes registered at /api/cart');
 

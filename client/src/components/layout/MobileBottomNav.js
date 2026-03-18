@@ -1,8 +1,7 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { FiHome, FiGrid, FiShoppingBag, FiUser, FiHeart } from 'react-icons/fi';
+import { FiHome, FiGrid, FiShoppingBag, FiUser } from 'react-icons/fi';
 import useCart from '../../hooks/useCart';
-import useWishlist from '../../hooks/useWishlist';
 
 /**
  * MobileBottomNav — sticky bottom navigation shown only on mobile (hidden md+).
@@ -11,10 +10,8 @@ import useWishlist from '../../hooks/useWishlist';
 const MobileBottomNav = () => {
   const location = useLocation();
   const { items: cartItems } = useCart();
-  const { items: wishlistItems } = useWishlist();
 
   const cartCount = cartItems?.reduce((t, i) => t + i.quantity, 0) || 0;
-  const wishlistCount = wishlistItems?.length || 0;
 
   const isActive = (path) => location.pathname === path || location.pathname.startsWith(path + '?');
 
@@ -26,12 +23,6 @@ const MobileBottomNav = () => {
       icon: FiShoppingBag,
       href: '/cart',
       badge: cartCount > 0 ? cartCount : null
-    },
-    {
-      label: 'Wishlist',
-      icon: FiHeart,
-      href: '/wishlist',
-      badge: wishlistCount > 0 ? wishlistCount : null
     },
     { label: 'Account', icon: FiUser, href: '/profile' }
   ];

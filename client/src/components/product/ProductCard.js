@@ -2,14 +2,12 @@ import React, { useMemo, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import useCart from '../../hooks/useCart';
-import useWishlist from '../../hooks/useWishlist';
 import { formatCurrency as formatPrice } from '../../utils/formatters';
 import { getImageUrl, getPlaceholderImage } from '../../utils/imageUtils';
 import QuantitySelector from '../ui/QuantitySelector';
 
 const ProductCard = React.memo(({ product, className = '' }) => {
   const { addToCart, isItemInCart, removeFromCart, items: cartItems, updateItemQuantity } = useCart();
-  const { addToWishlist, removeFromWishlist, isItemInWishlist } = useWishlist();
 
   const formattedPrice = useMemo(() => formatPrice(product.price), [product.price]);
   const formattedComparePrice = useMemo(() =>
@@ -25,7 +23,6 @@ const ProductCard = React.memo(({ product, className = '' }) => {
   const productId = product.product_id || product.id;
 
   const isInCartState = useMemo(() => isItemInCart(productId), [isItemInCart, productId]);
-  const isInWishlistState = useMemo(() => isItemInWishlist(productId), [isItemInWishlist, productId]);
 
   // Get cart item to read quantity
   const cartItem = useMemo(
@@ -64,14 +61,6 @@ const ProductCard = React.memo(({ product, className = '' }) => {
     }
   }, [cartItem, cartQty, removeFromCart, updateItemQuantity]);
 
-  const handleToggleWishlist = useCallback(() => {
-    if (isInWishlistState) {
-      removeFromWishlist(productId);
-    } else {
-      addToWishlist(product);
-    }
-  }, [isInWishlistState, removeFromWishlist, addToWishlist, product, productId]);
-
   if (!product) return null;
 
   const outOfStock = product.stock_quantity !== undefined && product.stock_quantity <= 0;
@@ -103,32 +92,6 @@ const ProductCard = React.memo(({ product, className = '' }) => {
             -{discountPercentage}%
           </div>
         )}
-
-        {/* Wishlist Button */}
-        <motion.button
-          whileTap={{ scale: 0.85 }}
-          onClick={handleToggleWishlist}
-          className={`absolute top-2 right-2 w-8 h-8 rounded-full shadow-md flex items-center justify-center transition-colors duration-200 ${
-            isInWishlistState
-              ? 'bg-red-50 text-red-500'
-              : 'bg-white/90 text-gray-400 hover:text-red-400 opacity-0 group-hover:opacity-100'
-          }`}
-          aria-label={isInWishlistState ? 'Remove from wishlist' : 'Add to wishlist'}
-        >
-          <svg
-            className="w-4 h-4"
-            fill={isInWishlistState ? 'currentColor' : 'none'}
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
-            />
-          </svg>
-        </motion.button>
 
         {/* Out of Stock Overlay */}
         {outOfStock && (

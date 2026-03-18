@@ -52,22 +52,30 @@ router.post('/setup-database', async (req, res) => {
 });
 
 // @route   POST /api/auth/register
-// @desc    Register a new user
+// @desc    Register a new user with phone + password (simplified for produce vendor)
 // @access  Public
-router.post('/register', validateRegistration, async (req, res) => {
+router.post('/register', async (req, res) => {
   try {
-    const { email, password, first_name, last_name, phone } = req.body;
+    const { phone, password, name } = req.body;
 
-    // Check if user already exists
+    // Validate required fields
+    if (!phone || !password || !name) {
+      return res.status(400).json({
+        success: false,
+        message: 'Phone, password, and name are required',
+      });
+    }
+
+    // Check if phone already exists
     const existingUser = await query(
-      'SELECT id FROM users WHERE email = $1',
-      [email],
+      'SELECT id FROM users WHERE phone = $1',
+      [phone],
     );
 
     if (existingUser.rows.length > 0) {
-      return res.status(400).json({
+      return res.status(409).json({
         success: false,
-        message: 'User with this email already exists',
+        message: 'Phone number already registered',
       });
     }
 
@@ -77,16 +85,16 @@ router.post('/register', validateRegistration, async (req, res) => {
 
     // Create user
     const result = await query(`
-      INSERT INTO users (email, password_hash, first_name, last_name, phone)
-      VALUES ($1, $2, $3, $4, $5)
-      RETURNING id, email, first_name, last_name, phone, is_admin, is_verified, created_at
-    `, [email, passwordHash, first_name, last_name, phone]);
+      INSERT INTO users (phone, password_hash, name, is_admin, created_at, updated_at)
+      VALUES ($1, $2, $3, $4, NOW(), NOW())
+      RETURNING id, phone, name, is_admin, created_at
+    `, [phone, passwordHash, name, false]);
 
     const user = result.rows[0];
 
     // Generate JWT token
     const token = jwt.sign(
-      { userId: user.id },
+      { id: user.id, is_admin: user.is_admin },
       process.env.JWT_SECRET,
       { expiresIn: '7d' },
     );
@@ -97,12 +105,9 @@ router.post('/register', validateRegistration, async (req, res) => {
       data: {
         user: {
           id: user.id,
-          email: user.email,
-          first_name: user.first_name,
-          last_name: user.last_name,
           phone: user.phone,
+          name: user.name,
           is_admin: user.is_admin,
-          is_verified: user.is_verified,
         },
         token,
       },
@@ -113,29 +118,36 @@ router.post('/register', validateRegistration, async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Internal server error',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined,
     });
   }
 });
 
 // @route   POST /api/auth/login
-// @desc    Authenticate user & get token
+// @desc    Authenticate user with phone + password & get token
 // @access  Public
-router.post('/login', validateLogin, async (req, res) => {
+router.post('/login', async (req, res) => {
   try {
-    console.log('🔐 Login attempt - Email:', req.body.email);
-    console.log('🔐 Login attempt - Headers:', req.headers);
-    const { email, password } = req.body;
+    const { phone, password } = req.body;
+
+    // Validate required fields
+    if (!phone || !password) {
+      return res.status(400).json({
+        success: false,
+        message: 'Phone and password are required',
+      });
+    }
 
     // Check if user exists
     const result = await query(`
-      SELECT id, email, password_hash, first_name, last_name, phone, is_admin, is_verified
-      FROM users WHERE email = $1
-    `, [email]);
+      SELECT id, phone, password_hash, name, is_admin
+      FROM users WHERE phone = $1
+    `, [phone]);
 
     if (result.rows.length === 0) {
       return res.status(401).json({
         success: false,
-        message: 'Invalid credentials',
+        message: 'Invalid phone or password',
       });
     }
 
@@ -146,7 +158,7 @@ router.post('/login', validateLogin, async (req, res) => {
     if (!isPasswordValid) {
       return res.status(401).json({
         success: false,
-        message: 'Invalid credentials',
+        message: 'Invalid phone or password',
       });
     }
 
@@ -157,25 +169,19 @@ router.post('/login', validateLogin, async (req, res) => {
       { expiresIn: '7d' },
     );
 
-    const responseData = {
+    res.json({
       success: true,
       message: 'Login successful',
       data: {
         user: {
           id: user.id,
-          email: user.email,
-          first_name: user.first_name,
-          last_name: user.last_name,
           phone: user.phone,
+          name: user.name,
           is_admin: user.is_admin,
-          is_verified: user.is_verified,
         },
         token,
       },
-    };
-
-    console.log('🔐 Login successful - sending response:', JSON.stringify(responseData, null, 2));
-    res.json(responseData);
+    });
 
   } catch (error) {
     console.error('Login error:', error);
@@ -192,7 +198,7 @@ router.post('/login', validateLogin, async (req, res) => {
 router.get('/me', authenticateToken, async (req, res) => {
   try {
     const result = await query(`
-      SELECT id, email, first_name, last_name, phone, is_admin, is_verified, created_at, updated_at
+      SELECT id, phone, name, is_admin, created_at, updated_at
       FROM users WHERE id = $1
     `, [req.user.id]);
 
@@ -219,23 +225,22 @@ router.get('/me', authenticateToken, async (req, res) => {
   }
 });
 
-// @route   PUT /api/auth/profile
+// @route   PUT /api/users/profile
 // @desc    Update user profile
 // @access  Private
 router.put('/profile', authenticateToken, async (req, res) => {
   try {
-    const { first_name, last_name, phone } = req.body;
+    const { name, phone } = req.body;
 
     // Update user profile
     const result = await query(`
       UPDATE users 
-      SET first_name = COALESCE($1, first_name),
-          last_name = COALESCE($2, last_name),
-          phone = COALESCE($3, phone),
+      SET name = COALESCE($1, name),
+          phone = COALESCE($2, phone),
           updated_at = CURRENT_TIMESTAMP
-      WHERE id = $4
-      RETURNING id, email, first_name, last_name, phone, is_admin, is_verified, updated_at
-    `, [first_name, last_name, phone, req.user.id]);
+      WHERE id = $3
+      RETURNING id, name, phone, is_admin, created_at, updated_at
+    `, [name, phone, req.user.id]);
 
     if (result.rows.length === 0) {
       return res.status(404).json({

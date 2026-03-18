@@ -1,13 +1,14 @@
 import React from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { useCart } from '../context/CartContext';
+import useCart from '../hooks/useCart';
 import CartItem from '../components/cart/CartItem';
 import CartSummary from '../components/cart/CartSummary';
 import Button from '../components/ui/Button';
 
 const CartPage = () => {
   const navigate = useNavigate();
-  const { items, getCartItemCount, summary } = useCart();
+  const { items, getCartItemCount, calculateSummary } = useCart();
+  const summary = calculateSummary();
 
   const handleCheckout = () => navigate('/checkout');
 
