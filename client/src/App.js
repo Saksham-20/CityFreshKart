@@ -1,74 +1,58 @@
-import React, { Suspense, lazy, useState, useEffect } from 'react';
+import React, { Suspense, lazy, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
-import { useAuthStore } from './store/useAuthStore';
-import { useCartStore } from './store/useCartStore';
 
 // Layout Components
 import AdminLayout from './components/layout/AdminLayout';
 
-// PWA Components
-import InstallPrompt from './components/pwa/InstallPrompt';
-import CartDrawer from './components/cart/CartDrawer';
-import MobileBottomNav from './components/layout/MobileBottomNav';
-
 // Auth Components
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import AdminRoute from './components/auth/AdminRoute';
+import useAuth from './hooks/useAuth';
+import { useAuthStore } from './store/useAuthStore';
 
-// Lazy load page components
-const LoginPage = lazy(() => import('./pages/LoginPage'));
+// Lazy load page components for better performance
 const ProductsPage = lazy(() => import('./pages/ProductsPage'));
-const ProductDetailPage = lazy(() => import('./pages/ProductDetailPage'));
 const CartPage = lazy(() => import('./pages/CartPage'));
 const CheckoutPage = lazy(() => import('./pages/CheckoutPage'));
 const OrderConfirmationPage = lazy(() => import('./pages/OrderConfirmationPage'));
-const OrdersPage = lazy(() => import('./pages/OrdersPage'));
-const ProfilePage = lazy(() => import('./pages/ProfilePage'));
+const LoginPage = lazy(() => import('./pages/LoginPage'));
 const AdminDashboardPage = lazy(() => import('./pages/AdminDashboardPage'));
 const AdminProductsPage = lazy(() => import('./pages/AdminProductsPage'));
 const AdminOrdersPage = lazy(() => import('./pages/AdminOrdersPage'));
 const AdminUsersPage = lazy(() => import('./pages/AdminUsersPage'));
+const AdminAnalyticsPage = lazy(() => import('./pages/AdminAnalyticsPage'));
+const AdminSettingsPage = lazy(() => import('./pages/AdminSettingsPage'));
 
 // Loading component
 const PageLoader = () => (
   <div className="min-h-screen flex items-center justify-center bg-green-50">
     <div className="text-center">
-      <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-green-600 mx-auto mb-4"></div>
-      <p className="text-green-600 font-semibold text-lg">Loading...</p>
+      <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-fresh-green mx-auto mb-4"></div>
+      <p className="text-fresh-green font-semibold text-lg">Loading FreshCart...</p>
     </div>
   </div>
 );
 
 function App() {
-  const [cartDrawerOpen, setCartDrawerOpen] = useState(false);
-  const checkAuth = useAuthStore((s) => s.checkAuth);
-  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
-  const isLoading = useAuthStore((s) => s.isLoading);
-  const loadUserCart = useCartStore((s) => s.loadUserCart);
-  const initGuestCart = useCartStore((s) => s.initGuestCart);
+  const { isAuthenticated, loading } = useAuth();
+  const initialize = useAuthStore(state => state.initialize);
 
+  // Initialize auth on app load
   useEffect(() => {
-    checkAuth();
-  }, [checkAuth]);
+    initialize();
+  }, [initialize]);
 
-  useEffect(() => {
-    if (isAuthenticated) {
-      loadUserCart();
-    } else {
-      initGuestCart();
-    }
-  }, [isAuthenticated, loadUserCart, initGuestCart]);
+  if (loading) {
+    return <PageLoader />;
+  }
 
   return (
     <Router>
       <Suspense fallback={<PageLoader />}>
-        <InstallPrompt />
-        <CartDrawer isOpen={cartDrawerOpen} onClose={() => setCartDrawerOpen(false)} />
-        
         <Routes>
-          {/* Auth Routes - No Navigation */}
-          <Route path="/login" element={<LoginPage />} />
+                {/* Auth Routes - No Header */}
+                <Route path="/login" element={<LoginPage />} />
 
           {/* Admin Routes */}
           <Route path="/admin" element={
@@ -100,71 +84,62 @@ function App() {
             </AdminRoute>
           } />
 
-          {/* Main App Routes */}
-          <Route path="/*" element={
-            isLoading ? <PageLoader /> : !isAuthenticated ? <Navigate to="/login" replace /> : (
-            <div className="min-h-screen bg-white flex flex-col pb-20">
-              <main className="flex-1">
-                <Routes>
-                  {/* Default to products - requires auth */}
-                  <Route path="/" element={<ProductsPage onCartClick={() => setCartDrawerOpen(true)} />} />
-                  
-                  {/* Protected Routes */}
-                  <Route path="/products" element={<ProductsPage onCartClick={() => setCartDrawerOpen(true)} />} />
-                  <Route path="/products/:id" element={<ProductDetailPage />} />
-                  <Route path="/cart" element={<CartPage />} />
+                {/* Main App Routes - With Header, authenticated users only */}
+                <Route path="/*" element={
+                  isAuthenticated ? (
+                    <div className="min-h-screen bg-white flex flex-col">
+                      <Header />
+                      <main className="flex-1">
+                        <Routes>
+                          {/* Redirect root to products */}
+                          <Route path="/" element={<ProductsPage />} />
+                          <Route path="/products" element={<ProductsPage />} />
+                          <Route path="/cart" element={<CartPage />} />
+                          <Route path="/checkout" element={
+                            <ProtectedRoute>
+                              <CheckoutPage />
+                            </ProtectedRoute>
+                          } />
+                          <Route path="/orders/:orderId/confirmation" element={
+                            <ProtectedRoute>
+                              <OrderConfirmationPage />
+                            </ProtectedRoute>
+                          } />
+                          {/* Catch all - redirect to products */}
+                          <Route path="*" element={<Navigate to="/products" replace />} />
+                        </Routes>
+                      </main>
+                      <Footer />
+                    </div>
+                  ) : (
+                    <Navigate to="/login" replace />
+                  )
+                } />
 
-                  {/* Protected Routes */}
-                  <Route path="/checkout" element={
-                    <ProtectedRoute>
-                      <CheckoutPage />
-                    </ProtectedRoute>
-                  } />
-                  <Route path="/orders" element={
-                    <ProtectedRoute>
-                      <OrdersPage />
-                    </ProtectedRoute>
-                  } />
-                  <Route path="/orders/:orderId/confirmation" element={
-                    <ProtectedRoute>
-                      <OrderConfirmationPage />
-                    </ProtectedRoute>
-                  } />
-                  <Route path="/profile" element={
-                    <ProtectedRoute>
-                      <ProfilePage />
-                    </ProtectedRoute>
-                  } />
+                {/* Admin Routes - No Header */}
+                <Route path="/admin/*" element={
+                  <AdminRoute>
+                    <AdminLayout>
+                      <Routes>
+                        <Route path="/" element={<AdminDashboardPage />} />
+                        <Route path="/products" element={<AdminProductsPage />} />
+                        <Route path="/orders" element={<AdminOrdersPage />} />
+                        <Route path="/users" element={<AdminUsersPage />} />
+                        <Route path="/analytics" element={<AdminAnalyticsPage />} />
+                        <Route path="/settings" element={<AdminSettingsPage />} />
+                        <Route path="*" element={<Navigate to="/admin" replace />} />
+                      </Routes>
+                    </AdminLayout>
+                  </AdminRoute>
+                } />
 
-                  {/* Catch all - redirect to products */}
-                  <Route path="*" element={<Navigate to="/" replace />} />
-                </Routes>
-              </main>
-              
-              {/* Simple Mobile Bottom Navigation for logged-in users */}
-              <MobileBottomNav onCartClick={() => setCartDrawerOpen(true)} />
-            </div>
-            )
-          } />
+                {/* Catch all unmatched routes */}
+                <Route path="*" element={
+                  isAuthenticated ? <Navigate to="/products" replace /> : <Navigate to="/login" replace />
+                } />
         </Routes>
-
-        {/* Toast Notifications */}
-        <Toaster
-          position="top-right"
-          toastOptions={{
-            duration: 4000,
-            style: { background: '#363636', color: '#fff' },
-            success: {
-              duration: 3000,
-              iconTheme: { primary: '#16a34a', secondary: '#fff' },
-            },
-            error: {
-              duration: 5000,
-              iconTheme: { primary: '#ef4444', secondary: '#fff' },
-            },
-          }}
-        />
       </Suspense>
+      <Toaster />
     </Router>
   );
 }

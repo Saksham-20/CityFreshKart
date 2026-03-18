@@ -3,152 +3,220 @@ const Razorpay = require('razorpay');
 const crypto = require('crypto');
 const { authenticateToken } = require('../middleware/auth');
 const { body, validationResult } = require('express-validator');
-const { query } = require('../database/config');
+const pool = require('../database/config');
 
 const router = express.Router();
 
-const razorpay = new Razorpay({
-  key_id: process.env.RAZORPAY_KEY_ID,
-  key_secret: process.env.RAZORPAY_KEY_SECRET,
-});
+// Initialize Razorpay instance only if keys are configured
+let razorpay = null;
 
-// @route   POST /api/razorpay/create-order
-// @desc    Create Razorpay order for checkout
+if (process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET) {
+  razorpay = new Razorpay({
+    key_id: process.env.RAZORPAY_KEY_ID,
+    key_secret: process.env.RAZORPAY_KEY_SECRET,
+  });
+} else {
+  console.warn('⚠️  Razorpay keys not configured. Payment routes will return errors.');
+}
+
+// @route   POST /api/razorpay/payment-link
+// @desc    Create Razorpay payment link for order
 // @access  Private
-router.post('/create-order', authenticateToken, [
+router.post('/payment-link', authenticateToken, [
+  body('orderId').notEmpty().withMessage('Order ID is required'),
   body('amount').isFloat({ min: 1 }).withMessage('Amount must be at least ₹1'),
-  body('currency').optional().isIn(['INR']).withMessage('Only INR supported'),
+  body('userPhone').notEmpty().withMessage('Phone number is required'),
+  body('userName').notEmpty().withMessage('User name is required'),
 ], async (req, res) => {
   try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({ success: false, errors: errors.array() });
+    if (!razorpay) {
+      return res.status(503).json({
+        success: false,
+        message: 'Payment service not configured. Please use COD.',
+      });
     }
 
-    const { amount, currency = 'INR', receipt } = req.body;
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
 
-    const options = {
-      amount: Math.round(amount * 100), // amount in paise
-      currency,
-      receipt: receipt || `receipt_${req.user.id}_${Date.now()}`,
-      notes: {
-        user_id: req.user.id.toString(),
-        user_phone: req.user.phone,
+    const { orderId, amount, userPhone, userName, userEmail } = req.body;
+
+    // Create payment link
+    const paymentLinkResponse = await razorpay.paymentLink.create({
+      upi_link: true,
+      amount: Math.round(amount * 100), // Razorpay expects amount in paise
+      currency: 'INR',
+      accept_partial: false,
+      first_min_partial_amount: 100, // Minimum partial payment (₹1)
+      reference_id: orderId,
+      description: `CityFreshKart Order #${orderId}`,
+      customer_notify: 1,
+      notify: {
+        sms: true,
+        email: true,
       },
-    };
-
-    const order = await razorpay.orders.create(options);
+      reminder_enable: true,
+      notes: {
+        order_id: orderId,
+        user_id: req.user.id.toString(),
+      },
+      callback_url: `${process.env.CLIENT_URL || 'http://localhost:3000'}/payment-callback`,
+      callback_method: 'get',
+    });
 
     res.json({
       success: true,
-      data: {
-        orderId: order.id,
-        amount: order.amount,
-        currency: order.currency,
-        receipt: order.receipt,
-        keyId: process.env.RAZORPAY_KEY_ID,
-      },
+      paymentLink: paymentLinkResponse.short_url,
+      paymentLinkId: paymentLinkResponse.id,
+      orderId: orderId,
+      amount: amount,
     });
+
   } catch (error) {
-    console.error('❌ Create Razorpay order error:', error);
-    res.status(500).json({ success: false, message: 'Failed to create payment order', error: error.message });
+    console.error('Create payment link error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to create payment link',
+      error: error.message,
+    });
   }
 });
 
 // @route   POST /api/razorpay/verify-payment
-// @desc    Verify Razorpay payment signature after checkout
+// @desc    Verify Razorpay payment
 // @access  Private
 router.post('/verify-payment', authenticateToken, [
-  body('razorpay_order_id').notEmpty().withMessage('Razorpay order ID required'),
-  body('razorpay_payment_id').notEmpty().withMessage('Razorpay payment ID required'),
-  body('razorpay_signature').notEmpty().withMessage('Razorpay signature required'),
+  body('paymentId').notEmpty().withMessage('Payment ID is required'),
+  body('orderId').notEmpty().withMessage('Order ID is required'),
+  body('signature').notEmpty().withMessage('Signature is required'),
+], async (req, res) => {
+  try {
+    if (!razorpay) {
+      return res.status(503).json({
+        success: false,
+        message: 'Payment service not configured.',
+      });
+    }
+
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    const { paymentId, orderId, signature } = req.body;
+
+    // Verify signature
+    const body = paymentId + '|' + orderId;
+    const expectedSignature = crypto
+      .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET)
+      .update(body.toString())
+      .digest('hex');
+
+    const isSignatureValid = expectedSignature === signature;
+
+    if (!isSignatureValid) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid payment signature',
+      });
+    }
+
+    // Fetch payment details from Razorpay
+    const payment = await razorpay.payments.fetch(paymentId);
+
+    if (payment.status === 'captured') {
+      // Update order status to paid
+      await pool.query(
+        'UPDATE orders SET payment_status = $1, payment_method = $2, payment_intent_id = $3, status = $4 WHERE id = $5',
+        ['paid', 'razorpay', paymentId, 'processing', orderId],
+      );
+
+      res.json({
+        success: true,
+        message: 'Payment verified successfully',
+        paymentStatus: 'paid',
+      });
+    } else {
+      res.status(400).json({
+        success: false,
+        message: 'Payment not captured',
+      });
+    }
+
+  } catch (error) {
+    console.error('Verify payment error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to verify payment',
+      error: error.message,
+    });
+  }
+});
+
+// @route   POST /api/razorpay/cod-order
+// @desc    Create cash-on-delivery order (no payment)
+// @access  Private
+router.post('/cod-order', authenticateToken, [
+  body('orderId').notEmpty().withMessage('Order ID is required'),
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      return res.status(400).json({ success: false, errors: errors.array() });
+      return res.status(400).json({ errors: errors.array() });
     }
 
-    const { razorpay_order_id, razorpay_payment_id, razorpay_signature, orderId } = req.body;
+    const { orderId } = req.body;
 
-    // Verify signature
-    const body = razorpay_order_id + '|' + razorpay_payment_id;
-    const expectedSignature = crypto
-      .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET)
-      .update(body)
-      .digest('hex');
-
-    if (expectedSignature !== razorpay_signature) {
-      return res.status(400).json({ success: false, message: 'Payment verification failed: invalid signature' });
-    }
-
-    // Update order payment status if orderId provided
-    if (orderId) {
-      await query(
-        `UPDATE orders SET payment_status = 'paid', status = 'confirmed', updated_at = NOW() WHERE id = $1 AND user_id = $2`,
-        [orderId, req.user.id]
-      );
-    }
+    // Update order status to COD pending (payment not required)
+    await pool.query(
+      'UPDATE orders SET payment_method = $1, payment_status = $2, status = $3 WHERE id = $4',
+      ['cod', 'pending', 'processing', orderId],
+    );
 
     res.json({
       success: true,
-      message: 'Payment verified successfully',
-      data: { razorpay_payment_id, razorpay_order_id },
+      message: 'COD order created successfully',
+      paymentMethod: 'cod',
     });
+
   } catch (error) {
-    console.error('❌ Verify payment error:', error);
-    res.status(500).json({ success: false, message: 'Payment verification failed', error: error.message });
+    console.error('Create COD order error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to create COD order',
+      error: error.message,
+    });
   }
 });
 
-// @route   POST /api/razorpay/webhook
-// @desc    Handle Razorpay webhooks
-// @access  Public
-router.post('/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
+// @route   GET /api/razorpay/payment-status/:paymentId
+// @desc    Get payment status
+// @access  Private
+router.get('/payment-status/:paymentId', authenticateToken, async (req, res) => {
   try {
-    const webhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET;
+    const { paymentId } = req.params;
 
-    if (webhookSecret) {
-      const signature = req.headers['x-razorpay-signature'];
-      const expectedSignature = crypto
-        .createHmac('sha256', webhookSecret)
-        .update(req.body)
-        .digest('hex');
+    const payment = await razorpay.payments.fetch(paymentId);
 
-      if (signature !== expectedSignature) {
-        return res.status(400).json({ error: 'Invalid webhook signature' });
-      }
-    }
+    res.json({
+      success: true,
+      paymentId: payment.id,
+      amount: payment.amount / 100, // Convert paise to rupees
+      currency: payment.currency,
+      status: payment.status,
+      method: payment.method,
+      createdAt: new Date(payment.created_at * 1000),
+    });
 
-    const event = JSON.parse(req.body);
-    console.log('📩 Razorpay webhook event:', event.event);
-
-    switch (event.event) {
-      case 'payment.captured': {
-        const payment = event.payload.payment.entity;
-        // Find and update order by razorpay order id stored in notes or payment_intent_id
-        await query(
-          `UPDATE orders SET payment_status = 'paid', status = 'confirmed', updated_at = NOW() WHERE payment_method = $1`,
-          [payment.order_id]
-        ).catch(err => console.error('Webhook order update error:', err));
-        break;
-      }
-      case 'payment.failed': {
-        const payment = event.payload.payment.entity;
-        await query(
-          `UPDATE orders SET payment_status = 'failed', updated_at = NOW() WHERE payment_method = $1`,
-          [payment.order_id]
-        ).catch(err => console.error('Webhook order update error:', err));
-        break;
-      }
-      default:
-        console.log(`ℹ️ Unhandled event: ${event.event}`);
-    }
-
-    res.json({ received: true });
   } catch (error) {
-    console.error('❌ Webhook error:', error);
-    res.status(500).json({ error: 'Webhook handler failed' });
+    console.error('Get payment status error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch payment status',
+      error: error.message,
+    });
   }
 });
 

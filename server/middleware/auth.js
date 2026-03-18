@@ -4,14 +4,8 @@ const { query } = require('../database/config');
 // Middleware to verify JWT token
 const authenticateToken = async (req, res, next) => {
   try {
-    // Try to get token from cookies first (primary method)
-    let token = req.cookies?.authToken;
-
-    // Fallback to Authorization header for backward compatibility
-    if (!token) {
-      const authHeader = req.headers['authorization'];
-      token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
-    }
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
 
     if (!token) {
       return res.status(401).json({
@@ -26,7 +20,7 @@ const authenticateToken = async (req, res, next) => {
     // Get user from database using userId from token
     const result = await query(
       'SELECT id, phone, name, is_admin FROM users WHERE id = $1',
-      [decoded.userId],
+      [decoded.id],
     );
 
     if (result.rows.length === 0) {

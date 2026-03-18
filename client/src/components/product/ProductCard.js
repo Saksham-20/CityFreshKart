@@ -9,10 +9,7 @@ import QuantitySelector from '../ui/QuantitySelector';
 const WEIGHT_OPTIONS = [0.5, 1, 1.5, 2]; // Default weight options in kg
 
 const ProductCard = React.memo(({ product, className = '' }) => {
-  const { addToCart, removeItem, updateItem, items: cartItems } = useCart();
-  
-  // For weight-based pricing
-  const [selectedWeight, setSelectedWeight] = useState(1);
+  const { addToCart, isItemInCart, removeFromCart, items: cartItems, updateItemQuantity } = useCart();
 
   const isWeightBased = useMemo(() => product.price_per_kg || product.pricePerKg, [product]);
   
@@ -38,7 +35,9 @@ const ProductCard = React.memo(({ product, className = '' }) => {
 
   const productId = product.product_id || product.id;
 
-  // Get cart item to check if in cart and read quantity
+  const isInCartState = useMemo(() => isItemInCart(productId), [isItemInCart, productId]);
+
+  // Get cart item to read quantity
   const cartItem = useMemo(
     () => cartItems?.find(i => (i.product_id || i.id) === productId),
     [cartItems, productId]
@@ -75,7 +74,7 @@ const ProductCard = React.memo(({ product, className = '' }) => {
     } else {
       updateItem(cartItem.id, { quantity: cartQty - 1 });
     }
-  }, [cartItem, cartQty, removeItem, updateItem]);
+  }, [cartItem, cartQty, removeFromCart, updateItemQuantity]);
 
   if (!product) return null;
 

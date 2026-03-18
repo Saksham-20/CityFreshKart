@@ -33,7 +33,7 @@
     "node-fetch": "^3.3.2",
     "nodemailer": "^6.9.7",
     "pg": "^8.11.3",
-    "razorpay": "^2.9.6",
+    "razorpay": "^2.9.0",
     "redis": "^4.6.10",
     "sharp": "^0.32.6",
     "stripe": "^14.7.0",

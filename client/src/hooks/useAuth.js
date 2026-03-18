@@ -1,8 +1,20 @@
 import { useAuthStore } from '../store/useAuthStore';
 
 const useAuth = () => {
-  const store = useAuthStore();
-  return { ...store, loading: store.isLoading };
+  const { user, isAuthenticated, loading, token, register: storeRegister, login: storeLogin, logout } = useAuthStore();
+  
+  return {
+    user: isAuthenticated ? user : null,
+    isAuthenticated,
+    loading,
+    token,
+    register: (data) => {
+      // Accept object with {name, phone, password}
+      return storeRegister(data.phone, data.password, data.name);
+    },
+    login: storeLogin,
+    logout,
+  };
 };
 
 export { useAuth };

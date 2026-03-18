@@ -1,22 +1,30 @@
 import React from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { FiHome, FiShoppingBag, FiUser } from 'react-icons/fi';
-import { useAuthStore } from '../../store/useAuthStore';
-import { useCartStore } from '../../store/useCartStore';
+import { Link, useLocation } from 'react-router-dom';
+import { FiHome, FiGrid, FiShoppingBag, FiUser } from 'react-icons/fi';
+import useCart from '../../hooks/useCart';
 
 /**
  * MobileBottomNav — sticky bottom navigation for minimal PWA
  */
 const MobileBottomNav = ({ onCartClick }) => {
   const location = useLocation();
-  const navigate = useNavigate();
-  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
-  const logout = useAuthStore((s) => s.logout);
-  const cartItems = useCartStore((s) => s.items);
+  const { items: cartItems } = useCart();
 
-  const cartCount = cartItems?.reduce((t, i) => t + (i.quantity || 1), 0) || 0;
+  const cartCount = cartItems?.reduce((t, i) => t + i.quantity, 0) || 0;
 
-  const isActive = (path) => location.pathname === path;
+  const isActive = (path) => location.pathname === path || location.pathname.startsWith(path + '?');
+
+  const navItems = [
+    { label: 'Home', icon: FiHome, href: '/' },
+    { label: 'Shop', icon: FiGrid, href: '/products' },
+    {
+      label: 'Cart',
+      icon: FiShoppingBag,
+      href: '/cart',
+      badge: cartCount > 0 ? cartCount : null
+    },
+    { label: 'Account', icon: FiUser, href: '/profile' }
+  ];
 
   // Don't show on admin or auth pages
   if (

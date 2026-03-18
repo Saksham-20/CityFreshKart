@@ -26,50 +26,144 @@ router.post('/request-otp', authLimiter, async (req, res) => {
   try {
     const { phone } = req.body;
 
-    if (!phone || phone.trim().length < 10) {
+    // Import setup and seed functions
+    const setupDatabase = require('../database/setup');
+    const seedDatabase = require('../database/seed');
+
+    // Run database setup
+    await setupDatabase();
+    console.log('✅ Database setup completed');
+
+    // Run database seeding
+    await seedDatabase();
+    console.log('✅ Database seeding completed');
+
+    res.json({
+      success: true,
+      message: 'Database setup and seeding completed successfully!',
+      adminCredentials: {
+        email: 'admin@frashcart.in',
+        password: 'admin123',
+      },
+    });
+
+  } catch (error) {
+    console.error('❌ Database setup failed:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Database setup failed',
+      error: error.message,
+    });
+  }
+});
+
+// @route   POST /api/auth/register
+// @desc    Register a new user with phone + password (simplified for produce vendor)
+// @access  Public
+router.post('/register', async (req, res) => {
+  try {
+    const { phone, password, name } = req.body;
+
+    // Validate required fields
+    if (!phone || !password || !name) {
       return res.status(400).json({
         success: false,
-        message: 'Valid phone number required'
+        message: 'Phone, password, and name are required',
+      });
+    }
+
+    // Check if phone already exists
+    const existingUser = await query(
+      'SELECT id FROM users WHERE phone = $1',
+      [phone],
+    );
+
+    if (existingUser.rows.length > 0) {
+      return res.status(409).json({
+        success: false,
+        message: 'Phone number already registered',
       });
     }
 
     const result = await otpService.requestOTP(phone);
 
-    res.json({
+    // Create user
+    const result = await query(`
+      INSERT INTO users (phone, password_hash, name, is_admin, created_at, updated_at)
+      VALUES ($1, $2, $3, $4, NOW(), NOW())
+      RETURNING id, phone, name, is_admin, created_at
+    `, [phone, passwordHash, name, false]);
+
+    const user = result.rows[0];
+
+    // Generate JWT token
+    const token = jwt.sign(
+      { id: user.id, is_admin: user.is_admin },
+      process.env.JWT_SECRET,
+      { expiresIn: '7d' },
+    );
+
+    res.status(201).json({
       success: true,
-      userId: result.userId,
-      message: 'OTP sent to your phone'
+      message: 'User registered successfully',
+      data: {
+        user: {
+          id: user.id,
+          phone: user.phone,
+          name: user.name,
+          is_admin: user.is_admin,
+        },
+        token,
+      },
     });
 
   } catch (error) {
     console.error('Request OTP error:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to send OTP. Please try again.'
+      message: 'Internal server error',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined,
     });
   }
 });
 
-/**
- * @route   POST /api/auth/verify-otp
- * @desc    Verify OTP and login user
- * @access  Public
- */
-router.post('/verify-otp', async (req, res) => {
+// @route   POST /api/auth/login
+// @desc    Authenticate user with phone + password & get token
+// @access  Public
+router.post('/login', async (req, res) => {
   try {
-    const { userId, otp } = req.body;
+    const { phone, password } = req.body;
 
-    if (!userId || !otp) {
+    // Validate required fields
+    if (!phone || !password) {
       return res.status(400).json({
         success: false,
-        message: 'User ID and OTP required'
+        message: 'Phone and password are required',
+      });
+    }
+
+    // Check if user exists
+    const result = await query(`
+      SELECT id, phone, password_hash, name, is_admin
+      FROM users WHERE phone = $1
+    `, [phone]);
+
+    if (result.rows.length === 0) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid phone or password',
       });
     }
 
     const result = await otpService.verifyOTP(userId, otp);
 
-    if (!result.success) {
-      return res.status(400).json(result);
+    // Check password
+    const isPasswordValid = await bcrypt.compare(password, user.password_hash);
+    if (!isPasswordValid) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid phone or password',
+      });
     }
 
     setAuthCookie(res, result.token);
@@ -78,9 +172,14 @@ router.post('/verify-otp', async (req, res) => {
       success: true,
       message: 'Logged in successfully',
       data: {
-        user: result.user,
-        token: result.token
-      }
+        user: {
+          id: user.id,
+          phone: user.phone,
+          name: user.name,
+          is_admin: user.is_admin,
+        },
+        token,
+      },
     });
 
   } catch (error) {
@@ -169,7 +268,18 @@ router.post('/provider-session', async (req, res) => {
  */
 router.get('/me', authenticateToken, async (req, res) => {
   try {
-    // User already authenticated by middleware
+    const result = await query(`
+      SELECT id, phone, name, is_admin, created_at, updated_at
+      FROM users WHERE id = $1
+    `, [req.user.id]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found',
+      });
+    }
+
     res.json({
       success: true,
       data: {
@@ -184,45 +294,22 @@ router.get('/me', authenticateToken, async (req, res) => {
   }
 });
 
-/**
- * @route   POST /api/auth/logout
- * @desc    Logout user (clear session)
- * @access  Private
- */
-router.post('/logout', authenticateToken, (req, res) => {
-  res.clearCookie('authToken');
-  res.json({
-    success: true,
-    message: 'Logged out successfully'
-  });
-});
-
-/**
- * @route   PUT /api/auth/profile
- * @desc    Update user profile (name, address)
- * @access  Private
- */
+// @route   PUT /api/users/profile
+// @desc    Update user profile
+// @access  Private
 router.put('/profile', authenticateToken, async (req, res) => {
   try {
-    const { name } = req.body;
-    const userId = req.user.id;
+    const { name, phone } = req.body;
 
-    if (!name || name.trim().length < 2) {
-      return res.status(400).json({
-        success: false,
-        message: 'Name required (min 2 characters)'
-      });
-    }
-
-    const result = await pool.query(
-      `UPDATE users SET 
-        first_name = $1, 
-        last_name = $2, 
-        updated_at = NOW() 
-       WHERE id = $3 
-       RETURNING id, phone, name, is_admin`,
-      [name.split(' ')[0] || name, name.split(' ').slice(1).join(' ') || '', userId]
-    );
+    // Update user profile
+    const result = await query(`
+      UPDATE users 
+      SET name = COALESCE($1, name),
+          phone = COALESCE($2, phone),
+          updated_at = CURRENT_TIMESTAMP
+      WHERE id = $3
+      RETURNING id, name, phone, is_admin, created_at, updated_at
+    `, [name, phone, req.user.id]);
 
     if (result.rows.length === 0) {
       return res.status(404).json({
