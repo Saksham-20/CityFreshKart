@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import useAuth from '../../hooks/useAuth';
+import toast from 'react-hot-toast';
 
 const RegisterForm = ({ onSwitchToLogin }) => {
   const navigate = useNavigate();
@@ -15,8 +16,6 @@ const RegisterForm = ({ onSwitchToLogin }) => {
   
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
-  const [otpExpiry, setOtpExpiry] = useState(null);
-  const [timeLeft, setTimeLeft] = useState(0);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -35,7 +34,11 @@ const RegisterForm = ({ onSwitchToLogin }) => {
     if (errors[name]) {
       setErrors(prev => ({ ...prev, [name]: '' }));
     }
-    setErrors({});
+    setErrors(prev => {
+      const newErrors = { ...prev };
+      delete newErrors.general;
+      return newErrors;
+    });
     return true;
   };
 
@@ -68,77 +71,32 @@ const RegisterForm = ({ onSwitchToLogin }) => {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleRequestOtp = async (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!validatePhone(phone)) return;
+    if (!validateForm()) return;
 
     setIsLoading(true);
     try {
-      setLoading(true);
       const serverData = {
         name: formData.name,
         phone: formData.phone,
         password: formData.password
       };
-      await register(serverData);
-      navigate('/login', { 
-        state: { message: 'Registration successful! Please log in.' }
-      });
-    } catch (error) {
-      setErrors({ submit: error.message || 'Registration failed' });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const validateOtp = () => {
-    if (!otp || otp.length !== 6) {
-      setErrors({ otp: 'Enter a valid 6-digit OTP' });
-      return false;
-    }
-    setErrors({});
-    return true;
-  };
-
-  const handleOtpChange = (e) => {
-    const val = e.target.value.replace(/\D/g, '').slice(0, 6);
-    setOtp(val);
-    if (errors.otp) setErrors({});
-  };
-
-  const handleVerifyOtp = async (e) => {
-    e.preventDefault();
-    if (!validateOtp()) return;
-
-    setIsLoading(true);
-    try {
-      const result = await verifyOTP(otpContext, otp);
-
-      if (!result?.success) {
-        setErrors({ general: result?.message || 'Invalid OTP. Please try again.' });
-        return;
-      }
-
-      toast.success('Account created and logged in!');
-
-      setTimeout(() => {
+      const result = await register(serverData);
+      
+      if (result.success) {
+        toast.success('Registration successful!');
         navigate('/');
-      }, 500);
+      } else {
+        setErrors({ general: result.message || 'Registration failed' });
+        toast.error(result.message || 'Registration failed');
+      }
     } catch (error) {
-      console.error('Verify OTP error:', error);
-      setErrors({ general: error.message || 'Invalid OTP. Please try again.' });
-      toast.error('Invalid OTP');
+      setErrors({ general: error.message || 'Registration failed' });
+      toast.error('Registration failed');
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const handleBackToPhone = () => {
-    setStep('phone');
-    setOtp('');
-    setOtpContext(null);
-    setOtpExpiry(null);
-    setErrors({});
   };
 
   return (
@@ -149,9 +107,9 @@ const RegisterForm = ({ onSwitchToLogin }) => {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-3">
-        {errors.submit && (
+        {errors.general && (
           <div className="bg-red-50 text-red-600 text-sm px-3 py-2 rounded-lg">
-            {errors.submit}
+            {errors.general}
           </div>
         )}
 
@@ -166,7 +124,7 @@ const RegisterForm = ({ onSwitchToLogin }) => {
             value={formData.name}
             onChange={handleInputChange}
             placeholder="John Doe"
-            className="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-fresh-green"
+            className="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
           />
           {errors.name && <p className="text-red-600 text-xs mt-1">{errors.name}</p>}
         </div>
@@ -184,7 +142,7 @@ const RegisterForm = ({ onSwitchToLogin }) => {
             value={formData.phone}
             onChange={handleInputChange}
             placeholder="8888888888"
-            className="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-fresh-green"
+            className="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
           />
           {errors.phone && <p className="text-red-600 text-xs mt-1">{errors.phone}</p>}
         </div>
@@ -200,7 +158,7 @@ const RegisterForm = ({ onSwitchToLogin }) => {
             value={formData.password}
             onChange={handleInputChange}
             placeholder="••••••••"
-            className="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-fresh-green"
+            className="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
           />
           {errors.password && <p className="text-red-600 text-xs mt-1">{errors.password}</p>}
         </div>
@@ -216,26 +174,26 @@ const RegisterForm = ({ onSwitchToLogin }) => {
             value={formData.confirmPassword}
             onChange={handleInputChange}
             placeholder="••••••••"
-            className="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-fresh-green"
+            className="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
           />
           {errors.confirmPassword && <p className="text-red-600 text-xs mt-1">{errors.confirmPassword}</p>}
         </div>
 
         <button
           type="submit"
-          disabled={loading}
-          className="w-full bg-fresh-green hover:bg-fresh-green/90 text-white font-semibold py-2 rounded text-sm transition"
+          disabled={isLoading}
+          className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-2 rounded text-sm transition mt-4"
         >
-          {loading ? 'Creating Account...' : 'Sign Up'}
+          {isLoading ? 'Creating Account...' : 'Sign Up'}
         </button>
       </form>
 
-      <div className="mt-3 text-center text-sm">
-        Already have an account?{' '}
+      <div className="mt-4 text-center text-sm">
+        <span className="text-gray-600">Already have an account? </span>
         <button
           type="button"
           onClick={onSwitchToLogin}
-          className="text-fresh-green hover:underline font-medium"
+          className="text-green-600 hover:text-green-800 hover:underline font-medium"
         >
           Sign in
         </button>

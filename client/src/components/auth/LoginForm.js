@@ -1,17 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import useAuth from '../../hooks/useAuth';
+import toast from 'react-hot-toast';
 
 const LoginForm = ({ onSwitchToRegister }) => {
   const navigate = useNavigate();
+  const { login } = useAuth();
   const [formData, setFormData] = useState({
     phone: '',
     password: ''
   });
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
-  const [otpExpiry, setOtpExpiry] = useState(null);
-  const [timeLeft, setTimeLeft] = useState(0);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -32,7 +32,11 @@ const LoginForm = ({ onSwitchToRegister }) => {
         [name]: ''
       }));
     }
-    setErrors({});
+    setErrors(prev => {
+      const newErrors = { ...prev };
+      delete newErrors.general;
+      return newErrors;
+    });
     return true;
   };
 
@@ -55,86 +59,33 @@ const LoginForm = ({ onSwitchToRegister }) => {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleRequestOtp = async (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!validateForm()) return;
     setIsLoading(true);
     try {
       const result = await login(formData.phone, formData.password);
       if (result.success) {
+        toast.success('Logged in successfully!');
         if (result.user && result.user.is_admin) {
           navigate('/admin');
         } else {
           navigate('/');
         }
+      } else {
+         setErrors({
+           general: result.message || 'Invalid phone or password'
+         });
+         toast.error(result.message || 'Login failed');
       }
-
-      setConfirmationResult(result.confirmationResult);
-      setStep('otp');
-      setOtpExpiry(new Date().getTime() + 5 * 60 * 1000);
-
-      toast.success('OTP sent to your phone!');
     } catch (error) {
       setErrors({
         general: error.message || 'Login failed'
       });
+      toast.error('Login failed');
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const validateOtp = () => {
-    if (!otp || otp.length !== 6) {
-      setErrors({ otp: 'Enter a valid 6-digit OTP' });
-      return false;
-    }
-    setErrors({});
-    return true;
-  };
-
-  const handleOtpChange = (e) => {
-    const val = e.target.value.replace(/\D/g, '').slice(0, 6);
-    setOtp(val);
-    if (errors.otp) setErrors({});
-  };
-
-  const handleVerifyOtp = async (e) => {
-    e.preventDefault();
-    if (!validateOtp()) return;
-
-    setIsLoading(true);
-    try {
-      const result = await verifyOTP(confirmationResult, otp);
-
-      if (!result?.success) {
-        setErrors({ general: result?.message || 'Invalid OTP. Please try again.' });
-        return;
-      }
-
-      toast.success('Logged in successfully!');
-
-      setTimeout(() => {
-        if (result.user?.is_admin) {
-          navigate('/admin');
-        } else {
-          navigate('/');
-        }
-      }, 500);
-    } catch (error) {
-      console.error('Verify OTP error:', error);
-      setErrors({ general: error.message || 'Invalid OTP. Please try again.' });
-      toast.error('Invalid OTP');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleBackToPhone = () => {
-    setStep('phone');
-    setOtp('');
-    setConfirmationResult(null);
-    setOtpExpiry(null);
-    setErrors({});
   };
 
   return (
@@ -164,7 +115,7 @@ const LoginForm = ({ onSwitchToRegister }) => {
             value={formData.phone}
             onChange={handleChange}
             placeholder="8888888888"
-            className="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-fresh-green"
+            className="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
           />
           {errors.phone && <p className="text-red-600 text-xs mt-1">{errors.phone}</p>}
         </div>
@@ -180,7 +131,7 @@ const LoginForm = ({ onSwitchToRegister }) => {
             value={formData.password}
             onChange={handleChange}
             placeholder="••••••••"
-            className="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-fresh-green"
+            className="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
           />
           {errors.password && <p className="text-red-600 text-xs mt-1">{errors.password}</p>}
         </div>
@@ -188,19 +139,19 @@ const LoginForm = ({ onSwitchToRegister }) => {
         <button
           type="submit"
           disabled={isLoading}
-          className="w-full bg-fresh-green hover:bg-fresh-green/90 text-white font-semibold py-2 rounded text-sm transition"
+          className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-2 rounded text-sm transition"
         >
           {isLoading ? 'Signing In...' : 'Sign In'}
         </button>
       </form>
       
-      <div className="mt-3 text-center text-sm">
+      <div className="mt-4 text-center text-sm">
         <button
           type="button"
           onClick={onSwitchToRegister}
-          className="text-fresh-green hover:underline font-medium"
+          className="text-green-600 hover:text-green-800 hover:underline font-medium"
         >
-          Create account
+          Don't have an account? Create one
         </button>
       </div>
     </div>

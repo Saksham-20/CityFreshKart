@@ -15,6 +15,7 @@ datasource db {
 model User {
   id        String   @id @default(uuid())
   phone     String   @unique // Format: +91XXXXXXXXXX - UNIQUE constraint for user lookups
+  password  String   @map("password_hash") // Hashed password
   name      String   // Full name
   isAdmin   Boolean  @default(false) @map("is_admin")
   createdAt DateTime @default(now()) @map("created_at")
@@ -169,16 +170,4 @@ model OrderItem {
   @@map("order_items")
 }
 
-// OTP Sessions - Phone-based OTP authentication
-model OTPSession {
-  id        String   @id @default(uuid())
-  userId    String   @map("user_id")
-  phone     String   // Normalized phone number (+91XXXXXXXXXX)
-  otp       String   // 6-digit OTP
-  expiresAt DateTime @map("expires_at") // 5-minute expiry
-  createdAt DateTime @default(now()) @map("created_at")
-
-  @@index([userId])
-  @@index([expiresAt])
-  @@map("otp_sessions")
-}
+// OTP sessions removed as per new auth system (Phone + Password only)
