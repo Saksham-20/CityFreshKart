@@ -65,7 +65,7 @@ const LoginForm = ({ onSwitchToRegister }) => {
     setIsLoading(true);
     try {
       const result = await login(formData.phone, formData.password);
-      if (result.success) {
+      if (result?.success) {
         toast.success('Logged in successfully!');
         if (result.user && result.user.is_admin) {
           navigate('/admin');
@@ -73,10 +73,9 @@ const LoginForm = ({ onSwitchToRegister }) => {
           navigate('/');
         }
       } else {
-         setErrors({
-           general: result.message || 'Invalid phone or password'
-         });
-         toast.error(result.message || 'Login failed');
+        const message = result?.message || 'Invalid phone or password';
+        setErrors({ general: message });
+        toast.error(message);
       }
     } catch (error) {
       setErrors({

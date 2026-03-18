@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import LoginForm from '../components/auth/LoginForm';
 import RegisterForm from '../components/auth/RegisterForm';
+import { Navigate } from 'react-router-dom';
 import { useAuthStore } from '../store/useAuthStore';
 
 const LoginPage = () => {

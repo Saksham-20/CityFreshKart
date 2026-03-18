@@ -1,0 +1,426 @@
+
+Running 19 tests using 1 worker
+
+  Γ£ÿ   1 [chromium] ΓÇ║ tests\auth.spec.js:20:3 ΓÇ║ Authentication Flows ΓÇ║ should navigate to login page from home (1.7s)
+  Γ£ÿ   2 [chromium] ΓÇ║ tests\auth.spec.js:29:3 ΓÇ║ Authentication Flows ΓÇ║ should display login form with phone and password fields (1.6s)
+  Γ£ÿ   3 [chromium] ΓÇ║ tests\auth.spec.js:45:3 ΓÇ║ Authentication Flows ΓÇ║ should show error for invalid phone (1.6s)
+  Γ£ÿ   4 [chromium] ΓÇ║ tests\auth.spec.js:57:3 ΓÇ║ Authentication Flows ΓÇ║ should show error for incorrect password (1.7s)
+  Γ£ÿ   5 [chromium] ΓÇ║ tests\auth.spec.js:69:3 ΓÇ║ Authentication Flows ΓÇ║ should login successfully with correct credentials (1.7s)
+  Γ£ÿ   6 [chromium] ΓÇ║ tests\auth.spec.js:86:3 ΓÇ║ Authentication Flows ΓÇ║ should persist login state on page refresh (1.6s)
+  Γ£ÿ   7 [chromium] ΓÇ║ tests\auth.spec.js:101:3 ΓÇ║ Authentication Flows ΓÇ║ should display registration section (1.5s)
+  Γ£ÿ   8 [chromium] ΓÇ║ tests\auth.spec.js:112:3 ΓÇ║ Authentication Flows ΓÇ║ should register new user with valid data (1.5s)
+  Γ£ÿ   9 [chromium] ΓÇ║ tests\auth.spec.js:152:3 ΓÇ║ Authentication Flows ΓÇ║ should show validation errors for empty fields (1.6s)
+  Γ£ÿ  10 [chromium] ΓÇ║ tests\auth.spec.js:163:3 ΓÇ║ Authentication Flows ΓÇ║ should have logout functionality (1.6s)
+  Γ£ô  11 [chromium] ΓÇ║ tests\auth.spec.js:191:5 ΓÇ║ Authentication Flows ΓÇ║ Mobile Authentication ΓÇ║ should load login page on mobile (1.5s)
+  Γ£ÿ  12 [chromium] ΓÇ║ tests\auth.spec.js:198:5 ΓÇ║ Authentication Flows ΓÇ║ Mobile Authentication ΓÇ║ should login on mobile device (1.5s)
+  Γ£ÿ  13 [chromium] ΓÇ║ tests\e2e.spec.js:8:3 ΓÇ║ Complete E2E User Journeys ΓÇ║ Complete Journey: Login ΓåÆ Browse ΓåÆ Add to Cart ΓåÆ Checkout (1.6s)
+  Γ£ô  14 [chromium] ΓÇ║ tests\e2e.spec.js:89:3 ΓÇ║ Complete E2E User Journeys ΓÇ║ Browse and Search Products Journey (1.6s)
+  Γ£ÿ  15 [chromium] ΓÇ║ tests\e2e.spec.js:117:3 ΓÇ║ Complete E2E User Journeys ΓÇ║ Multiple Products Cart Journey (918ms)
+  Γ£ÿ  16 [chromium] ΓÇ║ tests\e2e.spec.js:170:3 ΓÇ║ Complete E2E User Journeys ΓÇ║ Delivery Fee Logic Journey (946ms)
+  Γ£ÿ  17 [chromium] ΓÇ║ tests\e2e.spec.js:214:5 ΓÇ║ Complete E2E User Journeys ΓÇ║ Mobile E2E Journeys ΓÇ║ Mobile Complete Journey (911ms)
+  Γ£ô  18 [chromium] ΓÇ║ tests\e2e.spec.js:258:5 ΓÇ║ Complete E2E User Journeys ΓÇ║ Mobile E2E Journeys ΓÇ║ Mobile Product Search (1.6s)
+  Γ£ÿ  19 [chromium] ΓÇ║ tests\e2e.spec.js:280:5 ΓÇ║ Complete E2E User Journeys ΓÇ║ Desktop E2E Journeys ΓÇ║ Desktop Complete Journey (1.5s)
+
+
+  1) [chromium] ΓÇ║ tests\auth.spec.js:20:3 ΓÇ║ Authentication Flows ΓÇ║ should navigate to login page from home 
+
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoBeVisible[2m([22m[2m)[22m failed
+
+    Locator: locator('text=/Sign In|Login/i')
+    Expected: visible
+    Error: strict mode violation: locator('text=/Sign In|Login/i') resolved to 4 elements:
+        1) <p class="text-green-700 text-base">Sign in to shop fresh vegetables</p> aka getByText('Sign in to shop fresh')
+        2) <h2 class="text-xl font-bold text-gray-900">Sign In</h2> aka getByRole('heading', { name: 'Sign In' })
+        3) <button type="submit" class="w-full bg-fresh-green hover:bg-fresh-green/90 text-white font-semibold py-2 rounded text-sm transition">Sign In</button> aka getByRole('button', { name: 'Sign In' })
+        4) <p>Admin Login: Phone +919999999999 ΓÇó Password: admiΓÇª</p> aka getByText('Admin Login: Phone +')
+
+    Call log:
+    [2m  - Expect "toBeVisible" with timeout 5000ms[22m
+    [2m  - waiting for locator('text=/Sign In|Login/i')[22m
+
+
+      24 |     // Verify we're on login page
+      25 |     await expect(page.url()).toContain('/login');
+    > 26 |     await expect(page.locator('text=/Sign In|Login/i')).toBeVisible();
+         |                                                         ^
+      27 |   });
+      28 |
+      29 |   test('should display login form with phone and password fields', async ({ page }) => {
+        at D:\REACT\CityFreshKart\tests\auth.spec.js:26:57
+
+    attachment #1: screenshot (image/png) ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+    test-results\auth-Authentication-Flows--54fb8-ate-to-login-page-from-home-chromium\test-failed-1.png
+    ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+
+    Error Context: test-results\auth-Authentication-Flows--54fb8-ate-to-login-page-from-home-chromium\error-context.md
+
+  2) [chromium] ΓÇ║ tests\auth.spec.js:29:3 ΓÇ║ Authentication Flows ΓÇ║ should display login form with phone and password fields 
+
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoBeVisible[2m([22m[2m)[22m failed
+
+    Locator: button:has-text(/Sign In|Login/i)
+    Expected: visible
+    Error: Unexpected token "/" while parsing css selector "button:has-text(/Sign In|Login/i)". Did you mean to CSS.escape it?
+
+    Call log:
+    [2m  - Expect "toBeVisible" with timeout 5000ms[22m
+    [2m  - waiting for button:has-text(/Sign In|Login/i)[22m
+
+
+      40 |     // Check for sign in button
+      41 |     const signInButton = page.locator('button:has-text(/Sign In|Login/i)');
+    > 42 |     await expect(signInButton).toBeVisible();
+         |                                ^
+      43 |   });
+      44 |
+      45 |   test('should show error for invalid phone', async ({ page }) => {
+        at D:\REACT\CityFreshKart\tests\auth.spec.js:42:32
+
+    attachment #1: screenshot (image/png) ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+    test-results\auth-Authentication-Flows--d3444-h-phone-and-password-fields-chromium\test-failed-1.png
+    ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+
+    Error Context: test-results\auth-Authentication-Flows--d3444-h-phone-and-password-fields-chromium\error-context.md
+
+  3) [chromium] ΓÇ║ tests\auth.spec.js:45:3 ΓÇ║ Authentication Flows ΓÇ║ should show error for invalid phone 
+
+    Error: page.click: Unexpected token "/" while parsing css selector "button:has-text(/Sign In|Login/i)". Did you mean to CSS.escape it?
+    Call log:
+    [2m  - waiting for button:has-text(/Sign In|Login/i)[22m
+
+
+      49 |     await page.fill('input[type="tel"], input[placeholder*="phone" i]', '123');
+      50 |     await page.fill('input[type="password"]', 'password123');
+    > 51 |     await page.click('button:has-text(/Sign In|Login/i)');
+         |                ^
+      52 |     
+      53 |     // Should show error message or validation error
+      54 |     await expect(page.locator('text=/invalid|error|phone/i').first()).toBeVisible({ timeout: 5000 });
+        at D:\REACT\CityFreshKart\tests\auth.spec.js:51:16
+
+    attachment #1: screenshot (image/png) ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+    test-results\auth-Authentication-Flows--9fb3a-how-error-for-invalid-phone-chromium\test-failed-1.png
+    ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+
+    Error Context: test-results\auth-Authentication-Flows--9fb3a-how-error-for-invalid-phone-chromium\error-context.md
+
+  4) [chromium] ΓÇ║ tests\auth.spec.js:57:3 ΓÇ║ Authentication Flows ΓÇ║ should show error for incorrect password 
+
+    Error: page.click: Unexpected token "/" while parsing css selector "button:has-text(/Sign In|Login/i)". Did you mean to CSS.escape it?
+    Call log:
+    [2m  - waiting for button:has-text(/Sign In|Login/i)[22m
+
+
+      61 |     await page.fill('input[type="tel"], input[placeholder*="phone" i]', TEST_USER_PHONE);
+      62 |     await page.fill('input[type="password"]', 'wrongpassword');
+    > 63 |     await page.click('button:has-text(/Sign In|Login/i)');
+         |                ^
+      64 |     
+      65 |     // Should show error message
+      66 |     await expect(page.locator('text=/invalid|error|incorrect|password/i').first()).toBeVisible({ timeout: 5000 });
+        at D:\REACT\CityFreshKart\tests\auth.spec.js:63:16
+
+    attachment #1: screenshot (image/png) ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+    test-results\auth-Authentication-Flows--89368-rror-for-incorrect-password-chromium\test-failed-1.png
+    ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+
+    Error Context: test-results\auth-Authentication-Flows--89368-rror-for-incorrect-password-chromium\error-context.md
+
+  5) [chromium] ΓÇ║ tests\auth.spec.js:69:3 ΓÇ║ Authentication Flows ΓÇ║ should login successfully with correct credentials 
+
+    Error: page.click: Unexpected token "/" while parsing css selector "button:has-text(/Sign In|Login/i)". Did you mean to CSS.escape it?
+    Call log:
+    [2m  - waiting for button:has-text(/Sign In|Login/i)[22m
+
+
+      74 |     await page.fill('input[type="tel"], input[placeholder*="phone" i]', TEST_USER_PHONE);
+      75 |     await page.fill('input[type="password"]', TEST_USER_PASSWORD);
+    > 76 |     await page.click('button:has-text(/Sign In|Login/i)');
+         |                ^
+      77 |     
+      78 |     // Should redirect to home page or dashboard
+      79 |     await page.waitForNavigation();
+        at D:\REACT\CityFreshKart\tests\auth.spec.js:76:16
+
+    attachment #1: screenshot (image/png) ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+    test-results\auth-Authentication-Flows--81185-ly-with-correct-credentials-chromium\test-failed-1.png
+    ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+
+    Error Context: test-results\auth-Authentication-Flows--81185-ly-with-correct-credentials-chromium\error-context.md
+
+  6) [chromium] ΓÇ║ tests\auth.spec.js:86:3 ΓÇ║ Authentication Flows ΓÇ║ should persist login state on page refresh 
+
+    Error: page.click: Unexpected token "/" while parsing css selector "button:has-text(/Sign In|Login/i)". Did you mean to CSS.escape it?
+    Call log:
+    [2m  - waiting for button:has-text(/Sign In|Login/i)[22m
+
+
+      89 |     await page.fill('input[type="tel"], input[placeholder*="phone" i]', TEST_USER_PHONE);
+      90 |     await page.fill('input[type="password"]', TEST_USER_PASSWORD);
+    > 91 |     await page.click('button:has-text(/Sign In|Login/i)');
+         |                ^
+      92 |     await page.waitForNavigation();
+      93 |     
+      94 |     // Refresh page
+        at D:\REACT\CityFreshKart\tests\auth.spec.js:91:16
+
+    attachment #1: screenshot (image/png) ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+    test-results\auth-Authentication-Flows--b2f9e-login-state-on-page-refresh-chromium\test-failed-1.png
+    ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+
+    Error Context: test-results\auth-Authentication-Flows--b2f9e-login-state-on-page-refresh-chromium\error-context.md
+
+  7) [chromium] ΓÇ║ tests\auth.spec.js:101:3 ΓÇ║ Authentication Flows ΓÇ║ should display registration section 
+
+    Error: locator.count: SyntaxError: Invalid flags supplied to RegExp constructor 'i)'
+        at new RegExp (<anonymous>)
+        at createTextMatcher (<anonymous>:7998:16)
+        at Object.queryAll (<anonymous>:6874:33)
+        at InjectedScript._queryEngineAll (<anonymous>:6847:49)
+        at InjectedScript.querySelectorAll (<anonymous>:6834:30)
+        at eval (eval at evaluate (:290:30), <anonymous>:2:33)
+        at UtilityScript.evaluate (<anonymous>:292:16)
+        at UtilityScript.<anonymous> (<anonymous>:1:44)
+        at createTextMatcher (<anonymous>:7998:16)
+        at Object.queryAll (<anonymous>:6874:33)
+        at InjectedScript._queryEngineAll (<anonymous>:6847:49)
+        at InjectedScript.querySelectorAll (<anonymous>:6834:30)
+        at eval (eval at evaluate (:290:30), <anonymous>:2:33)
+        at UtilityScript.evaluate (<anonymous>:292:16)
+        at UtilityScript.<anonymous> (<anonymous>:1:44)
+        at D:\REACT\CityFreshKart\tests\auth.spec.js:107:26
+
+    attachment #1: screenshot (image/png) ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+    test-results\auth-Authentication-Flows--9323d-isplay-registration-section-chromium\test-failed-1.png
+    ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+
+    Error Context: test-results\auth-Authentication-Flows--9323d-isplay-registration-section-chromium\error-context.md
+
+  8) [chromium] ΓÇ║ tests\auth.spec.js:112:3 ΓÇ║ Authentication Flows ΓÇ║ should register new user with valid data 
+
+    Error: locator.count: SyntaxError: Invalid flags supplied to RegExp constructor 'i)'
+        at new RegExp (<anonymous>)
+        at createTextMatcher (<anonymous>:7998:16)
+        at Object.queryAll (<anonymous>:6874:33)
+        at InjectedScript._queryEngineAll (<anonymous>:6847:49)
+        at InjectedScript.querySelectorAll (<anonymous>:6834:30)
+        at eval (eval at evaluate (:290:30), <anonymous>:2:33)
+        at UtilityScript.evaluate (<anonymous>:292:16)
+        at UtilityScript.<anonymous> (<anonymous>:1:44)
+        at createTextMatcher (<anonymous>:7998:16)
+        at Object.queryAll (<anonymous>:6874:33)
+        at InjectedScript._queryEngineAll (<anonymous>:6847:49)
+        at InjectedScript.querySelectorAll (<anonymous>:6834:30)
+        at eval (eval at evaluate (:290:30), <anonymous>:2:33)
+        at UtilityScript.evaluate (<anonymous>:292:16)
+        at UtilityScript.<anonymous> (<anonymous>:1:44)
+        at D:\REACT\CityFreshKart\tests\auth.spec.js:122:28
+
+    attachment #1: screenshot (image/png) ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+    test-results\auth-Authentication-Flows--96842-er-new-user-with-valid-data-chromium\test-failed-1.png
+    ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+
+    Error Context: test-results\auth-Authentication-Flows--96842-er-new-user-with-valid-data-chromium\error-context.md
+
+  9) [chromium] ΓÇ║ tests\auth.spec.js:152:3 ΓÇ║ Authentication Flows ΓÇ║ should show validation errors for empty fields 
+
+    Error: locator.click: Unexpected token "/" while parsing css selector "button:has-text(/Sign In|Login/i)". Did you mean to CSS.escape it?
+    Call log:
+    [2m  - waiting for button:has-text(/Sign In|Login/i)[22m
+
+
+      155 |     // Try to submit empty form
+      156 |     const signInButton = page.locator('button:has-text(/Sign In|Login/i)');
+    > 157 |     await signInButton.click();
+          |                        ^
+      158 |     
+      159 |     // Should show validation error
+      160 |     await expect(page.locator('text=/required|error|please enter/i').first()).toBeVisible({ timeout: 5000 });
+        at D:\REACT\CityFreshKart\tests\auth.spec.js:157:24
+
+    attachment #1: screenshot (image/png) ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+    test-results\auth-Authentication-Flows--933dc-ion-errors-for-empty-fields-chromium\test-failed-1.png
+    ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+
+    Error Context: test-results\auth-Authentication-Flows--933dc-ion-errors-for-empty-fields-chromium\error-context.md
+
+  10) [chromium] ΓÇ║ tests\auth.spec.js:163:3 ΓÇ║ Authentication Flows ΓÇ║ should have logout functionality 
+
+    Error: page.click: Unexpected token "/" while parsing css selector "button:has-text(/Sign In|Login/i)". Did you mean to CSS.escape it?
+    Call log:
+    [2m  - waiting for button:has-text(/Sign In|Login/i)[22m
+
+
+      166 |     await page.fill('input[type="tel"], input[placeholder*="phone" i]', TEST_USER_PHONE);
+      167 |     await page.fill('input[type="password"]', TEST_USER_PASSWORD);
+    > 168 |     await page.click('button:has-text(/Sign In|Login/i)');
+          |                ^
+      169 |     await page.waitForNavigation();
+      170 |     
+      171 |     // Find and click logout
+        at D:\REACT\CityFreshKart\tests\auth.spec.js:168:16
+
+    attachment #1: screenshot (image/png) ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+    test-results\auth-Authentication-Flows-should-have-logout-functionality-chromium\test-failed-1.png
+    ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+
+    Error Context: test-results\auth-Authentication-Flows-should-have-logout-functionality-chromium\error-context.md
+
+  11) [chromium] ΓÇ║ tests\auth.spec.js:198:5 ΓÇ║ Authentication Flows ΓÇ║ Mobile Authentication ΓÇ║ should login on mobile device 
+
+    Error: page.click: Unexpected token "/" while parsing css selector "button:has-text(/Sign In|Login/i)". Did you mean to CSS.escape it?
+    Call log:
+    [2m  - waiting for button:has-text(/Sign In|Login/i)[22m
+
+
+      200 |       await page.fill('input[type="tel"], input[placeholder*="phone" i]', TEST_USER_PHONE);
+      201 |       await page.fill('input[type="password"]', TEST_USER_PASSWORD);
+    > 202 |       await page.click('button:has-text(/Sign In|Login/i)');
+          |                  ^
+      203 |       
+      204 |       await page.waitForNavigation();
+      205 |       await expect(page.locator('text=/Profile|Logout|Sign Out|Account/i')).toBeVisible({ timeout: 5000 });
+        at D:\REACT\CityFreshKart\tests\auth.spec.js:202:18
+
+    attachment #1: screenshot (image/png) ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+    test-results\auth-Authentication-Flows--e6444-ould-login-on-mobile-device-chromium\test-failed-1.png
+    ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+
+    Error Context: test-results\auth-Authentication-Flows--e6444-ould-login-on-mobile-device-chromium\error-context.md
+
+  12) [chromium] ΓÇ║ tests\e2e.spec.js:8:3 ΓÇ║ Complete E2E User Journeys ΓÇ║ Complete Journey: Login ΓåÆ Browse ΓåÆ Add to Cart ΓåÆ Checkout 
+
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoBeVisible[2m([22m[2m)[22m failed
+
+    Locator: locator('text=/CityFreshKart|Fresh|Produce|Products/i')
+    Expected: visible
+    Error: strict mode violation: locator('text=/CityFreshKart|Fresh|Produce|Products/i') resolved to 2 elements:
+        1) <h1 class="text-3xl font-bold text-green-900 mb-2">≡ƒÑ¼ FreshCart</h1> aka getByRole('heading', { name: '≡ƒÑ¼ FreshCart' })
+        2) <p class="text-green-700 text-base">Sign in to shop fresh vegetables</p> aka getByText('Sign in to shop fresh')
+
+    Call log:
+    [2m  - Expect "toBeVisible" with timeout 5000ms[22m
+    [2m  - waiting for locator('text=/CityFreshKart|Fresh|Produce|Products/i')[22m
+
+
+      12 |     
+      13 |     // Verify home page loaded
+    > 14 |     await expect(page.locator('text=/CityFreshKart|Fresh|Produce|Products/i')).toBeVisible();
+         |                                                                                ^
+      15 |     
+      16 |     // === Step 2: Navigate to Login ===
+      17 |     await page.click('text=/Sign In|Login|Account/i');
+        at D:\REACT\CityFreshKart\tests\e2e.spec.js:14:80
+
+    attachment #1: screenshot (image/png) ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+    test-results\e2e-Complete-E2E-User-Jour-d7f76-se-ΓåÆ-Add-to-Cart-ΓåÆ-Checkout-chromium\test-failed-1.png
+    ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+
+    Error Context: test-results\e2e-Complete-E2E-User-Jour-d7f76-se-ΓåÆ-Add-to-Cart-ΓåÆ-Checkout-chromium\error-context.md
+
+  13) [chromium] ΓÇ║ tests\e2e.spec.js:117:3 ΓÇ║ Complete E2E User Journeys ΓÇ║ Multiple Products Cart Journey 
+
+    Error: page.click: Unexpected token "/" while parsing css selector "button:has-text(/Sign In|Login/i)". Did you mean to CSS.escape it?
+    Call log:
+    [2m  - waiting for button:has-text(/Sign In|Login/i)[22m
+
+
+      121 |     await page.fill('input[type="tel"], input[placeholder*="phone" i]', TEST_USER_PHONE);
+      122 |     await page.fill('input[type="password"]', TEST_USER_PASSWORD);
+    > 123 |     await page.click('button:has-text(/Sign In|Login/i)');
+          |                ^
+      124 |     await page.waitForNavigation();
+      125 |     
+      126 |     // === Step 2: Add first product ===
+        at D:\REACT\CityFreshKart\tests\e2e.spec.js:123:16
+
+    attachment #1: screenshot (image/png) ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+    test-results\e2e-Complete-E2E-User-Jour-49ef7-tiple-Products-Cart-Journey-chromium\test-failed-1.png
+    ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+
+    Error Context: test-results\e2e-Complete-E2E-User-Jour-49ef7-tiple-Products-Cart-Journey-chromium\error-context.md
+
+  14) [chromium] ΓÇ║ tests\e2e.spec.js:170:3 ΓÇ║ Complete E2E User Journeys ΓÇ║ Delivery Fee Logic Journey 
+
+    Error: page.click: Unexpected token "/" while parsing css selector "button:has-text(/Sign In|Login/i)". Did you mean to CSS.escape it?
+    Call log:
+    [2m  - waiting for button:has-text(/Sign In|Login/i)[22m
+
+
+      174 |     await page.fill('input[type="tel"], input[placeholder*="phone" i]', TEST_USER_PHONE);
+      175 |     await page.fill('input[type="password"]', TEST_USER_PASSWORD);
+    > 176 |     await page.click('button:has-text(/Sign In|Login/i)');
+          |                ^
+      177 |     await page.waitForNavigation();
+      178 |     
+      179 |     // === Step 2: Add high value order ===
+        at D:\REACT\CityFreshKart\tests\e2e.spec.js:176:16
+
+    attachment #1: screenshot (image/png) ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+    test-results\e2e-Complete-E2E-User-Journeys-Delivery-Fee-Logic-Journey-chromium\test-failed-1.png
+    ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+
+    Error Context: test-results\e2e-Complete-E2E-User-Journeys-Delivery-Fee-Logic-Journey-chromium\error-context.md
+
+  15) [chromium] ΓÇ║ tests\e2e.spec.js:214:5 ΓÇ║ Complete E2E User Journeys ΓÇ║ Mobile E2E Journeys ΓÇ║ Mobile Complete Journey 
+
+    Error: page.click: Unexpected token "/" while parsing css selector "button:has-text(/Sign In|Login/i)". Did you mean to CSS.escape it?
+    Call log:
+    [2m  - waiting for button:has-text(/Sign In|Login/i)[22m
+
+
+      218 |       await page.fill('input[type="tel"], input[placeholder*="phone" i]', TEST_USER_PHONE);
+      219 |       await page.fill('input[type="password"]', TEST_USER_PASSWORD);
+    > 220 |       await page.click('button:has-text(/Sign In|Login/i)');
+          |                  ^
+      221 |       await page.waitForNavigation();
+      222 |       
+      223 |       // === Step 2: Browse products on mobile ===
+        at D:\REACT\CityFreshKart\tests\e2e.spec.js:220:18
+
+    attachment #1: screenshot (image/png) ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+    test-results\e2e-Complete-E2E-User-Jour-1984d-eys-Mobile-Complete-Journey-chromium\test-failed-1.png
+    ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+
+    Error Context: test-results\e2e-Complete-E2E-User-Jour-1984d-eys-Mobile-Complete-Journey-chromium\error-context.md
+
+  16) [chromium] ΓÇ║ tests\e2e.spec.js:280:5 ΓÇ║ Complete E2E User Journeys ΓÇ║ Desktop E2E Journeys ΓÇ║ Desktop Complete Journey 
+
+    Error: [2mexpect([22m[31mreceived[39m[2m).[22mtoBeGreaterThan[2m([22m[32mexpected[39m[2m)[22m
+
+    Expected: > [32m0[39m
+    Received:   [31m0[39m
+
+      285 |       // Should display grid of products
+      286 |       const products = page.locator('[class*="product"]');
+    > 287 |       expect(await products.count()).toBeGreaterThan(0);
+          |                                      ^
+      288 |       
+      289 |       // === Step 2: Login ===
+      290 |       await page.click('text=/Sign In|Login/i');
+        at D:\REACT\CityFreshKart\tests\e2e.spec.js:287:38
+
+    attachment #1: screenshot (image/png) ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+    test-results\e2e-Complete-E2E-User-Jour-cefbd-ys-Desktop-Complete-Journey-chromium\test-failed-1.png
+    ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+
+    Error Context: test-results\e2e-Complete-E2E-User-Jour-cefbd-ys-Desktop-Complete-Journey-chromium\error-context.md
+
+  16 failed
+    [chromium] ΓÇ║ tests\auth.spec.js:20:3 ΓÇ║ Authentication Flows ΓÇ║ should navigate to login page from home 
+    [chromium] ΓÇ║ tests\auth.spec.js:29:3 ΓÇ║ Authentication Flows ΓÇ║ should display login form with phone and password fields 
+    [chromium] ΓÇ║ tests\auth.spec.js:45:3 ΓÇ║ Authentication Flows ΓÇ║ should show error for invalid phone 
+    [chromium] ΓÇ║ tests\auth.spec.js:57:3 ΓÇ║ Authentication Flows ΓÇ║ should show error for incorrect password 
+    [chromium] ΓÇ║ tests\auth.spec.js:69:3 ΓÇ║ Authentication Flows ΓÇ║ should login successfully with correct credentials 
+    [chromium] ΓÇ║ tests\auth.spec.js:86:3 ΓÇ║ Authentication Flows ΓÇ║ should persist login state on page refresh 
+    [chromium] ΓÇ║ tests\auth.spec.js:101:3 ΓÇ║ Authentication Flows ΓÇ║ should display registration section 
+    [chromium] ΓÇ║ tests\auth.spec.js:112:3 ΓÇ║ Authentication Flows ΓÇ║ should register new user with valid data 
+    [chromium] ΓÇ║ tests\auth.spec.js:152:3 ΓÇ║ Authentication Flows ΓÇ║ should show validation errors for empty fields 
+    [chromium] ΓÇ║ tests\auth.spec.js:163:3 ΓÇ║ Authentication Flows ΓÇ║ should have logout functionality 
+    [chromium] ΓÇ║ tests\auth.spec.js:198:5 ΓÇ║ Authentication Flows ΓÇ║ Mobile Authentication ΓÇ║ should login on mobile device 
+    [chromium] ΓÇ║ tests\e2e.spec.js:8:3 ΓÇ║ Complete E2E User Journeys ΓÇ║ Complete Journey: Login ΓåÆ Browse ΓåÆ Add to Cart ΓåÆ Checkout 
+    [chromium] ΓÇ║ tests\e2e.spec.js:117:3 ΓÇ║ Complete E2E User Journeys ΓÇ║ Multiple Products Cart Journey 
+    [chromium] ΓÇ║ tests\e2e.spec.js:170:3 ΓÇ║ Complete E2E User Journeys ΓÇ║ Delivery Fee Logic Journey ΓöÇ
+    [chromium] ΓÇ║ tests\e2e.spec.js:214:5 ΓÇ║ Complete E2E User Journeys ΓÇ║ Mobile E2E Journeys ΓÇ║ Mobile Complete Journey 
+    [chromium] ΓÇ║ tests\e2e.spec.js:280:5 ΓÇ║ Complete E2E User Journeys ΓÇ║ Desktop E2E Journeys ΓÇ║ Desktop Complete Journey 
+  3 passed (57.5s)

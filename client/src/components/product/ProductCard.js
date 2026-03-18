@@ -10,6 +10,7 @@ const WEIGHT_OPTIONS = [0.5, 1, 1.5, 2]; // Default weight options in kg
 
 const ProductCard = React.memo(({ product, className = '' }) => {
   const { addToCart, isItemInCart, removeFromCart, items: cartItems, updateItemQuantity } = useCart();
+  const [selectedWeight, setSelectedWeight] = useState(1);
 
   const isWeightBased = useMemo(() => product.price_per_kg || product.pricePerKg, [product]);
   
@@ -63,16 +64,16 @@ const ProductCard = React.memo(({ product, className = '' }) => {
 
   const handleIncrease = useCallback(() => {
     if (cartItem) {
-      updateItem(cartItem.id, { quantity: cartQty + 1 });
+      updateItemQuantity(cartItem.id, { quantity: cartQty + 1 });
     }
-  }, [cartItem, cartQty, updateItem]);
+  }, [cartItem, cartQty, updateItemQuantity]);
 
   const handleDecrease = useCallback(() => {
     if (!cartItem) return;
     if (cartQty <= 1) {
-      removeItem(cartItem.id);
+      removeFromCart(cartItem.id);
     } else {
-      updateItem(cartItem.id, { quantity: cartQty - 1 });
+      updateItemQuantity(cartItem.id, { quantity: cartQty - 1 });
     }
   }, [cartItem, cartQty, removeFromCart, updateItemQuantity]);
 

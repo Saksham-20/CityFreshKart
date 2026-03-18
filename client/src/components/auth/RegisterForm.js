@@ -84,12 +84,13 @@ const RegisterForm = ({ onSwitchToLogin }) => {
       };
       const result = await register(serverData);
       
-      if (result.success) {
+      if (result?.success) {
         toast.success('Registration successful!');
         navigate('/');
       } else {
-        setErrors({ general: result.message || 'Registration failed' });
-        toast.error(result.message || 'Registration failed');
+        const message = result?.message || 'Registration failed';
+        setErrors({ general: message });
+        toast.error(message);
       }
     } catch (error) {
       setErrors({ general: error.message || 'Registration failed' });
@@ -182,7 +183,7 @@ const RegisterForm = ({ onSwitchToLogin }) => {
         <button
           type="submit"
           disabled={isLoading}
-          className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-2 rounded text-sm transition mt-4"
+          className="w-full bg-fresh-green hover:bg-fresh-green/90 text-white font-semibold py-2 rounded text-sm transition"
         >
           {isLoading ? 'Creating Account...' : 'Sign Up'}
         </button>

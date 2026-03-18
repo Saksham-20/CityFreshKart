@@ -2,7 +2,6 @@ const { defineConfig, devices } = require('@playwright/test');
 
 module.exports = defineConfig({
   testDir: './tests',
-  testMatch: '**/*basic-flow*',
   fullyParallel: false,
   forbidOnly: !!process.env.CI,
   retries: 0,
@@ -21,18 +20,4 @@ module.exports = defineConfig({
     },
   ],
 
-  webServer: [
-    {
-      command: 'npm run server',
-      port: 5000,
-      reuseExistingServer: !process.env.CI,
-      cwd: __dirname,
-    },
-    {
-      command: 'cd client && npm start',
-      port: 3000,
-      reuseExistingServer: !process.env.CI,
-      cwd: __dirname,
-    },
-  ],
 });

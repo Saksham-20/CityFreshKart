@@ -4,6 +4,7 @@ import useCart from '../hooks/useCart';
 import CartItem from '../components/cart/CartItem';
 import CartSummary from '../components/cart/CartSummary';
 import Button from '../components/ui/Button';
+import Navbar from '../components/layout/Navbar';
 
 const CartPage = () => {
   const navigate = useNavigate();
