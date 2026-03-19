@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FiSearch, FiUser, FiShoppingBag, FiX, FiSettings, FiLogOut, FiMapPin, FiChevronDown, FiClock } from 'react-icons/fi';
+import { FiSearch, FiUser, FiShoppingBag, FiX, FiSettings, FiLogOut, FiMapPin, FiChevronDown, FiClock, FiPackage, FiList } from 'react-icons/fi';
 import useAuth from '../../hooks/useAuth';
 import useCart from '../../hooks/useCart';
 
@@ -141,6 +141,20 @@ const Header = () => {
                         <p className="text-[11px] text-gray-400 uppercase tracking-wide">Signed in as</p>
                         <p className="text-sm font-bold text-gray-900 truncate mt-0.5">{user.name || user.phone}</p>
                       </div>
+                      <Link
+                        to="/profile"
+                        className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                      >
+                        <FiUser className="w-4 h-4 text-gray-400" />
+                        My Profile
+                      </Link>
+                      <Link
+                        to="/orders"
+                        className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                      >
+                        <FiPackage className="w-4 h-4 text-gray-400" />
+                        My Orders
+                      </Link>
                       {user?.is_admin && (
                         <Link
                           to="/admin"
@@ -150,13 +164,15 @@ const Header = () => {
                           Admin Panel
                         </Link>
                       )}
-                      <button
-                        onClick={handleLogout}
-                        className="w-full text-left flex items-center gap-2.5 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors"
-                      >
-                        <FiLogOut className="w-4 h-4" />
-                        Logout
-                      </button>
+                      <div className="border-t border-gray-100 mt-1 pt-1">
+                        <button
+                          onClick={handleLogout}
+                          className="w-full text-left flex items-center gap-2.5 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                        >
+                          <FiLogOut className="w-4 h-4" />
+                          Logout
+                        </button>
+                      </div>
                     </motion.div>
                   )}
                 </AnimatePresence>

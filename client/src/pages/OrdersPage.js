@@ -49,21 +49,24 @@ const OrdersPage = () => {
     }
   };
 
+  const STATUS_LABELS = {
+    pending: 'Pending',
+    confirmed: 'Accepted',
+    delivered: 'Delivered',
+    cancelled: 'Rejected',
+  };
+
   const getStatusColor = (status) => {
     const colors = {
       pending: 'bg-yellow-100 text-yellow-800',
-      processing: 'bg-blue-100 text-blue-800',
-      shipped: 'bg-purple-100 text-purple-800',
+      confirmed: 'bg-blue-100 text-blue-800',
       delivered: 'bg-green-100 text-green-800',
       cancelled: 'bg-red-100 text-red-800',
-      refunded: 'bg-gray-100 text-gray-800'
     };
     return colors[status] || 'bg-gray-100 text-gray-800';
   };
 
-  const getStatusText = (status) => {
-    return status ? status.charAt(0).toUpperCase() + status.slice(1) : 'Unknown';
-  };
+  const getStatusText = (status) => STATUS_LABELS[status] || (status ? status.charAt(0).toUpperCase() + status.slice(1) : 'Unknown');
 
   const handleViewOrder = (orderId) => {
     navigate(`/orders/${orderId}`);
@@ -91,7 +94,7 @@ const OrdersPage = () => {
 
         {/* Status Filter */}
         <div className="mb-6 flex flex-wrap gap-2">
-          {['all', 'pending', 'processing', 'shipped', 'delivered', 'cancelled'].map((status) => (
+          {['all', 'pending', 'confirmed', 'delivered', 'cancelled'].map((status) => (
             <button
               key={status}
               onClick={() => {
@@ -150,7 +153,7 @@ const OrdersPage = () => {
                     <div>
                       <p className="text-xs text-gray-500 uppercase font-semibold">Items</p>
                       <p className="text-lg font-bold text-gray-900 mt-1">
-                        {order.items?.length || order.total_items || 0}
+                        {order.item_count || order.items?.length || order.total_items || '—'}
                       </p>
                     </div>
                     <div>

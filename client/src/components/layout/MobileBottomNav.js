@@ -1,6 +1,6 @@
 import React from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { FiHome, FiShoppingBag, FiList, FiLogOut } from 'react-icons/fi';
+import { Link, useLocation } from 'react-router-dom';
+import { FiHome, FiShoppingBag, FiList, FiUser } from 'react-icons/fi';
 import useAuth from '../../hooks/useAuth';
 import useCart from '../../hooks/useCart';
 
@@ -9,8 +9,7 @@ import useCart from '../../hooks/useCart';
  */
 const MobileBottomNav = () => {
   const location = useLocation();
-  const navigate = useNavigate();
-  const { isAuthenticated, logout } = useAuth();
+  const { isAuthenticated } = useAuth();
   const { items: cartItems } = useCart();
 
   const cartCount = cartItems?.length || 0;
@@ -26,11 +25,6 @@ const MobileBottomNav = () => {
   ) {
     return null;
   }
-
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
-  };
 
   return (
     <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-gray-100 shadow-[0_-2px_10px_rgba(0,0,0,0.08)]">
@@ -82,24 +76,18 @@ const MobileBottomNav = () => {
           <span className="text-xs mt-0.5 font-medium">Orders</span>
         </Link>
 
-        {/* Account / Logout */}
-        {isAuthenticated ? (
-          <button
-            onClick={handleLogout}
-            className="flex flex-col items-center py-2 px-4 rounded-xl transition-all duration-200 text-gray-500 hover:text-red-600 hover:bg-red-50"
-          >
-            <FiLogOut size={22} strokeWidth={1.5} />
-            <span className="text-xs mt-0.5 font-medium">Logout</span>
-          </button>
-        ) : (
-          <Link
-            to="/login"
-            className="flex flex-col items-center py-2 px-4 rounded-xl transition-all duration-200 text-gray-500 hover:text-green-600 hover:bg-green-50"
-          >
-            <FiLogOut size={22} strokeWidth={1.5} />
-            <span className="text-xs mt-0.5 font-medium">Login</span>
-          </Link>
-        )}
+        {/* Account / Profile */}
+        <Link
+          to={isAuthenticated ? '/profile' : '/login'}
+          className={`flex flex-col items-center py-2 px-4 rounded-xl transition-all duration-200 ${
+            isActive('/profile')
+              ? 'text-green-600 bg-green-50'
+              : 'text-gray-500 hover:text-green-600 hover:bg-green-50'
+          }`}
+        >
+          <FiUser size={22} strokeWidth={isActive('/profile') ? 2.5 : 1.5} />
+          <span className="text-xs mt-0.5 font-medium">{isAuthenticated ? 'Profile' : 'Login'}</span>
+        </Link>
       </div>
     </nav>
   );

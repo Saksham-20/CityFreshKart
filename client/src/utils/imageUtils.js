@@ -10,7 +10,7 @@ const getImageUrl = (imagePath) => {
     return imagePath;
   }
 
-  const apiBaseUrl = process.env.REACT_APP_API_URL || 'http://localhost:5001';
+  const apiBaseUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 
   // For paths starting with /uploads or uploads/ (disk storage paths from multer)
   if (imagePath.startsWith('/uploads') || imagePath.startsWith('uploads/')) {

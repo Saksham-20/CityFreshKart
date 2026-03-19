@@ -38,6 +38,20 @@ const ProfilePage = () => {
   });
   const [activeSection, setActiveSection] = useState('profile');
 
+  // Recent orders state
+  const [recentOrders, setRecentOrders] = useState([]);
+  const [ordersLoading, setOrdersLoading] = useState(false);
+
+  const ORDER_STATUS_LABELS = {
+    pending: 'Pending', confirmed: 'Accepted', delivered: 'Delivered', cancelled: 'Rejected',
+  };
+  const ORDER_STATUS_COLORS = {
+    pending: 'bg-yellow-100 text-yellow-800',
+    confirmed: 'bg-blue-100 text-blue-800',
+    delivered: 'bg-green-100 text-green-800',
+    cancelled: 'bg-red-100 text-red-800',
+  };
+
   useEffect(() => {
     if (!user) {
       navigate('/login');
@@ -48,7 +62,23 @@ const ProfilePage = () => {
     if (user && activeSection === 'addresses') {
       fetchAddresses();
     }
+    if (user && activeSection === 'orders') {
+      fetchRecentOrders();
+    }
   }, [user, activeSection]);
+
+  const fetchRecentOrders = async () => {
+    try {
+      setOrdersLoading(true);
+      const response = await api.get('/orders', { params: { limit: 10 } });
+      const data = response.data?.data?.orders || [];
+      setRecentOrders(data);
+    } catch {
+      toast.error('Failed to load orders');
+    } finally {
+      setOrdersLoading(false);
+    }
+  };
 
   const fetchAddresses = async () => {
     try {
@@ -257,6 +287,7 @@ const ProfilePage = () => {
                 {[
                   { id: 'profile', label: 'Profile Info', icon: '👤' },
                   { id: 'addresses', label: 'Saved Addresses', icon: '📍' },
+                  { id: 'orders', label: 'My Orders', icon: '📦' },
                   { id: 'security', label: 'Security', icon: '🔒' },
                 ].map(item => (
                   <button
@@ -478,6 +509,54 @@ const ProfilePage = () => {
                             )}
                           </div>
                         </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ── Orders ── */}
+            {activeSection === 'orders' && (
+              <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
+                <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+                  <h3 className="text-lg font-semibold text-gray-900">Recent Orders</h3>
+                  <button onClick={() => navigate('/orders')}
+                    className="text-sm text-green-600 hover:text-green-700 font-medium">View All →</button>
+                </div>
+                {ordersLoading ? (
+                  <div className="py-12 text-center text-gray-400">Loading orders…</div>
+                ) : recentOrders.length === 0 ? (
+                  <div className="py-12 text-center">
+                    <div className="text-4xl mb-3">📦</div>
+                    <p className="text-gray-500 text-sm">No orders yet.</p>
+                    <button onClick={() => navigate('/products')}
+                      className="mt-4 px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors">
+                      Start Shopping
+                    </button>
+                  </div>
+                ) : (
+                  <div className="divide-y divide-gray-100">
+                    {recentOrders.map(order => (
+                      <div key={order.id} className="px-6 py-4 flex items-center gap-4 hover:bg-gray-50 transition-colors">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-semibold text-gray-900 text-sm">#{order.order_number || order.id?.slice(0, 8)}</p>
+                          <p className="text-xs text-gray-500 mt-0.5">
+                            {new Date(order.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                            {' · '}
+                            {order.item_count || '?'} item{(order.item_count || 0) !== 1 ? 's' : ''}
+                          </p>
+                        </div>
+                        <p className="font-bold text-gray-900 text-sm">
+                          ₹{parseFloat(order.total_price || 0).toLocaleString('en-IN')}
+                        </p>
+                        <span className={`inline-flex px-2.5 py-1 rounded-full text-[11px] font-semibold ${ORDER_STATUS_COLORS[order.status] || 'bg-gray-100 text-gray-800'}`}>
+                          {ORDER_STATUS_LABELS[order.status] || order.status}
+                        </span>
+                        <button onClick={() => navigate(`/orders/${order.id}`)}
+                          className="text-xs text-green-600 hover:text-green-700 font-semibold underline underline-offset-2 flex-shrink-0">
+                          View
+                        </button>
                       </div>
                     ))}
                   </div>

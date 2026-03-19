@@ -124,3 +124,22 @@ CREATE TRIGGER update_user_addresses_updated_at BEFORE UPDATE ON user_addresses 
 
 CREATE INDEX IF NOT EXISTS idx_user_addresses_user_id ON user_addresses(user_id);
 CREATE INDEX IF NOT EXISTS idx_user_addresses_is_default ON user_addresses(user_id, is_default);
+
+-- Per-piece / per-kg pricing support
+ALTER TABLE products ADD COLUMN IF NOT EXISTS pricing_type VARCHAR(20) DEFAULT 'per_kg';
+ALTER TABLE order_items ADD COLUMN IF NOT EXISTS pricing_type VARCHAR(20) DEFAULT 'per_kg';
+
+-- Store settings (min order amount, free delivery threshold, delivery fee)
+CREATE TABLE IF NOT EXISTS store_settings (
+    key VARCHAR(50) PRIMARY KEY,
+    value TEXT NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+INSERT INTO store_settings (key, value) VALUES
+    ('min_order_amount', '0'),
+    ('free_delivery_threshold', '300'),
+    ('delivery_fee', '50')
+ON CONFLICT (key) DO NOTHING;
+
+DROP TRIGGER IF EXISTS update_store_settings_updated_at ON store_settings;
+CREATE TRIGGER update_store_settings_updated_at BEFORE UPDATE ON store_settings FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();

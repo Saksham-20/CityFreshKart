@@ -6,19 +6,40 @@ const useCartStore = create((set, get) => ({
   loading: false,
   error: null,
 
-  // Calculate cart summary (price_per_kg × quantity kg, apply discount if exists)
+  // Dynamic settings (loaded from /api/settings on app init)
+  freeDeliveryThreshold: 300,
+  deliveryFeeAmount: 50,
+  minOrderAmount: 0,
+
+  // Load store settings from the public API endpoint
+  loadSettings: async () => {
+    try {
+      const res = await fetch(
+        `${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/settings`,
+      );
+      const json = await res.json();
+      const data = json.data || {};
+      set({
+        freeDeliveryThreshold: parseFloat(data.free_delivery_threshold) || 300,
+        deliveryFeeAmount: parseFloat(data.delivery_fee) || 50,
+        minOrderAmount: parseFloat(data.min_order_amount) || 0,
+      });
+    } catch (_) {
+      // keep defaults on error
+    }
+  },
+
+  // Calculate cart summary using dynamic settings
   calculateSummary: () => {
-    const items = get().items;
+    const { items, freeDeliveryThreshold, deliveryFeeAmount } = get();
 
     const subtotal = items.reduce((sum, item) => {
-      // quantity is stored in kg (e.g. 0.5, 1, 1.5, 2)
       const price = (item.price_per_kg || 0) * (item.quantity || 0);
       const discountedPrice = item.discount ? price * (1 - item.discount / 100) : price;
       return sum + discountedPrice;
     }, 0);
 
-    // Free delivery above ₹300
-    const deliveryFee = subtotal >= 300 ? 0 : 50;
+    const deliveryFee = subtotal >= freeDeliveryThreshold ? 0 : deliveryFeeAmount;
 
     return {
       subtotal: parseFloat(subtotal.toFixed(2)),
@@ -40,17 +61,16 @@ const useCartStore = create((set, get) => ({
     }
   },
 
-  // Add item to cart (quantity = kg amount, e.g. 0.5, 1, 1.5, 2)
+  // Add item to cart
   addToCart: (product, quantity = 1) => {
     const items = get().items;
     const existingItem = items.find(i => i.id === product.id);
 
     if (existingItem) {
-      // Accumulate kg quantity
       const updated = items.map(i =>
         i.id === product.id
           ? { ...i, quantity: parseFloat((i.quantity + quantity).toFixed(2)) }
-          : i
+          : i,
       );
       set({ items: updated });
       localStorage.setItem('cart', JSON.stringify(updated));
@@ -61,6 +81,7 @@ const useCartStore = create((set, get) => ({
         price_per_kg: product.price_per_kg,
         discount: product.discount || 0,
         image_url: product.image_url || '',
+        pricing_type: product.pricing_type || 'per_kg',
         quantity,
       };
       const updated = [...items, newItem];
@@ -75,12 +96,7 @@ const useCartStore = create((set, get) => ({
       get().removeFromCart(productId);
       return;
     }
-
-    const items = get().items.map(i =>
-      i.id === productId
-        ? { ...i, quantity }
-        : i
-    );
+    const items = get().items.map(i => i.id === productId ? { ...i, quantity } : i);
     set({ items });
     localStorage.setItem('cart', JSON.stringify(items));
   },
@@ -99,14 +115,10 @@ const useCartStore = create((set, get) => ({
   },
 
   // Check if product is in cart
-  isItemInCart: (productId) => {
-    return get().items.some(i => i.id === productId);
-  },
+  isItemInCart: (productId) => get().items.some(i => i.id === productId),
 
   // Get cart item count
-  getCartItemCount: () => {
-    return get().items.reduce((sum, item) => sum + item.quantity, 0);
-  },
+  getCartItemCount: () => get().items.reduce((sum, item) => sum + item.quantity, 0),
 }));
 
 export { useCartStore };

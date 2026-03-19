@@ -12,7 +12,7 @@ const AdminLayout = ({ children }) => {
     { name: 'Products', href: '/admin/products', icon: '🛍️' },
     { name: 'Orders', href: '/admin/orders', icon: '📦' },
     { name: 'Users', href: '/admin/users', icon: '👥' },
-    { name: 'Analytics', href: '/admin/analytics', icon: '📈' },
+    // { name: 'Analytics', href: '/admin/analytics', icon: '📈' }, // hidden temporarily
     { name: 'Settings', href: '/admin/settings', icon: '⚙️' },
   ];
 

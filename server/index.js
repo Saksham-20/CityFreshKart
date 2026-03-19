@@ -98,6 +98,19 @@ app.use('/api/razorpay', razorpayRoutes);
 console.log('✅ Razorpay routes registered at /api/razorpay');
 app.use('/api/cart', cartRoutes);
 app.use('/api/addresses', addressRoutes);
+
+// Public store settings endpoint (read-only, no auth required)
+app.get('/api/settings', async (req, res) => {
+  try {
+    const { pool } = require('./database/config');
+    const result = await pool.query('SELECT key, value FROM store_settings ORDER BY key');
+    const settings = {};
+    result.rows.forEach(row => { settings[row.key] = row.value; });
+    res.json({ success: true, data: settings });
+  } catch (error) {
+    res.json({ success: true, data: { free_delivery_threshold: '300', delivery_fee: '50', min_order_amount: '0' } });
+  }
+});
 app.use('/api/wishlist', wishlistRoutes);
 
 // Error handling middleware

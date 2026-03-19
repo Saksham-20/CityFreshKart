@@ -154,7 +154,7 @@ router.get('/products', async (req, res) => {
 // @access  Admin
 router.post('/products', upload.array('images', 10), handleUploadError, async (req, res) => {
   try {
-    const { name, description, price_per_kg, discount, category, stock_quantity, is_active } = req.body;
+    const { name, description, price_per_kg, discount, category, stock_quantity, is_active, pricing_type } = req.body;
 
     // Validate required fields
     if (!name || !price_per_kg) {
@@ -177,18 +177,21 @@ router.post('/products', upload.array('images', 10), handleUploadError, async (r
                 (primaryImage.secure_url || primaryImage.url || primaryImage.path);
     }
 
+    const validPricingType = ['per_kg', 'per_piece'].includes(pricing_type) ? pricing_type : 'per_kg';
+
     // Create product
     const newProduct = await pool.query(`
       INSERT INTO products (
         name, description, category, image_url, price_per_kg, discount,
-        quantity_available, is_active, created_at, updated_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW())
+        quantity_available, is_active, pricing_type, created_at, updated_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW())
       RETURNING *
     `, [
       name, description || '', category || 'Uncategorized', imageUrl,
       parseFloat(price_per_kg) || 0, parseFloat(discount) || 0,
       parseFloat(stock_quantity) || 0,
       is_active !== 'false' && is_active !== false,
+      validPricingType,
     ]);
 
     const product = newProduct.rows[0];
@@ -412,7 +415,7 @@ router.get('/orders', async (req, res) => {
 // @desc    Update order status (and optionally append an admin note)
 // @access  Admin
 router.put('/orders/:id/status', [
-  body('status').isIn(['pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled']).withMessage('Invalid status'),
+  body('status').isIn(['pending', 'confirmed', 'delivered', 'cancelled']).withMessage('Invalid status'),
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -835,6 +838,55 @@ router.get('/analytics', async (req, res) => {
 
   } catch (error) {
     console.error('Get analytics error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// ── Store Settings ──────────────────────────────────────────────────────────
+
+// @route   GET /api/admin/settings  (also exposed publicly via server/index.js as GET /api/settings)
+// @desc    Get all store settings as key-value object
+// @access  Admin (public read registered separately in index.js)
+router.get('/settings', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT key, value FROM store_settings ORDER BY key');
+    const settings = {};
+    result.rows.forEach(row => { settings[row.key] = row.value; });
+    res.json({ success: true, data: settings });
+  } catch (error) {
+    console.error('Get settings error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// @route   PUT /api/admin/settings
+// @desc    Update store settings
+// @access  Admin
+router.put('/settings', async (req, res) => {
+  try {
+    const { min_order_amount, free_delivery_threshold, delivery_fee } = req.body;
+    const updates = [];
+
+    if (min_order_amount !== undefined) {
+      updates.push(['min_order_amount', String(parseFloat(min_order_amount) || 0)]);
+    }
+    if (free_delivery_threshold !== undefined) {
+      updates.push(['free_delivery_threshold', String(parseFloat(free_delivery_threshold) || 0)]);
+    }
+    if (delivery_fee !== undefined) {
+      updates.push(['delivery_fee', String(parseFloat(delivery_fee) || 0)]);
+    }
+
+    for (const [key, value] of updates) {
+      await pool.query(
+        'INSERT INTO store_settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value = $2, updated_at = CURRENT_TIMESTAMP',
+        [key, value],
+      );
+    }
+
+    res.json({ success: true, message: 'Settings saved successfully' });
+  } catch (error) {
+    console.error('Update settings error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });

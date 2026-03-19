@@ -13,6 +13,7 @@ import ProtectedRoute from './components/auth/ProtectedRoute';
 import AdminRoute from './components/auth/AdminRoute';
 import useAuth from './hooks/useAuth';
 import { useAuthStore } from './store/useAuthStore';
+import { useCartStore } from './store/useCartStore';
 
 // Lazy load page components for better performance
 const ProductsPage = lazy(() => import('./pages/ProductsPage'));
@@ -44,9 +45,10 @@ function App() {
   const { isAuthenticated, loading } = useAuth();
   const initialize = useAuthStore(state => state.initialize);
 
-  // Initialize auth on app load
+  // Initialize auth and store settings on app load
   useEffect(() => {
     initialize();
+    useCartStore.getState().loadSettings();
   }, [initialize]);
 
   if (loading) {

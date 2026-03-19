@@ -5,6 +5,7 @@ import { useAuthStore } from '../store/useAuthStore';
 import api from '../services/api';
 import { razorpayService } from '../services/razorpayService';
 import { addressService } from '../services/addressService';
+import toast from 'react-hot-toast';
 
 const CheckoutPage = () => {
   const navigate = useNavigate();
@@ -15,6 +16,7 @@ const CheckoutPage = () => {
   const [selectedAddressId, setSelectedAddressId] = useState(null);
   const [useNewAddress, setUseNewAddress] = useState(false);
   const [newAddressText, setNewAddressText] = useState('');
+  const [saveNewAddress, setSaveNewAddress] = useState(false);
   const [deliveryNotes, setDeliveryNotes] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('cod');
   const [loading, setLoading] = useState(false);
@@ -100,6 +102,33 @@ const CheckoutPage = () => {
     setLoading(true);
     setError('');
 
+    // Save new address to profile if checkbox is ticked
+    if (useNewAddress && saveNewAddress && address) {
+      try {
+        // Parse the free-text address into structured fields
+        const lines = address.split(',').map(s => s.trim()).filter(Boolean);
+        const addressLine = lines.slice(0, Math.max(1, lines.length - 3)).join(', ') || lines[0] || address;
+        const city = lines[lines.length - 3] || '';
+        const state = lines[lines.length - 2] || '';
+        const postalCode = lines[lines.length - 1] || '';
+        await addressService.addAddress({
+          firstName: user.name || 'User',
+          lastName: '',
+          addressLine,
+          city,
+          state,
+          postalCode,
+          phone: user.phone || '',
+          isDefault: savedAddresses.length === 0,
+        });
+        toast.success('Address saved to your profile!');
+        // Refresh addresses silently so future visits are pre-filled
+        loadAddresses();
+      } catch {
+        // Don't block order if address save fails
+      }
+    }
+
     try {
       if (paymentMethod === 'razorpay') {
         await razorpayService.openCheckout({
@@ -115,7 +144,8 @@ const CheckoutPage = () => {
               if (response.data.success) {
                 clearCart();
                 const orderId = response.data.data?.order?.id || response.data.data?.id;
-                navigate(orderId ? `/orders/${orderId}/confirmation` : '/');
+                toast.success('Order placed! Waiting for admin confirmation.', { duration: 5000 });
+                navigate(orderId ? `/orders/${orderId}` : '/orders');
               } else {
                 setError(response.data.message || 'Order creation failed after payment.');
               }
@@ -135,7 +165,8 @@ const CheckoutPage = () => {
         if (response.data.success) {
           clearCart();
           const orderId = response.data.data?.order?.id || response.data.data?.id;
-          navigate(orderId ? `/orders/${orderId}/confirmation` : '/');
+          toast.success('Order placed! Waiting for admin confirmation.', { duration: 5000 });
+          navigate(orderId ? `/orders/${orderId}` : '/orders');
         } else {
           setError(response.data.message || 'Order failed. Please try again.');
           setLoading(false);
@@ -270,13 +301,26 @@ const CheckoutPage = () => {
                         {savedAddresses.length > 0 ? '+ Use a different address' : 'Enter delivery address'}
                       </span>
                       {useNewAddress && (
-                        <textarea
-                          value={newAddressText}
-                          onChange={(e) => { setNewAddressText(e.target.value); if (error) setError(''); }}
-                          placeholder="House no., Street, Area, City, Pincode"
-                          rows={3}
-                          className="mt-2 w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 resize-none bg-white transition-colors"
-                        />
+                        <div className="mt-2 space-y-2">
+                          <textarea
+                            value={newAddressText}
+                            onChange={(e) => { setNewAddressText(e.target.value); if (error) setError(''); }}
+                            placeholder="House no., Street, Area, City, State, Pincode"
+                            rows={3}
+                            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 resize-none bg-white transition-colors"
+                          />
+                          <label className="flex items-center gap-2 cursor-pointer select-none">
+                            <input
+                              type="checkbox"
+                              checked={saveNewAddress}
+                              onChange={(e) => setSaveNewAddress(e.target.checked)}
+                              className="w-4 h-4 accent-green-600 rounded"
+                            />
+                            <span className="text-xs text-gray-600 font-medium">
+                              Save this address to my profile
+                            </span>
+                          </label>
+                        </div>
                       )}
                     </div>
                   </label>

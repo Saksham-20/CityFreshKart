@@ -7,24 +7,27 @@ import api from '../../services/api';
 const STATUS_COLORS = {
   pending: 'bg-yellow-100 text-yellow-800',
   confirmed: 'bg-blue-100 text-blue-800',
-  processing: 'bg-purple-100 text-purple-800',
-  shipped: 'bg-indigo-100 text-indigo-800',
   delivered: 'bg-green-100 text-green-800',
   cancelled: 'bg-red-100 text-red-800',
 };
 
+const STATUS_LABELS = {
+  pending: 'Pending',
+  confirmed: 'Accepted',
+  delivered: 'Delivered',
+  cancelled: 'Rejected',
+};
+
 const STATUS_FLOW = {
   pending: ['confirmed', 'cancelled'],
-  confirmed: ['processing', 'cancelled'],
-  processing: ['shipped', 'cancelled'],
-  shipped: ['delivered', 'cancelled'],
+  confirmed: ['delivered'],
   delivered: [],
   cancelled: [],
 };
 
-const ALL_STATUSES = ['pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled'];
+const ALL_STATUSES = ['pending', 'confirmed', 'delivered', 'cancelled'];
 
-const statusLabel = (s) => s ? s.charAt(0).toUpperCase() + s.slice(1) : '';
+const statusLabel = (s) => STATUS_LABELS[s] || (s ? s.charAt(0).toUpperCase() + s.slice(1) : '');
 
 const OrderManager = () => {
   const [orders, setOrders] = useState([]);
@@ -309,12 +312,15 @@ const OrderManager = () => {
               </div>
             )}
 
-            <div className="flex justify-between items-center pt-2">
+            <div className="flex justify-between items-center pt-2 gap-2 flex-wrap">
               {STATUS_FLOW[selectedOrder.status]?.length > 0 && (
                 <Button onClick={() => { setShowDetailsModal(false); openStatusModal(selectedOrder); }}>
                   Update Status
                 </Button>
               )}
+              <Button variant="outline" onClick={() => window.print()} className="ml-2">
+                🖨 Print Bill
+              </Button>
               <Button variant="outline" onClick={() => setShowDetailsModal(false)} className="ml-auto">
                 Close
               </Button>

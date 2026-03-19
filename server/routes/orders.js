@@ -94,12 +94,25 @@ router.get('/:id', authenticateToken, async (req, res) => {
   }
 });
 
+// Helper: fetch a single store setting value (falls back to default if table not ready)
+async function getSetting(key, defaultValue) {
+  try {
+    const result = await query('SELECT value FROM store_settings WHERE key = $1', [key]);
+    if (result.rows.length > 0) return parseFloat(result.rows[0].value) || defaultValue;
+  } catch (_) { /* table may not exist yet on first run */ }
+  return defaultValue;
+}
+
 // @route   POST /api/orders
 // @desc    Create a new order
 // @access  Private
 router.post('/', authenticateToken, async (req, res) => {
   try {
-    const { items, delivery_address, payment_method = 'cod', subtotal: clientSubtotal, delivery_fee: clientDeliveryFee, total_price: clientTotal } = req.body;
+    const {
+      items, delivery_address, notes,
+      payment_method = 'cod',
+      razorpay_payment_id, razorpay_order_id,
+    } = req.body;
 
     if (!items || !Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Items are required' } });
@@ -108,6 +121,11 @@ router.post('/', authenticateToken, async (req, res) => {
     if (!delivery_address || !delivery_address.trim()) {
       return res.status(400).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Delivery address is required' } });
     }
+
+    // Load dynamic settings from DB
+    const freeDeliveryThreshold = await getSetting('free_delivery_threshold', 300);
+    const deliveryFeeAmount = await getSetting('delivery_fee', 50);
+    const minOrderAmount = await getSetting('min_order_amount', 0);
 
     // Recalculate totals server-side for integrity
     let subtotal = 0;
@@ -120,7 +138,14 @@ router.post('/', authenticateToken, async (req, res) => {
     }
     subtotal = parseFloat(subtotal.toFixed(2));
 
-    const deliveryFee = subtotal >= 300 ? 0 : 50;
+    if (minOrderAmount > 0 && subtotal < minOrderAmount) {
+      return res.status(400).json({
+        success: false,
+        error: { code: 'MIN_ORDER', message: `Minimum order amount is ₹${minOrderAmount}` },
+      });
+    }
+
+    const deliveryFee = subtotal >= freeDeliveryThreshold ? 0 : deliveryFeeAmount;
     const totalPrice = parseFloat((subtotal + deliveryFee).toFixed(2));
 
     const orderNumber = `ORD-${Date.now()}-${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
@@ -129,35 +154,38 @@ router.post('/', authenticateToken, async (req, res) => {
     try {
       await client.query('BEGIN');
 
-      // Insert order — columns match schema.sql exactly
+      // Insert order — includes notes and optional razorpay fields
       const orderResult = await client.query(`
-        INSERT INTO orders (order_number, user_id, phone, delivery_address, subtotal, delivery_fee, total_price, payment_method, status)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        INSERT INTO orders (order_number, user_id, phone, delivery_address, notes, subtotal, delivery_fee, total_price, payment_method, razorpay_payment_id, status)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
         RETURNING *
       `, [
         orderNumber,
         req.user.id,
         req.user.phone,
         delivery_address.trim(),
+        notes ? notes.trim() : null,
         subtotal,
         deliveryFee,
         totalPrice,
         payment_method,
+        razorpay_payment_id || null,
         'pending',
       ]);
 
       const order = orderResult.rows[0];
 
-      // Insert order items — columns match schema.sql exactly
+      // Insert order items — include pricing_type snapshot
       for (const item of items) {
         const pricePerKg = parseFloat(item.price_per_kg || 0);
         const quantityKg = parseFloat(item.quantity_kg || 0);
         const discount = parseFloat(item.discount || 0);
         const itemTotal = parseFloat((pricePerKg * quantityKg * (1 - discount / 100)).toFixed(2));
+        const pricingType = item.pricing_type || 'per_kg';
 
         await client.query(`
-          INSERT INTO order_items (order_id, product_id, product_name, quantity_kg, price_per_kg, total_price)
-          VALUES ($1, $2, $3, $4, $5, $6)
+          INSERT INTO order_items (order_id, product_id, product_name, quantity_kg, price_per_kg, total_price, pricing_type)
+          VALUES ($1, $2, $3, $4, $5, $6, $7)
         `, [
           order.id,
           item.product_id,
@@ -165,16 +193,17 @@ router.post('/', authenticateToken, async (req, res) => {
           quantityKg,
           pricePerKg,
           itemTotal,
+          pricingType,
         ]);
 
-        // Decrement available stock (quantity_available matches schema.sql)
+        // Decrement available stock
         await client.query(
           'UPDATE products SET quantity_available = quantity_available - $1 WHERE id = $2 AND quantity_available >= $1',
           [quantityKg, item.product_id],
         );
       }
 
-      // Clear user's cart — flat `cart` table matches schema.sql
+      // Clear user's cart
       await client.query('DELETE FROM cart WHERE user_id = $1', [req.user.id]);
 
       await client.query('COMMIT');
