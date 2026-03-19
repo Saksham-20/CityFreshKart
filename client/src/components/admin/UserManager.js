@@ -4,6 +4,7 @@ import Input from '../ui/Input';
 import Modal from '../ui/Modal';
 import Loading from '../ui/Loading';
 import api from '../../services/api';
+import toast from 'react-hot-toast';
 
 const emptyForm = { name: '', phone: '', password: '', isAdmin: false };
 
@@ -33,10 +34,11 @@ const UserManager = () => {
       if (searchTerm) params.search = searchTerm;
 
       const response = await api.get('/admin/users', { params });
-      setUsers(response.data.users);
+      setUsers(response.data.users || []);
       setTotalPages(response.data.pagination.totalPages);
     } catch (error) {
       console.error('Error fetching users:', error);
+      toast.error('Failed to load users');
     } finally {
       setLoading(false);
     }
@@ -55,6 +57,7 @@ const UserManager = () => {
       });
       setShowAddModal(false);
       setFormData(emptyForm);
+      toast.success('User added successfully');
       fetchUsers();
     } catch (error) {
       setFormError(error.response?.data?.message || 'Failed to add user');
@@ -74,6 +77,7 @@ const UserManager = () => {
       });
       setShowEditModal(false);
       setSelectedUser(null);
+      toast.success('User updated successfully');
       fetchUsers();
     } catch (error) {
       setFormError(error.response?.data?.message || 'Failed to update user');
@@ -88,9 +92,12 @@ const UserManager = () => {
       await api.delete(`/admin/users/${selectedUser.id}`);
       setShowDeleteModal(false);
       setSelectedUser(null);
+      toast.success('User deleted successfully');
       fetchUsers();
     } catch (error) {
-      console.error('Error deleting user:', error.response?.data?.message || error.message);
+      const message = error.response?.data?.message || 'Failed to delete user';
+      toast.error(message);
+      console.error('Error deleting user:', message);
     } finally {
       setLoading(false);
     }
@@ -117,21 +124,21 @@ const UserManager = () => {
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">User Management</h1>
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-6">
+        <h1 className="text-xl sm:text-2xl font-bold text-gray-900">User Management</h1>
         <Button onClick={() => { setFormData(emptyForm); setFormError(''); setShowAddModal(true); }}>
           Add New User
         </Button>
       </div>
 
       {/* Filters */}
-      <div className="mb-6 flex gap-4">
+      <div className="mb-6 flex flex-col sm:flex-row gap-3 sm:gap-4">
         <Input
           type="text"
           placeholder="Search by name or phone..."
           value={searchTerm}
           onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
-          className="max-w-md"
+          className="w-full sm:max-w-md"
         />
         <select
           value={roleFilter}
@@ -144,8 +151,42 @@ const UserManager = () => {
         </select>
       </div>
 
-      {/* Users Table */}
-      <div className="bg-white shadow-md rounded-lg overflow-hidden">
+      {/* Mobile user cards */}
+      <div className="space-y-3 md:hidden">
+        {users.length === 0 ? (
+          <div className="bg-white border border-gray-200 rounded-xl p-6 text-center text-gray-500">No users found</div>
+        ) : users.map((user) => (
+          <div key={user.id} className="bg-white border border-gray-200 rounded-xl p-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-gray-900 truncate">{user.name || '—'}</p>
+                <p className="text-xs text-gray-500">{user.phone}</p>
+              </div>
+              <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                user.is_admin ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'
+              }`}>
+                {user.is_admin ? 'Admin' : 'User'}
+              </span>
+            </div>
+            <p className="text-xs text-gray-500 mt-2">Joined: {new Date(user.created_at).toLocaleDateString()}</p>
+            <div className="mt-3 flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={() => openEditModal(user)}>Edit</Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => openDeleteModal(user)}
+                className="text-red-600 hover:text-red-900"
+              >
+                Delete
+              </Button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Desktop users table */}
+      <div className="hidden md:block bg-white shadow-md rounded-lg overflow-hidden">
+        <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
@@ -203,6 +244,7 @@ const UserManager = () => {
             ))}
           </tbody>
         </table>
+        </div>
       </div>
 
       {/* Pagination */}

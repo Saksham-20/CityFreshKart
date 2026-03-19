@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FiSearch, FiUser, FiShoppingBag, FiX, FiSettings, FiLogOut, FiMapPin, FiChevronDown, FiClock, FiPackage, FiList } from 'react-icons/fi';
+import { FiSearch, FiUser, FiShoppingBag, FiX, FiSettings, FiLogOut, FiMapPin, FiChevronDown, FiClock, FiPackage } from 'react-icons/fi';
 import useAuth from '../../hooks/useAuth';
 import useCart from '../../hooks/useCart';
 
@@ -28,6 +28,11 @@ const Header = () => {
   }, [location]);
 
   useEffect(() => {
+    const query = new URLSearchParams(location.search).get('search') || '';
+    setSearchQuery(query);
+  }, [location.pathname, location.search]);
+
+  useEffect(() => {
     const handler = (e) => {
       if (userMenuRef.current && !userMenuRef.current.contains(e.target)) {
         setShowUserMenu(false);
@@ -41,7 +46,6 @@ const Header = () => {
     e.preventDefault();
     if (searchQuery.trim()) {
       navigate(`/products?search=${encodeURIComponent(searchQuery.trim())}`);
-      setSearchQuery('');
       searchRef.current?.blur();
     }
   };
@@ -57,12 +61,12 @@ const Header = () => {
     <header className={`fixed top-0 left-0 right-0 z-50 transition-all duration-200 ${isScrolled ? 'bg-white/95 backdrop-blur-sm shadow-md' : 'bg-white border-b border-gray-100'}`}>
       {/* Top row: logo, location, admin button, user, cart */}
       <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6">
-        <div className="flex items-center h-14 gap-2 sm:gap-3">
+        <div className="flex items-center h-14 sm:h-[3.75rem] gap-2 sm:gap-3">
 
           {/* Logo */}
-          <Link to="/" className="flex-shrink-0 flex items-center gap-1.5">
+          <Link to="/" className="flex-shrink-0 flex items-center gap-1.5 max-w-[9.5rem] sm:max-w-none">
             <span className="text-lg sm:text-xl leading-none">🌿</span>
-            <span className="text-base sm:text-lg font-extrabold tracking-tight whitespace-nowrap leading-none bg-gradient-to-r from-green-600 to-emerald-500 bg-clip-text text-transparent">
+            <span className="text-base sm:text-lg font-extrabold tracking-tight whitespace-nowrap leading-none bg-gradient-to-r from-green-600 to-emerald-500 bg-clip-text text-transparent truncate">
               City<span className="text-gray-900">Fresh</span>Kart
             </span>
           </Link>
@@ -81,7 +85,7 @@ const Header = () => {
           </div>
 
           {/* Search — full width center */}
-          <form onSubmit={handleSearch} className="flex-1 flex items-center relative min-w-0">
+          <form onSubmit={handleSearch} className="flex-1 flex items-center relative min-w-0 max-w-[13rem] sm:max-w-none">
             <FiSearch className="absolute left-3 text-gray-400 w-4 h-4 pointer-events-none z-10" />
             <input
               ref={searchRef}
@@ -182,7 +186,7 @@ const Header = () => {
             {/* Cart */}
             <Link
               to="/cart"
-              className="relative flex items-center gap-1.5 bg-gradient-to-r from-green-600 to-emerald-500 hover:from-green-700 hover:to-emerald-600 active:scale-[0.97] text-white pl-3 pr-3.5 py-2 rounded-xl transition-all duration-150 text-sm font-bold shadow-md hover:shadow-lg"
+              className="relative flex items-center gap-1.5 bg-gradient-to-r from-green-600 to-emerald-500 hover:from-green-700 hover:to-emerald-600 active:scale-[0.97] text-white pl-2.5 sm:pl-3 pr-3 sm:pr-3.5 py-2 rounded-xl transition-all duration-150 text-sm font-bold shadow-md hover:shadow-lg"
               data-testid="cart-icon"
             >
               <FiShoppingBag className="w-4 h-4" />

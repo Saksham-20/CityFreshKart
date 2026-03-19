@@ -1,11 +1,12 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { FiExternalLink, FiLogOut } from 'react-icons/fi';
+import { FiExternalLink, FiLogOut, FiMenu, FiX } from 'react-icons/fi';
 import useAuth from '../../hooks/useAuth';
 
 const AdminLayout = ({ children }) => {
   const { user, logout } = useAuth();
   const location = useLocation();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const navigation = [
     { name: 'Dashboard', href: '/admin', icon: '📊' },
@@ -23,6 +24,8 @@ const AdminLayout = ({ children }) => {
     return location.pathname.startsWith(path);
   };
 
+  const closeSidebar = () => setSidebarOpen(false);
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Admin Header */}
@@ -30,8 +33,15 @@ const AdminLayout = ({ children }) => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center">
+              <button
+                className="lg:hidden mr-2 p-2 rounded-lg text-gray-600 hover:bg-gray-100"
+                onClick={() => setSidebarOpen(true)}
+                aria-label="Open admin menu"
+              >
+                <FiMenu className="w-5 h-5" />
+              </button>
               <Link to="/admin" className="flex items-center">
-                <span className="text-2xl font-bold text-gray-900">Admin Panel</span>
+                <span className="text-xl sm:text-2xl font-bold text-gray-900">Admin Panel</span>
               </Link>
             </div>
             
@@ -41,10 +51,10 @@ const AdminLayout = ({ children }) => {
               </span>
               <Link
                 to="/"
-                className="flex items-center gap-1.5 text-sm font-medium text-green-700 bg-green-50 hover:bg-green-100 border border-green-200 px-3 py-1.5 rounded-lg transition-colors"
+                className="flex items-center gap-1.5 text-xs sm:text-sm font-medium text-green-700 bg-green-50 hover:bg-green-100 border border-green-200 px-2.5 sm:px-3 py-1.5 rounded-lg transition-colors"
               >
                 <FiExternalLink className="w-3.5 h-3.5" />
-                View Store
+                <span className="hidden sm:inline">View Store</span>
               </Link>
               <button
                 onClick={logout}
@@ -59,14 +69,38 @@ const AdminLayout = ({ children }) => {
       </header>
 
       <div className="flex">
+        {sidebarOpen && (
+          <button
+            type="button"
+            aria-label="Close admin menu"
+            className="fixed inset-0 z-30 bg-black/35 lg:hidden"
+            onClick={closeSidebar}
+          />
+        )}
+
         {/* Sidebar Navigation */}
-        <nav className="w-64 bg-white shadow-sm min-h-screen">
+        <nav
+          className={`fixed lg:static top-16 lg:top-0 left-0 z-40 w-64 bg-white shadow-sm min-h-[calc(100vh-4rem)] lg:min-h-screen transform transition-transform duration-200 ${
+            sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
+          }`}
+        >
           <div className="p-4">
+            <div className="lg:hidden flex items-center justify-between mb-4">
+              <p className="text-sm font-semibold text-gray-700">Navigation</p>
+              <button
+                className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-100"
+                onClick={closeSidebar}
+                aria-label="Close navigation"
+              >
+                <FiX className="w-4 h-4" />
+              </button>
+            </div>
             <ul className="space-y-2">
               {navigation.map((item) => (
                 <li key={item.name}>
                   <Link
                     to={item.href}
+                    onClick={closeSidebar}
                     className={`flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors ${
                       isActive(item.href)
                         ? 'bg-indigo-100 text-indigo-700'
@@ -83,7 +117,7 @@ const AdminLayout = ({ children }) => {
         </nav>
 
         {/* Main Content */}
-        <main className="flex-1 p-6">
+        <main className="flex-1 p-3 sm:p-5 lg:p-6">
           {children}
         </main>
       </div>

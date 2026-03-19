@@ -42,8 +42,8 @@ const CartPage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 pt-14 pb-36">
-      <div className="max-w-lg mx-auto px-0 sm:px-4 py-4">
+    <div className="min-h-screen bg-gray-50 pt-14 pb-[11.5rem] sm:pb-36">
+      <div className="max-w-lg mx-auto px-0 sm:px-4 py-3 sm:py-4">
 
         {/* Delivery info banner */}
         <div className="mx-3 sm:mx-0 mb-3 bg-white rounded-xl border border-gray-100 overflow-hidden">
@@ -159,7 +159,10 @@ const CartPage = () => {
       </div>
 
       {/* Sticky bottom checkout bar */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 px-4 pt-3 pb-5 z-30 shadow-2xl">
+      <div
+        className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 px-4 pt-3 pb-5 z-50 shadow-2xl"
+        style={{ paddingBottom: 'calc(1.25rem + env(safe-area-inset-bottom))' }}
+      >
         {/* Price summary */}
         <div className="flex items-center justify-between mb-3 text-sm">
           <div className="flex items-center gap-3 text-gray-500">

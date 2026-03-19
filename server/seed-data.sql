@@ -2,8 +2,7 @@
 INSERT INTO categories (id, name, slug, description, "createdAt", "updatedAt") VALUES
   ('cat-1', 'Vegetables', 'vegetables', 'Fresh vegetables and greens', NOW(), NOW()),
   ('cat-2', 'Fruits', 'fruits', 'Fresh fruits', NOW(), NOW()),
-  ('cat-3', 'Dairy', 'dairy', 'Dairy products', NOW(), NOW()),
-  ('cat-4', 'Grains', 'grains', 'Grains and cereals', NOW(), NOW());
+  ('cat-3', 'Herbs', 'herbs', 'Fresh herbs and greens', NOW(), NOW());
 
 -- Insert sample products
 INSERT INTO products (id, name, slug, description, "short_description", image, "category_id", price, price_per_kg, discount, sku, stock_quantity, "is_featured", "is_active", "meta_title", "meta_description", "createdAt", "updatedAt") VALUES

@@ -5,8 +5,7 @@ const CATEGORIES = [
   { id: 'all', name: 'All', emoji: '🛒' },
   { id: 'vegetables', name: 'Vegetables', emoji: '🥬' },
   { id: 'fruits', name: 'Fruits', emoji: '🍎' },
-  { id: 'leafy', name: 'Leafy Greens', emoji: '🌿' },
-  { id: 'herbs', name: 'Herbs & Spices', emoji: '🌶️' }
+  { id: 'herbs', name: 'Herbs', emoji: '🌿' }
 ];
 
 const CategoryFilter = ({ selectedCategory, onCategoryChange }) => {

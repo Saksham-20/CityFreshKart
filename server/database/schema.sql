@@ -19,7 +19,7 @@ CREATE TABLE IF NOT EXISTS products (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     name VARCHAR(255) NOT NULL,
     description TEXT,
-    category VARCHAR(100) DEFAULT 'Uncategorized',
+    category VARCHAR(100) DEFAULT 'Vegetables',
     price_per_kg DECIMAL(10,2) NOT NULL,
     discount DECIMAL(10,2) DEFAULT 0,
     image_url VARCHAR(500),
@@ -128,6 +128,12 @@ CREATE INDEX IF NOT EXISTS idx_user_addresses_is_default ON user_addresses(user_
 -- Per-piece / per-kg pricing support
 ALTER TABLE products ADD COLUMN IF NOT EXISTS pricing_type VARCHAR(20) DEFAULT 'per_kg';
 ALTER TABLE order_items ADD COLUMN IF NOT EXISTS pricing_type VARCHAR(20) DEFAULT 'per_kg';
+ALTER TABLE products ADD COLUMN IF NOT EXISTS category VARCHAR(100);
+ALTER TABLE products ALTER COLUMN category SET DEFAULT 'Vegetables';
+ALTER TABLE products
+    DROP CONSTRAINT IF EXISTS products_category_check;
+ALTER TABLE products
+    ADD CONSTRAINT products_category_check CHECK (category IN ('Vegetables', 'Fruits', 'Herbs'));
 
 -- Store settings (min order amount, free delivery threshold, delivery fee)
 CREATE TABLE IF NOT EXISTS store_settings (

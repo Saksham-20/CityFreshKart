@@ -105,8 +105,8 @@ const OrderManager = () => {
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Order Management</h1>
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-6">
+        <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Order Management</h1>
         <button onClick={fetchOrders} className="text-sm text-blue-600 hover:underline font-medium">
           Refresh
         </button>
@@ -148,8 +148,37 @@ const OrderManager = () => {
         })}
       </div>
 
-      {/* Orders Table */}
-      <div className="bg-white shadow-md rounded-lg overflow-hidden">
+      {/* Mobile order cards */}
+      <div className="space-y-3 md:hidden">
+        {filteredOrders.length === 0 ? (
+          <div className="bg-white border border-gray-200 rounded-xl p-6 text-center text-gray-500">No orders found</div>
+        ) : filteredOrders.map((order) => (
+          <div key={order.id} className="bg-white border border-gray-200 rounded-xl p-3">
+            <div className="flex items-center justify-between gap-2">
+              <div>
+                <p className="text-sm font-semibold text-gray-900">#{order.order_number}</p>
+                <p className="text-xs text-gray-500">{order.name || 'Unknown'} · {order.phone || '—'}</p>
+              </div>
+              <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${STATUS_COLORS[order.status] || 'bg-gray-100 text-gray-800'}`}>
+                {statusLabel(order.status)}
+              </span>
+            </div>
+            <div className="mt-2 flex items-center justify-between text-xs text-gray-600">
+              <span>{new Date(order.created_at).toLocaleDateString('en-IN')}</span>
+              <span className="font-bold text-gray-900">₹{(parseFloat(order.total_price) || 0).toFixed(2)}</span>
+            </div>
+            <div className="mt-3 flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={() => openDetailsModal(order)}>View</Button>
+              {STATUS_FLOW[order.status]?.length > 0 && (
+                <Button variant="outline" size="sm" onClick={() => openStatusModal(order)}>Update</Button>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Desktop orders table */}
+      <div className="hidden md:block bg-white shadow-md rounded-lg overflow-hidden">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
@@ -215,7 +244,7 @@ const OrderManager = () => {
         {selectedOrder && (
           <div className="space-y-6">
             {/* Header info grid */}
-            <div className="grid grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
               <div>
                 <h4 className="text-sm font-semibold text-gray-500 uppercase mb-2">Order Info</h4>
                 <div className="space-y-1 text-sm">
@@ -244,7 +273,7 @@ const OrderManager = () => {
               <h4 className="text-sm font-semibold text-gray-500 uppercase mb-2">
                 Items ({(selectedOrder.items || []).length})
               </h4>
-              <div className="border border-gray-200 rounded-lg overflow-hidden">
+              <div className="border border-gray-200 rounded-lg overflow-hidden overflow-x-auto">
                 <table className="min-w-full text-sm">
                   <thead className="bg-gray-50">
                     <tr>

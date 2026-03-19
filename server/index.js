@@ -5,6 +5,7 @@ const helmet = require('helmet');
 const compression = require('compression');
 const rateLimit = require('express-rate-limit');
 const path = require('path');
+const fs = require('fs');
 require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 
 const authRoutes = require('./routes/auth');
@@ -65,7 +66,15 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Static files
-app.use('/uploads', express.static('uploads'));
+const uploadRoot = path.join(__dirname, 'uploads');
+['products', 'users', 'general'].forEach((folder) => {
+  fs.mkdirSync(path.join(uploadRoot, folder), { recursive: true });
+});
+
+app.use('/uploads', express.static(uploadRoot, {
+  maxAge: '7d',
+  etag: true,
+}));
 
 // Health check
 app.get('/health', (req, res) => {
@@ -113,6 +122,18 @@ app.get('/api/settings', async (req, res) => {
 });
 app.use('/api/wishlist', wishlistRoutes);
 
+// Serve React build in production (single-origin deploy: web + api)
+if (process.env.NODE_ENV === 'production') {
+  const clientBuildPath = path.join(__dirname, '..', 'client', 'build');
+  app.use(express.static(clientBuildPath));
+
+  // SPA fallback (must be after API routes)
+  app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api/') || req.path.startsWith('/uploads/')) return next();
+    return res.sendFile(path.join(clientBuildPath, 'index.html'));
+  });
+}
+
 // Error handling middleware
 app.use((err, req, res, next) => {
   console.error(err.stack);
@@ -125,8 +146,8 @@ app.use((err, req, res, next) => {
   });
 });
 
-// 404 handler for API routes
-app.use('*', (req, res) => {
+// 404 handler for API routes only
+app.use('/api/*', (req, res) => {
   res.status(404).json({ message: 'API route not found' });
 });
 

@@ -7,6 +7,7 @@ import AdminLayout from './components/layout/AdminLayout';
 import Header from './components/layout/Header';
 import Footer from './components/layout/Footer';
 import MobileBottomNav from './components/layout/MobileBottomNav';
+import InstallPrompt from './components/pwa/InstallPrompt';
 
 // Auth Components
 import ProtectedRoute from './components/auth/ProtectedRoute';
@@ -62,29 +63,57 @@ function App() {
                 {/* Auth Routes - No Header */}
                 <Route path="/login" element={<LoginPage />} />
 
-                {/* Admin Routes - must be before /* to prevent wildcard capture */}
-                <Route path="/admin/*" element={
+                {/* Admin Routes - explicit routes to avoid nested matching issues */}
+                <Route path="/admin" element={
                   <AdminRoute>
                     <AdminLayout>
-                      <Routes>
-                        <Route path="/" element={<AdminDashboardPage />} />
-                        <Route path="/products" element={<AdminProductsPage />} />
-                        <Route path="/orders" element={<AdminOrdersPage />} />
-                        <Route path="/users" element={<AdminUsersPage />} />
-                        <Route path="/analytics" element={<AdminAnalyticsPage />} />
-                        <Route path="/settings" element={<AdminSettingsPage />} />
-                        <Route path="*" element={<Navigate to="/admin" replace />} />
-                      </Routes>
+                      <AdminDashboardPage />
                     </AdminLayout>
                   </AdminRoute>
                 } />
+                <Route path="/admin/products" element={
+                  <AdminRoute>
+                    <AdminLayout>
+                      <AdminProductsPage />
+                    </AdminLayout>
+                  </AdminRoute>
+                } />
+                <Route path="/admin/orders" element={
+                  <AdminRoute>
+                    <AdminLayout>
+                      <AdminOrdersPage />
+                    </AdminLayout>
+                  </AdminRoute>
+                } />
+                <Route path="/admin/users" element={
+                  <AdminRoute>
+                    <AdminLayout>
+                      <AdminUsersPage />
+                    </AdminLayout>
+                  </AdminRoute>
+                } />
+                <Route path="/admin/analytics" element={
+                  <AdminRoute>
+                    <AdminLayout>
+                      <AdminAnalyticsPage />
+                    </AdminLayout>
+                  </AdminRoute>
+                } />
+                <Route path="/admin/settings" element={
+                  <AdminRoute>
+                    <AdminLayout>
+                      <AdminSettingsPage />
+                    </AdminLayout>
+                  </AdminRoute>
+                } />
+                <Route path="/admin/*" element={<Navigate to="/admin" replace />} />
 
                 {/* Main App Routes - With Header, authenticated users only */}
                 <Route path="/*" element={
                   isAuthenticated ? (
                     <div className="min-h-screen bg-white flex flex-col">
                       <Header />
-                      <main className="flex-1 pb-16 md:pb-0">
+                      <main className="flex-1 pb-[calc(4.5rem+env(safe-area-inset-bottom))] md:pb-0">
                         <Routes>
                           <Route path="/" element={<ProductsPage />} />
                           <Route path="/products" element={<ProductsPage />} />
@@ -117,7 +146,10 @@ function App() {
                           <Route path="*" element={<Navigate to="/products" replace />} />
                         </Routes>
                       </main>
-                      <Footer />
+                      <div className="hidden md:block">
+                        <Footer />
+                      </div>
+                      <InstallPrompt />
                       <MobileBottomNav />
                     </div>
                   ) : (

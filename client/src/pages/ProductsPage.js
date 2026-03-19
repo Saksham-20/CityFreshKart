@@ -8,11 +8,7 @@ const CATEGORIES = [
   { name: 'All', emoji: '🛒' },
   { name: 'Vegetables', emoji: '🥬' },
   { name: 'Fruits', emoji: '🍎' },
-  { name: 'Dairy', emoji: '🥛' },
-  { name: 'Bakery', emoji: '🍞' },
-  { name: 'Grains', emoji: '🌾' },
-  { name: 'Herbs & Spices', emoji: '🌿' },
-  { name: 'Other', emoji: '📦' },
+  { name: 'Herbs', emoji: '🌿' },
 ];
 
 const SORT_OPTIONS = [
@@ -127,14 +123,14 @@ const ProductsPage = () => {
         {/* Category chips */}
         <div
           ref={categoryRef}
-          className="flex items-center gap-2 overflow-x-auto no-scrollbar px-3 sm:px-4 pt-2.5 pb-0"
+          className="flex items-center gap-2 overflow-x-auto no-scrollbar px-3 sm:px-4 pt-2.5 pb-1"
           style={{ scrollbarWidth: 'none' }}
         >
           {CATEGORIES.map(cat => (
             <button
               key={cat.name}
               onClick={() => { setActiveCategory(cat.name); setSearchQuery(''); }}
-              className={`flex-shrink-0 flex items-center gap-1.5 text-xs font-semibold px-3.5 py-1.5 rounded-full border transition-all whitespace-nowrap ${
+                className={`flex-shrink-0 flex items-center gap-1.5 text-xs font-semibold px-3.5 py-1.5 rounded-full border transition-all whitespace-nowrap ${
                 activeCategory === cat.name
                   ? 'bg-gradient-to-r from-green-600 to-emerald-500 text-white border-transparent shadow-sm'
                   : 'text-gray-600 border-gray-200 bg-white hover:border-green-400 hover:text-green-700'
@@ -147,16 +143,16 @@ const ProductsPage = () => {
         </div>
 
         {/* Sort + item count row */}
-        <div className="flex items-center justify-between px-3 sm:px-4 py-2">
+        <div className="flex items-center justify-between px-3 sm:px-4 py-2.5 gap-2">
           <span className="text-xs text-gray-400 font-medium">
             {loading ? '' : `${filteredProducts.length} products`}
           </span>
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
             {SORT_OPTIONS.map(opt => (
               <button
                 key={opt.value}
                 onClick={() => setSortBy(opt.value)}
-                className={`text-xs px-2.5 py-1 rounded-lg font-medium transition-colors ${
+                className={`text-xs px-2.5 py-1 rounded-lg font-medium transition-colors whitespace-nowrap ${
                   sortBy === opt.value
                     ? 'bg-gray-900 text-white'
                     : 'text-gray-500 bg-gray-100 hover:bg-gray-200'
@@ -170,7 +166,7 @@ const ProductsPage = () => {
       </div>
 
       {/* Products Grid */}
-      <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6 py-4">
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6 py-3 sm:py-4">
         {loading ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4">
             <ProductCardSkeleton count={12} />

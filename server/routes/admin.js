@@ -3,9 +3,36 @@ const pool = require('../database/config');
 const { authenticateToken, requireAdmin } = require('../middleware/auth');
 const { body, validationResult } = require('express-validator');
 const { upload, handleUploadError } = require('../middleware/upload');
-const fs = require('fs');
+const path = require('path');
 
 const router = express.Router();
+const ALLOWED_CATEGORIES = ['Vegetables', 'Fruits', 'Herbs'];
+
+const normalizeCategory = (rawCategory = '') => {
+  const trimmed = String(rawCategory).trim().toLowerCase();
+  const aliasMap = {
+    vegetables: 'Vegetables',
+    vegetable: 'Vegetables',
+    fruits: 'Fruits',
+    fruit: 'Fruits',
+    herbs: 'Herbs',
+    'herbs & spices': 'Herbs',
+    'herbs and spices': 'Herbs',
+  };
+  return aliasMap[trimmed] || null;
+};
+
+const normalizeImagePath = (rawPath = '', { allowRemote = true } = {}) => {
+  if (!rawPath) return '';
+  if (String(rawPath).startsWith('http')) {
+    return allowRemote ? rawPath : '';
+  }
+
+  const unixPath = String(rawPath).replace(/\\/g, '/');
+  if (unixPath.startsWith('/uploads/')) return unixPath;
+  if (unixPath.startsWith('uploads/')) return `/${unixPath}`;
+  return `/uploads/products/${path.basename(unixPath)}`;
+};
 
 // Apply admin auth to all routes
 router.use(authenticateToken, requireAdmin);
@@ -155,6 +182,13 @@ router.get('/products', async (req, res) => {
 router.post('/products', upload.array('images', 10), handleUploadError, async (req, res) => {
   try {
     const { name, description, price_per_kg, discount, category, stock_quantity, is_active, pricing_type } = req.body;
+    const normalizedCategory = normalizeCategory(category || 'Vegetables');
+    if (!normalizedCategory || !ALLOWED_CATEGORIES.includes(normalizedCategory)) {
+      return res.status(400).json({
+        message: 'Invalid category. Allowed values: Vegetables, Fruits, Herbs',
+      });
+    }
+
 
     // Validate required fields
     if (!name || !price_per_kg) {
@@ -170,11 +204,10 @@ router.post('/products', upload.array('images', 10), handleUploadError, async (r
     }
 
     // Get image URL: prefer uploaded file, fall back to direct URL from form
-    let imageUrl = req.body.image_url || '';
+    let imageUrl = normalizeImagePath(req.body.image_url || '', { allowRemote: false });
     if (req.files && req.files.length > 0) {
       const primaryImage = req.files[0];
-      imageUrl = primaryImage.path.startsWith('http') ? primaryImage.path :
-                (primaryImage.secure_url || primaryImage.url || primaryImage.path);
+      imageUrl = normalizeImagePath(primaryImage.path || primaryImage.url || primaryImage.secure_url || '', { allowRemote: false });
     }
 
     const validPricingType = ['per_kg', 'per_piece'].includes(pricing_type) ? pricing_type : 'per_kg';
@@ -187,7 +220,7 @@ router.post('/products', upload.array('images', 10), handleUploadError, async (r
       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW())
       RETURNING *
     `, [
-      name, description || '', category || 'Uncategorized', imageUrl,
+      name, description || '', normalizedCategory, imageUrl,
       parseFloat(price_per_kg) || 0, parseFloat(discount) || 0,
       parseFloat(stock_quantity) || 0,
       is_active !== 'false' && is_active !== false,
@@ -227,6 +260,16 @@ router.put('/products/:id', upload.array('images', 1), handleUploadError, [
 
     const { id } = req.params;
     const updateData = req.body || {};
+    if (updateData.category !== undefined) {
+      const normalizedCategory = normalizeCategory(updateData.category);
+      if (!normalizedCategory) {
+        return res.status(400).json({
+          message: 'Invalid category. Allowed values: Vegetables, Fruits, Herbs',
+        });
+      }
+      updateData.category = normalizedCategory;
+    }
+
 
     // Check if product exists
     const existingProduct = await pool.query('SELECT id FROM products WHERE id = $1', [id]);
@@ -237,8 +280,11 @@ router.put('/products/:id', upload.array('images', 1), handleUploadError, [
     // Handle new image if uploaded
     if (req.files && req.files.length > 0) {
       const imageFile = req.files[0];
-      updateData.image_url = imageFile.path.startsWith('http') ? imageFile.path :
-                             (imageFile.secure_url || imageFile.url || imageFile.path);
+      updateData.image_url = normalizeImagePath(imageFile.path || imageFile.url || imageFile.secure_url || '', { allowRemote: false });
+    }
+
+    if (updateData.image_url !== undefined) {
+      updateData.image_url = normalizeImagePath(updateData.image_url, { allowRemote: false });
     }
 
     // Map stock_quantity form field to quantity_available column
@@ -673,6 +719,11 @@ router.delete('/users/:id', async (req, res) => {
 
   } catch (error) {
     console.error('Delete admin user error:', error);
+    if (error.code === '23503') {
+      return res.status(409).json({
+        message: 'Cannot delete this user because they have existing orders.',
+      });
+    }
     res.status(500).json({ message: 'Server error' });
   }
 });

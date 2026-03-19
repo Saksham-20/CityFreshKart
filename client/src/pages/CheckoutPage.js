@@ -180,7 +180,7 @@ const CheckoutPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-24">
+    <div className="min-h-screen bg-gray-50 pb-[10rem]">
       {/* Header */}
       <div className="bg-white border-b border-gray-200 px-4 py-3 flex items-center gap-3 sticky top-14 z-10">
         <button onClick={() => navigate('/cart')} className="text-gray-600 p-1 -ml-1 rounded-lg hover:bg-gray-100">
@@ -191,7 +191,7 @@ const CheckoutPage = () => {
         <h1 className="text-lg font-bold text-gray-900">Checkout</h1>
       </div>
 
-      <div className="max-w-lg mx-auto px-4 pt-4 space-y-3">
+      <div className="max-w-lg mx-auto px-3 sm:px-4 pt-3 sm:pt-4 space-y-3">
         {/* Order Summary */}
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
           <div className="px-4 py-3 border-b border-gray-100">
@@ -392,7 +392,10 @@ const CheckoutPage = () => {
       </div>
 
       {/* Sticky Place Order Button */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 z-20">
+      <div
+        className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 z-20"
+        style={{ paddingBottom: 'calc(1rem + env(safe-area-inset-bottom))' }}
+      >
         <button
           type="submit"
           form="checkout-form"

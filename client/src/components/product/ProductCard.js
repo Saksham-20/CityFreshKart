@@ -72,6 +72,8 @@ const ProductCard = React.memo(({ product, className = '' }) => {
           alt={product.name}
           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
           loading="lazy"
+          decoding="async"
+          sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
           onError={(e) => {
             e.target.onerror = null;
             e.target.src = `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200' viewBox='0 0 200 200'%3E%3Crect width='200' height='200' fill='%23f0fdf4'/%3E%3Ctext x='50%25' y='45%25' font-size='48' text-anchor='middle' dominant-baseline='middle'%3E%F0%9F%A5%A6%3C/text%3E%3Ctext x='50%25' y='74%25' font-size='13' fill='%2386efac' text-anchor='middle' font-family='Arial'%3ENo Image%3C/text%3E%3C/svg%3E`;
@@ -91,7 +93,7 @@ const ProductCard = React.memo(({ product, className = '' }) => {
 
       {/* Info */}
       <div className="flex flex-col flex-1 px-2.5 pt-2.5 pb-3 gap-2">
-        <h3 className="text-sm font-bold text-gray-800 leading-snug line-clamp-2 min-h-[2.6em]">{product.name}</h3>
+        <h3 className="text-[13px] sm:text-sm font-bold text-gray-800 leading-snug line-clamp-2 min-h-[2.6em]">{product.name}</h3>
 
         {/* Qty/Weight selector */}
         <div className="flex gap-1 flex-wrap">
@@ -112,7 +114,7 @@ const ProductCard = React.memo(({ product, className = '' }) => {
 
         {/* Price row */}
         <div className="flex items-baseline gap-1.5">
-          <span className="text-base font-black text-green-700">₹{effectivePrice.toFixed(0)}</span>
+          <span className="text-sm sm:text-base font-black text-green-700">₹{effectivePrice.toFixed(0)}</span>
           {discountPercent > 0 && (
             <span className="text-[11px] text-gray-400 line-through">₹{originalPrice.toFixed(0)}</span>
           )}

@@ -93,28 +93,22 @@ const HomePage = () => {
 
   const categories = [
     {
-      name: 'Sabzi & Greens',
-      description: 'Taza sabziyan seedha khet se',
+      name: 'Vegetables',
+      description: 'Daily fresh vegetables from trusted local farms',
       image: 'https://images.unsplash.com/photo-1540420773420-3366772f4999?w=600&q=80',
-      href: '/products?category=sabzi-greens'
+      href: '/products?category=Vegetables'
     },
     {
       name: 'Fruits',
       description: 'Seasonal fresh fruits daily',
       image: 'https://images.unsplash.com/photo-1619566636858-adf3ef46400b?w=600&q=80',
-      href: '/products?category=fruits'
+      href: '/products?category=Fruits'
     },
     {
-      name: 'Root Vegetables',
-      description: 'Aloo, pyaaz, gajar & more',
+      name: 'Herbs',
+      description: 'Fresh herbs for garnish, aroma, and flavor',
       image: 'https://images.unsplash.com/photo-1590868309235-ea34bed7bd7f?w=600&q=80',
-      href: '/products?category=root-vegetables'
-    },
-    {
-      name: 'Exotic & Herbs',
-      description: 'Fresh herbs & exotic veggies',
-      image: 'https://images.unsplash.com/photo-1466637574441-749b8f19452f?w=600&q=80',
-      href: '/products?category=exotic-herbs'
+      href: '/products?category=Herbs'
     }
   ];
 
@@ -316,7 +310,7 @@ const HomePage = () => {
             </p>
           </motion.div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {categories.map((category, index) => (
               <motion.div
                 key={category.name}

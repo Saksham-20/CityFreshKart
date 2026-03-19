@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, Download } from 'lucide-react';
-import { handleInstallClick, isAppInstalled } from '../../utils/pwa';
-import { cn } from '../../utils/cn';
+import { isAppInstalled } from '../../utils/pwa';
 
 /**
  * InstallPrompt Component
@@ -9,16 +8,57 @@ import { cn } from '../../utils/cn';
  */
 const InstallPrompt = () => {
   const [isVisible, setIsVisible] = useState(false);
-  const [isInstalled, setIsInstalled] = useState(false);
+  const [isInstalled, setIsInstalled] = useState(true);
+  const [deferredPrompt, setDeferredPrompt] = useState(null);
 
   useEffect(() => {
-    setIsInstalled(isAppInstalled());
+    const installed = isAppInstalled();
+    setIsInstalled(installed);
 
-    // Hide if already installed
-    if (isAppInstalled()) {
+    const isMobileViewport = window.matchMedia('(max-width: 767px)').matches;
+    const dismissedAt = Number(localStorage.getItem('cityfreshkart-install-dismissed-at') || 0);
+    const dismissedRecently = Date.now() - dismissedAt < 7 * 24 * 60 * 60 * 1000;
+
+    const onBeforeInstallPrompt = (e) => {
+      if (installed || !isMobileViewport || dismissedRecently) return;
+      e.preventDefault();
+      setDeferredPrompt(e);
+      setIsVisible(true);
+    };
+
+    const onInstalled = () => {
+      setIsInstalled(true);
       setIsVisible(false);
-    }
+      setDeferredPrompt(null);
+      localStorage.setItem('cityfreshkart-app-installed', 'true');
+    };
+
+    window.addEventListener('beforeinstallprompt', onBeforeInstallPrompt);
+    window.addEventListener('appinstalled', onInstalled);
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', onBeforeInstallPrompt);
+      window.removeEventListener('appinstalled', onInstalled);
+    };
   }, []);
+
+  const dismissPrompt = () => {
+    localStorage.setItem('cityfreshkart-install-dismissed-at', String(Date.now()));
+    setIsVisible(false);
+  };
+
+  const onInstall = async () => {
+    if (!deferredPrompt) {
+      setIsVisible(false);
+      return;
+    }
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    if (outcome !== 'accepted') {
+      dismissPrompt();
+    }
+    setDeferredPrompt(null);
+  };
 
   if (isInstalled || !isVisible) {
     return null;
@@ -27,12 +67,8 @@ const InstallPrompt = () => {
   return (
     <div
       id="install-banner"
-      className={cn(
-        'fixed bottom-24 sm:bottom-6 left-4 right-4 sm:left-auto sm:right-6 sm:w-80',
-        'bg-green-600 text-white rounded-2xl shadow-lg',
-        'p-4 flex flex-col gap-3 z-30',
-        'border border-green-700'
-      )}
+      data-testid="install-banner"
+      className="fixed bottom-[5.5rem] left-3 right-3 bg-green-600 text-white rounded-2xl shadow-lg p-4 flex flex-col gap-3 z-40 border border-green-700 md:hidden"
     >
       <div className="flex items-start gap-3">
         <Download className="w-5 h-5 flex-shrink-0 mt-0.5" />
@@ -47,26 +83,14 @@ const InstallPrompt = () => {
       </div>
       <div className="flex gap-2">
         <button
-          onClick={async () => {
-            await handleInstallClick();
-            setIsVisible(false);
-          }}
-          className={cn(
-            'flex-1 px-3 py-2 rounded-lg text-sm font-semibold',
-            'bg-white text-green-600',
-            'hover:bg-green-50 active:bg-green-100',
-            'transition-colors duration-200'
-          )}
+          onClick={onInstall}
+          className="flex-1 px-3 py-2 rounded-lg text-sm font-semibold bg-white text-green-600 hover:bg-green-50 active:bg-green-100 transition-colors duration-200"
         >
           Install
         </button>
         <button
-          onClick={() => setIsVisible(false)}
-          className={cn(
-            'px-3 py-2 rounded-lg text-sm font-semibold',
-            'bg-green-700 hover:bg-green-800',
-            'transition-colors duration-200'
-          )}
+          onClick={dismissPrompt}
+          className="px-3 py-2 rounded-lg text-sm font-semibold bg-green-700 hover:bg-green-800 transition-colors duration-200"
         >
           <X className="w-4 h-4" />
         </button>

@@ -8,6 +8,8 @@ README.md
 .env.development.local
 .env.test.local
 .env.production.local
+.env.*
+.envrc
 .nyc_output
 coverage
 .DS_Store

@@ -74,14 +74,14 @@ const Dashboard = () => {
   return (
     <div>
       <div className="mb-8">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Admin Dashboard</h1>
-            <p className="mt-2 text-gray-600">
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Admin Dashboard</h1>
+            <p className="mt-1 sm:mt-2 text-sm sm:text-base text-gray-600">
               Welcome back, {user?.name || 'Admin'}! Here's what's happening with your store.
             </p>
           </div>
-          <div className="text-right">
+          <div className="text-left sm:text-right">
             <p className="text-sm text-gray-500">Last updated</p>
             <p className="text-sm font-medium text-gray-900">{new Date().toLocaleDateString()}</p>
           </div>
@@ -89,7 +89,7 @@ const Dashboard = () => {
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 sm:gap-6 mb-8">
         <StatCard
           title="Total Revenue"
           value={`₹${safeToFixed(stats?.totalRevenue)}`}

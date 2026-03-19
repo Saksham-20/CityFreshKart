@@ -1,46 +1,24 @@
 const multer = require('multer');
 const path = require('path');
-const { CloudinaryStorage } = require('multer-storage-cloudinary');
-const cloudinary = require('../config/cloudinary');
+const fs = require('fs');
+const uploadRoot = path.join(__dirname, '..', 'uploads');
 
-// Configure Cloudinary storage
-const storage = new CloudinaryStorage({
-  cloudinary: cloudinary,
-  params: {
-    folder: (req, file) => {
-      // Determine folder based on route
-      if (req.baseUrl.includes('products')) {
-        return 'frashcart/products';
-      } else if (req.baseUrl.includes('users')) {
-        return 'frashcart/users';
-      }
-      return 'frashcart/general';
-    },
-    public_id: (req, file) => {
-      // Generate unique filename
-      const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1E9)}`;
-      return `${file.fieldname}-${uniqueSuffix}`;
-    },
-    transformation: [
-      { width: 800, height: 600, crop: 'limit', quality: 'auto' },
-      { fetch_format: 'auto' },
-    ],
-  },
-});
-
-// Fallback to disk storage if Cloudinary is not configured
 const diskStorage = multer.diskStorage({
   destination: (req, file, cb) => {
-    let uploadPath = 'uploads/';
+    let uploadPath = uploadRoot;
 
     // Determine upload path based on the route path (req.path) or baseUrl
     const fullPath = (req.baseUrl + req.path).toLowerCase();
     if (fullPath.includes('products')) {
-      uploadPath += 'products/';
+      uploadPath = path.join(uploadPath, 'products');
     } else if (fullPath.includes('users')) {
-      uploadPath += 'users/';
+      uploadPath = path.join(uploadPath, 'users');
     } else {
-      uploadPath += 'general/';
+      uploadPath = path.join(uploadPath, 'general');
+    }
+
+    if (!fs.existsSync(uploadPath)) {
+      fs.mkdirSync(uploadPath, { recursive: true });
     }
 
     cb(null, uploadPath);
@@ -52,11 +30,6 @@ const diskStorage = multer.diskStorage({
     cb(null, `${file.fieldname}-${uniqueSuffix}${ext}`);
   },
 });
-
-// Use Cloudinary only if it's actually configured (not a placeholder)
-const isCloudinaryConfigured = process.env.CLOUDINARY_CLOUD_NAME &&
-  !process.env.CLOUDINARY_CLOUD_NAME.startsWith('your_');
-const finalStorage = isCloudinaryConfigured ? storage : diskStorage;
 
 // File filter function
 const fileFilter = (req, file, cb) => {
@@ -70,7 +43,7 @@ const fileFilter = (req, file, cb) => {
 
 // Configure multer
 const upload = multer({
-  storage: finalStorage,
+  storage: diskStorage,
   limits: {
     fileSize: parseInt(process.env.MAX_FILE_SIZE) || 5 * 1024 * 1024, // Use env variable or default 5MB
   },
