@@ -47,7 +47,7 @@ const ProductCard = React.memo(({ product, className = '' }) => {
   if (!product) return null;
 
   return (
-    <div className={`group bg-white rounded-2xl border border-gray-100 hover:border-green-200 hover:shadow-lg transition-all duration-200 overflow-hidden flex flex-col ${className}`}>
+    <div className={`group bg-white rounded-2xl border border-gray-100 hover:border-green-200 hover:shadow-xl hover:-translate-y-0.5 transition-all duration-200 overflow-hidden flex flex-col ${className}`}>
       
       {/* Image container */}
       <div className="relative bg-gray-50 overflow-hidden" style={{ aspectRatio: '1 / 1' }}>
@@ -58,21 +58,21 @@ const ProductCard = React.memo(({ product, className = '' }) => {
           loading="lazy"
           onError={(e) => {
             e.target.onerror = null;
-            e.target.src = `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200' viewBox='0 0 200 200'%3E%3Crect width='200' height='200' fill='%23f3f4f6'/%3E%3Ctext x='50%25' y='45%25' font-size='40' text-anchor='middle' dominant-baseline='middle'%3E%F0%9F%A5%A6%3C/text%3E%3Ctext x='50%25' y='72%25' font-size='13' fill='%239ca3af' text-anchor='middle' font-family='Arial'%3ENo Image%3C/text%3E%3C/svg%3E`;
+            e.target.src = `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200' viewBox='0 0 200 200'%3E%3Crect width='200' height='200' fill='%23f0fdf4'/%3E%3Ctext x='50%25' y='45%25' font-size='48' text-anchor='middle' dominant-baseline='middle'%3E%F0%9F%A5%A6%3C/text%3E%3Ctext x='50%25' y='74%25' font-size='13' fill='%2386efac' text-anchor='middle' font-family='Arial'%3ENo Image%3C/text%3E%3C/svg%3E`;
           }}
         />
 
         {/* Discount badge */}
         {discountPercent > 0 && (
-          <div className="absolute top-2 left-2 bg-red-500 text-white text-[10px] font-extrabold px-1.5 py-0.5 rounded-md shadow">
+          <div className="absolute top-2 left-2 bg-gradient-to-r from-orange-500 to-red-500 text-white text-[10px] font-extrabold px-2 py-1 rounded-full shadow-md tracking-wide">
             {discountPercent}% OFF
           </div>
         )}
 
         {/* Out of stock overlay */}
         {outOfStock && (
-          <div className="absolute inset-0 bg-white/70 flex items-center justify-center">
-            <span className="bg-gray-800 text-white text-[11px] font-bold px-3 py-1.5 rounded-full">
+          <div className="absolute inset-0 bg-white/75 backdrop-blur-[2px] flex items-center justify-center">
+            <span className="bg-gray-900 text-white text-[11px] font-bold px-3 py-1.5 rounded-full shadow-lg">
               Out of Stock
             </span>
           </div>
@@ -80,9 +80,9 @@ const ProductCard = React.memo(({ product, className = '' }) => {
       </div>
 
       {/* Info */}
-      <div className="flex flex-col flex-1 px-2.5 pt-2 pb-2.5 gap-1.5">
+      <div className="flex flex-col flex-1 px-2.5 pt-2.5 pb-3 gap-2">
         {/* Name */}
-        <h3 className="text-xs font-semibold text-gray-800 leading-snug line-clamp-2 min-h-[2.5em]">
+        <h3 className="text-sm font-bold text-gray-800 leading-snug line-clamp-2 min-h-[2.6em]">
           {product.name}
         </h3>
 
@@ -92,10 +92,10 @@ const ProductCard = React.memo(({ product, className = '' }) => {
             <button
               key={w}
               onClick={() => setSelectedWeight(w)}
-              className={`text-[10px] font-semibold px-1.5 py-0.5 rounded border transition-colors ${
+              className={`text-[10px] font-bold px-2 py-1 rounded-full border transition-all duration-150 ${
                 selectedWeight === w
-                  ? 'bg-green-600 text-white border-green-600'
-                  : 'text-gray-500 border-gray-200 hover:border-green-400 hover:text-green-700'
+                  ? 'bg-gradient-to-r from-green-600 to-emerald-500 text-white border-transparent shadow-sm'
+                  : 'text-gray-500 border-gray-200 bg-white hover:border-green-400 hover:text-green-700'
               }`}
             >
               {w}kg
@@ -105,40 +105,40 @@ const ProductCard = React.memo(({ product, className = '' }) => {
 
         {/* Price row */}
         <div className="flex items-baseline gap-1.5">
-          <span className="text-sm font-extrabold text-gray-900">₹{effectivePrice.toFixed(0)}</span>
+          <span className="text-base font-black text-green-700">₹{effectivePrice.toFixed(0)}</span>
           {discountPercent > 0 && (
             <span className="text-[11px] text-gray-400 line-through">₹{originalPrice.toFixed(0)}</span>
           )}
-          <span className="text-[10px] text-gray-400 ml-auto">/ {selectedWeight}kg</span>
+          <span className="text-[10px] text-gray-400 ml-auto font-medium">/ {selectedWeight}kg</span>
         </div>
 
         {/* Add to cart / quantity control */}
         {!outOfStock && (
-          <div className="mt-auto pt-1">
+          <div className="mt-auto">
             {!isInCart ? (
               <button
                 onClick={handleAddToCart}
-                className="w-full flex items-center justify-center gap-1 bg-green-600 hover:bg-green-700 active:bg-green-800 text-white text-xs font-bold py-2 rounded-xl transition-colors shadow-sm"
+                className="w-full flex items-center justify-center gap-1.5 bg-gradient-to-r from-green-600 to-emerald-500 hover:from-green-700 hover:to-emerald-600 active:scale-[0.97] text-white text-xs font-bold py-2.5 rounded-xl transition-all duration-150 shadow-sm hover:shadow-md"
               >
                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
                 </svg>
-                Add
+                Add to Cart
               </button>
             ) : (
-              <div className="flex items-center justify-between bg-green-600 rounded-xl overflow-hidden shadow-sm">
+              <div className="flex items-center justify-between bg-gradient-to-r from-green-600 to-emerald-500 rounded-xl overflow-hidden shadow-sm">
                 <button
                   onClick={handleDecrease}
-                  className="w-9 h-8 flex items-center justify-center text-white hover:bg-green-700 active:bg-green-800 transition-colors text-base font-bold"
+                  className="w-10 h-9 flex items-center justify-center text-white hover:bg-black/10 active:bg-black/20 transition-colors text-lg font-bold"
                 >
                   −
                 </button>
-                <span className="text-white text-xs font-extrabold flex-1 text-center">
+                <span className="text-white text-xs font-extrabold flex-1 text-center tracking-wide">
                   {cartQty % 1 === 0 ? cartQty : cartQty.toFixed(1)} kg
                 </span>
                 <button
                   onClick={handleIncrease}
-                  className="w-9 h-8 flex items-center justify-center text-white hover:bg-green-700 active:bg-green-800 transition-colors text-base font-bold"
+                  className="w-10 h-9 flex items-center justify-center text-white hover:bg-black/10 active:bg-black/20 transition-colors text-lg font-bold"
                 >
                   +
                 </button>

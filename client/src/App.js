@@ -27,6 +27,8 @@ const AdminUsersPage = lazy(() => import('./pages/AdminUsersPage'));
 const AdminAnalyticsPage = lazy(() => import('./pages/AdminAnalyticsPage'));
 const AdminSettingsPage = lazy(() => import('./pages/AdminSettingsPage'));
 const OrdersPage = lazy(() => import('./pages/OrdersPage'));
+const OrderDetailPage = lazy(() => import('./pages/OrderDetailPage'));
+const ProfilePage = lazy(() => import('./pages/ProfilePage'));
 
 // Loading component
 const PageLoader = () => (
@@ -98,6 +100,16 @@ function App() {
                           <Route path="/orders/:orderId/confirmation" element={
                             <ProtectedRoute>
                               <OrderConfirmationPage />
+                            </ProtectedRoute>
+                          } />
+                          <Route path="/orders/:orderId" element={
+                            <ProtectedRoute>
+                              <OrderDetailPage />
+                            </ProtectedRoute>
+                          } />
+                          <Route path="/profile" element={
+                            <ProtectedRoute>
+                              <ProfilePage />
                             </ProtectedRoute>
                           } />
                           <Route path="*" element={<Navigate to="/products" replace />} />

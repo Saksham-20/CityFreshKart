@@ -54,14 +54,15 @@ const Header = () => {
   const cartItemCount = cartItems?.length || 0;
 
   return (
-    <header className={`fixed top-0 left-0 right-0 z-50 bg-white transition-all duration-200 ${isScrolled ? 'shadow-md' : 'border-b border-gray-100'}`}>
+    <header className={`fixed top-0 left-0 right-0 z-50 transition-all duration-200 ${isScrolled ? 'bg-white/95 backdrop-blur-sm shadow-md' : 'bg-white border-b border-gray-100'}`}>
       {/* Top row: logo, location, admin button, user, cart */}
       <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6">
         <div className="flex items-center h-14 gap-2 sm:gap-3">
 
           {/* Logo */}
-          <Link to="/" className="flex-shrink-0 flex items-center gap-1">
-            <span className="text-base sm:text-lg font-extrabold text-green-600 tracking-tight whitespace-nowrap leading-none">
+          <Link to="/" className="flex-shrink-0 flex items-center gap-1.5">
+            <span className="text-lg sm:text-xl leading-none">🌿</span>
+            <span className="text-base sm:text-lg font-extrabold tracking-tight whitespace-nowrap leading-none bg-gradient-to-r from-green-600 to-emerald-500 bg-clip-text text-transparent">
               City<span className="text-gray-900">Fresh</span>Kart
             </span>
           </Link>
@@ -165,7 +166,7 @@ const Header = () => {
             {/* Cart */}
             <Link
               to="/cart"
-              className="relative flex items-center gap-1.5 bg-green-600 hover:bg-green-700 active:bg-green-800 text-white pl-3 pr-3.5 py-2 rounded-xl transition-colors text-sm font-bold shadow-sm"
+              className="relative flex items-center gap-1.5 bg-gradient-to-r from-green-600 to-emerald-500 hover:from-green-700 hover:to-emerald-600 active:scale-[0.97] text-white pl-3 pr-3.5 py-2 rounded-xl transition-all duration-150 text-sm font-bold shadow-md hover:shadow-lg"
               data-testid="cart-icon"
             >
               <FiShoppingBag className="w-4 h-4" />

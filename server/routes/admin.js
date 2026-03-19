@@ -409,7 +409,7 @@ router.get('/orders', async (req, res) => {
 });
 
 // @route   PUT /api/admin/orders/:id/status
-// @desc    Update order status
+// @desc    Update order status (and optionally append an admin note)
 // @access  Admin
 router.put('/orders/:id/status', [
   body('status').isIn(['pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled']).withMessage('Invalid status'),
@@ -421,19 +421,29 @@ router.put('/orders/:id/status', [
     }
 
     const { id } = req.params;
-    const { status } = req.body;
+    const { status, admin_note } = req.body;
 
     // Check if order exists
-    const existingOrder = await pool.query('SELECT id FROM orders WHERE id = $1', [id]);
+    const existingOrder = await pool.query('SELECT id, notes FROM orders WHERE id = $1', [id]);
     if (existingOrder.rows.length === 0) {
       return res.status(404).json({ message: 'Order not found' });
     }
 
-    // Update status
-    await pool.query(
-      'UPDATE orders SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
-      [status, id],
-    );
+    if (admin_note && admin_note.trim()) {
+      const timestamp = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
+      const existing = existingOrder.rows[0].notes || '';
+      const separator = existing ? '\n' : '';
+      const newNotes = `${existing}${separator}[Admin ${timestamp}]: ${admin_note.trim()}`;
+      await pool.query(
+        'UPDATE orders SET status = $1, notes = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
+        [status, newNotes, id],
+      );
+    } else {
+      await pool.query(
+        'UPDATE orders SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+        [status, id],
+      );
+    }
 
     res.json({ message: 'Order status updated successfully' });
 

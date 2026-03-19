@@ -4,7 +4,16 @@ import ProductGrid from '../components/product/ProductGrid';
 import ProductCardSkeleton from '../components/product/ProductCardSkeleton';
 import api from '../services/api';
 
-const CATEGORIES = ['All', 'Vegetables', 'Fruits', 'Dairy', 'Bakery', 'Grains', 'Herbs & Spices', 'Other'];
+const CATEGORIES = [
+  { name: 'All', emoji: '🛒' },
+  { name: 'Vegetables', emoji: '🥬' },
+  { name: 'Fruits', emoji: '🍎' },
+  { name: 'Dairy', emoji: '🥛' },
+  { name: 'Bakery', emoji: '🍞' },
+  { name: 'Grains', emoji: '🌾' },
+  { name: 'Herbs & Spices', emoji: '🌿' },
+  { name: 'Other', emoji: '📦' },
+];
 
 const SORT_OPTIONS = [
   { value: 'newest', label: 'Newest' },
@@ -38,7 +47,7 @@ const ProductsPage = () => {
     const q = searchParams.get('search') || '';
     const cat = searchParams.get('category') || '';
     setSearchQuery(q);
-    if (cat && CATEGORIES.includes(cat)) {
+    if (cat && CATEGORIES.find(c => c.name === cat)) {
       setActiveCategory(cat);
     } else if (q) {
       setActiveCategory('All');
@@ -97,14 +106,18 @@ const ProductsPage = () => {
     <div className="min-h-screen bg-gray-50 pt-14">
 
       {/* Hero delivery strip */}
-      <div className="bg-green-600 text-white">
+      <div className="bg-gradient-to-r from-green-700 via-green-600 to-emerald-600 text-white">
         <div className="max-w-7xl mx-auto px-4 py-2.5 flex items-center justify-between text-sm">
           <div className="flex items-center gap-2 font-semibold">
-            <span className="text-base">⚡</span>
+            <span className="text-base animate-pulse">⚡</span>
             <span>Delivery in <strong>30 minutes</strong></span>
           </div>
-          <div className="text-green-100 text-xs hidden sm:block">
-            Fresh produce · Quality guaranteed · Free delivery over ₹300
+          <div className="text-green-100 text-xs hidden sm:flex items-center gap-3">
+            <span className="flex items-center gap-1">🌱 <span>Fresh produce</span></span>
+            <span className="text-green-300">·</span>
+            <span className="flex items-center gap-1">✅ <span>Quality guaranteed</span></span>
+            <span className="text-green-300">·</span>
+            <span className="flex items-center gap-1">🚚 <span>Free delivery over ₹300</span></span>
           </div>
         </div>
       </div>
@@ -119,15 +132,16 @@ const ProductsPage = () => {
         >
           {CATEGORIES.map(cat => (
             <button
-              key={cat}
-              onClick={() => { setActiveCategory(cat); setSearchQuery(''); }}
-              className={`flex-shrink-0 text-xs font-semibold px-3.5 py-1.5 rounded-full border transition-all whitespace-nowrap ${
-                activeCategory === cat
-                  ? 'bg-green-600 text-white border-green-600 shadow-sm'
+              key={cat.name}
+              onClick={() => { setActiveCategory(cat.name); setSearchQuery(''); }}
+              className={`flex-shrink-0 flex items-center gap-1.5 text-xs font-semibold px-3.5 py-1.5 rounded-full border transition-all whitespace-nowrap ${
+                activeCategory === cat.name
+                  ? 'bg-gradient-to-r from-green-600 to-emerald-500 text-white border-transparent shadow-sm'
                   : 'text-gray-600 border-gray-200 bg-white hover:border-green-400 hover:text-green-700'
               }`}
             >
-              {cat}
+              <span className="text-sm leading-none">{cat.emoji}</span>
+              <span>{cat.name}</span>
             </button>
           ))}
         </div>
@@ -177,7 +191,7 @@ const ProductsPage = () => {
             <div className="text-5xl mb-3">🥦</div>
             <p className="text-gray-600 font-semibold">No products found</p>
             <p className="text-gray-400 text-sm mt-1">
-              {searchQuery ? `No results for "${searchQuery}"` : `Nothing in "${activeCategory}" yet`}
+              {searchQuery ? `No results for "${searchQuery}"` : `Nothing in "${activeCategory}" yet — check back soon!`}
             </p>
             {(searchQuery || activeCategory !== 'All') && (
               <button
@@ -191,7 +205,9 @@ const ProductsPage = () => {
         ) : (
           <>
             {activeCategory !== 'All' && (
-              <h2 className="text-base font-bold text-gray-800 mb-3">{activeCategory}</h2>
+              <h2 className="text-base font-bold text-gray-800 mb-3">
+                {CATEGORIES.find(c => c.name === activeCategory)?.emoji} {activeCategory}
+              </h2>
             )}
             <ProductGrid products={filteredProducts} loading={false} error={null} />
           </>

@@ -1,19 +1,50 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCartStore } from '../store/useCartStore';
 import { useAuthStore } from '../store/useAuthStore';
 import api from '../services/api';
 import { razorpayService } from '../services/razorpayService';
+import { addressService } from '../services/addressService';
 
 const CheckoutPage = () => {
   const navigate = useNavigate();
   const { items, calculateSummary, clearCart } = useCartStore();
   const { user } = useAuthStore();
 
-  const [deliveryAddress, setDeliveryAddress] = useState('');
+  const [savedAddresses, setSavedAddresses] = useState([]);
+  const [selectedAddressId, setSelectedAddressId] = useState(null);
+  const [useNewAddress, setUseNewAddress] = useState(false);
+  const [newAddressText, setNewAddressText] = useState('');
+  const [deliveryNotes, setDeliveryNotes] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('cod');
   const [loading, setLoading] = useState(false);
+  const [addressesLoading, setAddressesLoading] = useState(true);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (user) {
+      loadAddresses();
+    }
+  }, [user]);
+
+  const loadAddresses = async () => {
+    try {
+      setAddressesLoading(true);
+      const data = await addressService.getAddresses();
+      setSavedAddresses(data);
+      const defaultAddr = data.find(a => a.is_default) || data[0];
+      if (defaultAddr) {
+        setSelectedAddressId(defaultAddr.id);
+        setUseNewAddress(false);
+      } else {
+        setUseNewAddress(true);
+      }
+    } catch {
+      setUseNewAddress(true);
+    } finally {
+      setAddressesLoading(false);
+    }
+  };
 
   if (!items || items.length === 0) {
     navigate('/cart');
@@ -27,6 +58,13 @@ const CheckoutPage = () => {
 
   const { subtotal, deliveryFee, total } = calculateSummary();
 
+  const getDeliveryAddress = () => {
+    if (useNewAddress) return newAddressText.trim();
+    const addr = savedAddresses.find(a => a.id === selectedAddressId);
+    if (!addr) return '';
+    return addressService.formatAddressText(addr);
+  };
+
   const placeOrder = async (paymentData = {}) => {
     const orderItems = items.map(item => ({
       product_id: item.id,
@@ -38,7 +76,8 @@ const CheckoutPage = () => {
 
     const response = await api.post('/orders', {
       items: orderItems,
-      delivery_address: deliveryAddress.trim(),
+      delivery_address: getDeliveryAddress(),
+      notes: deliveryNotes.trim() || undefined,
       payment_method: paymentMethod,
       subtotal,
       delivery_fee: deliveryFee,
@@ -52,8 +91,9 @@ const CheckoutPage = () => {
   const handleOrderSubmit = async (e) => {
     e.preventDefault();
 
-    if (!deliveryAddress.trim()) {
-      setError('Please enter your delivery address');
+    const address = getDeliveryAddress();
+    if (!address) {
+      setError(useNewAddress ? 'Please enter your delivery address' : 'Please select or enter a delivery address');
       return;
     }
 
@@ -62,7 +102,6 @@ const CheckoutPage = () => {
 
     try {
       if (paymentMethod === 'razorpay') {
-        // Open Razorpay modal; order is created after successful payment
         await razorpayService.openCheckout({
           amount: total,
           orderId: null,
@@ -72,10 +111,7 @@ const CheckoutPage = () => {
           description: `CityFreshKart Order — ₹${total.toFixed(2)}`,
           onSuccess: async ({ razorpay_payment_id, razorpay_order_id }) => {
             try {
-              const response = await placeOrder({
-                razorpay_payment_id,
-                razorpay_order_id,
-              });
+              const response = await placeOrder({ razorpay_payment_id, razorpay_order_id });
               if (response.data.success) {
                 clearCart();
                 const orderId = response.data.data?.order?.id || response.data.data?.id;
@@ -95,7 +131,6 @@ const CheckoutPage = () => {
           },
         });
       } else {
-        // COD flow
         const response = await placeOrder();
         if (response.data.success) {
           clearCart();
@@ -156,9 +191,7 @@ const CheckoutPage = () => {
               </span>
             </div>
             {subtotal < 300 && (
-              <p className="text-xs text-green-600">
-                Add ₹{(300 - subtotal).toFixed(2)} more for free delivery
-              </p>
+              <p className="text-xs text-green-600">Add ₹{(300 - subtotal).toFixed(2)} more for free delivery</p>
             )}
             <div className="flex justify-between font-bold text-gray-900 border-t border-gray-100 pt-2">
               <span>Total</span>
@@ -170,21 +203,102 @@ const CheckoutPage = () => {
         {/* Delivery Address */}
         <form onSubmit={handleOrderSubmit} id="checkout-form">
           <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-            <div className="px-4 py-3 border-b border-gray-100">
+            <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
               <h3 className="font-semibold text-gray-900 text-sm">Delivery Address</h3>
+              <button
+                type="button"
+                onClick={() => navigate('/profile')}
+                className="text-xs text-fresh-green hover:underline font-medium"
+              >
+                Manage Addresses
+              </button>
+            </div>
+            <div className="px-4 py-3 space-y-3">
+              {addressesLoading ? (
+                <p className="text-sm text-gray-400">Loading saved addresses...</p>
+              ) : (
+                <>
+                  {/* Saved address radio cards */}
+                  {savedAddresses.map(addr => (
+                    <label
+                      key={addr.id}
+                      className={`flex items-start gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all ${
+                        !useNewAddress && selectedAddressId === addr.id
+                          ? 'border-green-500 bg-green-50'
+                          : 'border-gray-200 bg-white hover:border-gray-300'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="deliveryAddress"
+                        checked={!useNewAddress && selectedAddressId === addr.id}
+                        onChange={() => { setSelectedAddressId(addr.id); setUseNewAddress(false); if (error) setError(''); }}
+                        className="mt-0.5 accent-green-600"
+                      />
+                      <div className="flex-1 text-sm">
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold text-gray-900">{addr.first_name} {addr.last_name}</span>
+                          {addr.is_default && (
+                            <span className="text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded font-semibold">Default</span>
+                          )}
+                        </div>
+                        <p className="text-gray-600 mt-0.5">{addr.address_line}</p>
+                        <p className="text-gray-600">{addr.city}, {addr.state} – {addr.postal_code}</p>
+                        {addr.phone && <p className="text-gray-500 text-xs mt-0.5">Ph: {addr.phone}</p>}
+                      </div>
+                      {!useNewAddress && selectedAddressId === addr.id && (
+                        <span className="text-green-600 text-xs font-bold mt-0.5">✓</span>
+                      )}
+                    </label>
+                  ))}
+
+                  {/* Use new address option */}
+                  <label
+                    className={`flex items-start gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all ${
+                      useNewAddress ? 'border-green-500 bg-green-50' : 'border-gray-200 bg-white hover:border-gray-300'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="deliveryAddress"
+                      checked={useNewAddress}
+                      onChange={() => { setUseNewAddress(true); if (error) setError(''); }}
+                      className="mt-0.5 accent-green-600"
+                    />
+                    <div className="flex-1 text-sm">
+                      <span className="font-semibold text-gray-900">
+                        {savedAddresses.length > 0 ? '+ Use a different address' : 'Enter delivery address'}
+                      </span>
+                      {useNewAddress && (
+                        <textarea
+                          value={newAddressText}
+                          onChange={(e) => { setNewAddressText(e.target.value); if (error) setError(''); }}
+                          placeholder="House no., Street, Area, City, Pincode"
+                          rows={3}
+                          className="mt-2 w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 resize-none bg-white transition-colors"
+                        />
+                      )}
+                    </div>
+                  </label>
+                </>
+              )}
+              {error && <p className="text-red-600 text-xs mt-1">{error}</p>}
+            </div>
+          </div>
+
+          {/* Delivery Notes */}
+          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden mt-3">
+            <div className="px-4 py-3 border-b border-gray-100">
+              <h3 className="font-semibold text-gray-900 text-sm">Delivery Instructions <span className="text-gray-400 font-normal">(Optional)</span></h3>
             </div>
             <div className="px-4 py-3">
               <textarea
-                value={deliveryAddress}
-                onChange={(e) => {
-                  setDeliveryAddress(e.target.value);
-                  if (error) setError('');
-                }}
-                placeholder="House no., Street, Area, City, Pincode"
-                rows={3}
+                value={deliveryNotes}
+                onChange={(e) => setDeliveryNotes(e.target.value)}
+                placeholder="e.g. Leave at the door, Ring bell twice, etc."
+                rows={2}
                 className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 resize-none bg-gray-50 focus:bg-white transition-colors"
               />
-              {error && <p className="text-red-600 text-xs mt-1">{error}</p>}
             </div>
           </div>
         </form>
@@ -195,22 +309,13 @@ const CheckoutPage = () => {
             <h3 className="font-semibold text-gray-900 text-sm">Payment Method</h3>
           </div>
           <div className="p-3 space-y-2">
-            {/* COD Option */}
             <label
               className={`flex items-start gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all ${
-                paymentMethod === 'cod'
-                  ? 'border-green-500 bg-green-50'
-                  : 'border-gray-200 bg-white hover:border-gray-300'
+                paymentMethod === 'cod' ? 'border-green-500 bg-green-50' : 'border-gray-200 bg-white hover:border-gray-300'
               }`}
             >
-              <input
-                type="radio"
-                name="paymentMethod"
-                value="cod"
-                checked={paymentMethod === 'cod'}
-                onChange={() => setPaymentMethod('cod')}
-                className="mt-0.5 accent-green-600"
-              />
+              <input type="radio" name="paymentMethod" value="cod" checked={paymentMethod === 'cod'}
+                onChange={() => setPaymentMethod('cod')} className="mt-0.5 accent-green-600" />
               <div className="flex-1">
                 <div className="flex items-center gap-2">
                   <span className="text-lg">💵</span>
@@ -218,27 +323,16 @@ const CheckoutPage = () => {
                 </div>
                 <p className="text-xs text-gray-500 mt-0.5 ml-7">Pay cash or scan UPI QR code when your order arrives.</p>
               </div>
-              {paymentMethod === 'cod' && (
-                <span className="text-green-600 text-xs font-bold mt-0.5">✓</span>
-              )}
+              {paymentMethod === 'cod' && <span className="text-green-600 text-xs font-bold mt-0.5">✓</span>}
             </label>
 
-            {/* Razorpay Option */}
             <label
               className={`flex items-start gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all ${
-                paymentMethod === 'razorpay'
-                  ? 'border-blue-500 bg-blue-50'
-                  : 'border-gray-200 bg-white hover:border-gray-300'
+                paymentMethod === 'razorpay' ? 'border-blue-500 bg-blue-50' : 'border-gray-200 bg-white hover:border-gray-300'
               }`}
             >
-              <input
-                type="radio"
-                name="paymentMethod"
-                value="razorpay"
-                checked={paymentMethod === 'razorpay'}
-                onChange={() => setPaymentMethod('razorpay')}
-                className="mt-0.5 accent-blue-600"
-              />
+              <input type="radio" name="paymentMethod" value="razorpay" checked={paymentMethod === 'razorpay'}
+                onChange={() => setPaymentMethod('razorpay')} className="mt-0.5 accent-blue-600" />
               <div className="flex-1">
                 <div className="flex items-center gap-2">
                   <span className="text-lg">💳</span>
@@ -247,9 +341,7 @@ const CheckoutPage = () => {
                 </div>
                 <p className="text-xs text-gray-500 mt-0.5 ml-7">UPI, Credit/Debit Card, Netbanking — secure & instant.</p>
               </div>
-              {paymentMethod === 'razorpay' && (
-                <span className="text-blue-600 text-xs font-bold mt-0.5">✓</span>
-              )}
+              {paymentMethod === 'razorpay' && <span className="text-blue-600 text-xs font-bold mt-0.5">✓</span>}
             </label>
           </div>
         </div>

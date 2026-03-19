@@ -7,6 +7,7 @@ import Loading from '../components/ui/Loading';
 import Breadcrumb from '../components/common/Breadcrumb';
 import api from '../services/api';
 import toast from 'react-hot-toast';
+import { addressService } from '../services/addressService';
 
 const ProfilePage = () => {
   const navigate = useNavigate();
@@ -26,11 +27,112 @@ const ProfilePage = () => {
   });
   const [showPasswordForm, setShowPasswordForm] = useState(false);
 
+  // Address state
+  const [addresses, setAddresses] = useState([]);
+  const [addressLoading, setAddressLoading] = useState(false);
+  const [showAddressForm, setShowAddressForm] = useState(false);
+  const [editingAddress, setEditingAddress] = useState(null);
+  const [addressForm, setAddressForm] = useState({
+    firstName: '', lastName: '', addressLine: '',
+    city: '', state: '', postalCode: '', phone: '', isDefault: false,
+  });
+  const [activeSection, setActiveSection] = useState('profile');
+
   useEffect(() => {
     if (!user) {
       navigate('/login');
     }
   }, [user, navigate]);
+
+  useEffect(() => {
+    if (user && activeSection === 'addresses') {
+      fetchAddresses();
+    }
+  }, [user, activeSection]);
+
+  const fetchAddresses = async () => {
+    try {
+      setAddressLoading(true);
+      const data = await addressService.getAddresses();
+      setAddresses(data);
+    } catch {
+      toast.error('Failed to load addresses');
+    } finally {
+      setAddressLoading(false);
+    }
+  };
+
+  const openAddressForm = (address = null) => {
+    if (address) {
+      setEditingAddress(address);
+      setAddressForm({
+        firstName: address.first_name || '',
+        lastName: address.last_name || '',
+        addressLine: address.address_line || '',
+        city: address.city || '',
+        state: address.state || '',
+        postalCode: address.postal_code || '',
+        phone: address.phone || '',
+        isDefault: address.is_default || false,
+      });
+    } else {
+      setEditingAddress(null);
+      setAddressForm({
+        firstName: '', lastName: '', addressLine: '',
+        city: '', state: '', postalCode: '', phone: '', isDefault: false,
+      });
+    }
+    setShowAddressForm(true);
+  };
+
+  const handleAddressFormChange = (e) => {
+    const { name, value, type, checked } = e.target;
+    setAddressForm(prev => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
+  };
+
+  const handleSaveAddress = async () => {
+    if (!addressForm.firstName || !addressForm.addressLine || !addressForm.city || !addressForm.state || !addressForm.postalCode) {
+      toast.error('Please fill all required address fields');
+      return;
+    }
+    try {
+      setAddressLoading(true);
+      if (editingAddress) {
+        await addressService.updateAddress(editingAddress.id, addressForm);
+        toast.success('Address updated');
+      } else {
+        await addressService.addAddress(addressForm);
+        toast.success('Address added');
+      }
+      setShowAddressForm(false);
+      fetchAddresses();
+    } catch {
+      toast.error('Failed to save address');
+    } finally {
+      setAddressLoading(false);
+    }
+  };
+
+  const handleDeleteAddress = async (id) => {
+    if (!window.confirm('Delete this address?')) return;
+    try {
+      await addressService.deleteAddress(id);
+      toast.success('Address deleted');
+      fetchAddresses();
+    } catch {
+      toast.error('Failed to delete address');
+    }
+  };
+
+  const handleSetDefault = async (id) => {
+    try {
+      await addressService.setDefault(id);
+      toast.success('Default address updated');
+      fetchAddresses();
+    } catch {
+      toast.error('Failed to update default address');
+    }
+  };
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -151,258 +253,275 @@ const ProfilePage = () => {
               </div>
 
               {/* Menu */}
-              <div className="space-y-2">
-                <button
-                  onClick={() => navigate('/orders')}
-                  className="w-full text-left px-4 py-2 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
-                >
-                  📦 My Orders
-                </button>
-                <button
-                  onClick={() => navigate('/wishlist')}
-                  className="w-full text-left px-4 py-2 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
-                >
-                  ❤️ Wishlist
-                </button>
-                <button
-                  onClick={handleLogout}
-                  className="w-full text-left px-4 py-2 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50 transition-colors"
-                >
-                  🚪 Logout
-                </button>
+              <div className="space-y-1">
+                {[
+                  { id: 'profile', label: 'Profile Info', icon: '👤' },
+                  { id: 'addresses', label: 'Saved Addresses', icon: '📍' },
+                  { id: 'security', label: 'Security', icon: '🔒' },
+                ].map(item => (
+                  <button
+                    key={item.id}
+                    onClick={() => setActiveSection(item.id)}
+                    className={`w-full text-left px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      activeSection === item.id
+                        ? 'bg-green-50 text-fresh-green'
+                        : 'text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    {item.icon} {item.label}
+                  </button>
+                ))}
+                <div className="border-t border-gray-100 pt-1 mt-1">
+                  <button
+                    onClick={() => navigate('/orders')}
+                    className="w-full text-left px-4 py-2 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+                  >
+                    📦 My Orders
+                  </button>
+                  <button
+                    onClick={() => navigate('/wishlist')}
+                    className="w-full text-left px-4 py-2 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+                  >
+                    ❤️ Wishlist
+                  </button>
+                  <button
+                    onClick={handleLogout}
+                    className="w-full text-left px-4 py-2 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50 transition-colors"
+                  >
+                    🚪 Logout
+                  </button>
+                </div>
               </div>
             </div>
           </div>
 
           {/* Main Content */}
           <div className="lg:col-span-2 space-y-6">
-            {/* Profile Information */}
-            <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
-              <div className="flex items-center justify-between mb-6">
-                <h3 className="text-lg font-semibold text-gray-900">
-                  Profile Information
-                </h3>
-                {!editMode && (
-                  <button
-                    onClick={() => setEditMode(true)}
-                    className="text-sm font-medium text-fresh-green hover:text-fresh-green-dark transition-colors"
-                  >
-                    Edit
-                  </button>
+
+            {/* ── Profile Information ── */}
+            {activeSection === 'profile' && (
+              <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-lg font-semibold text-gray-900">Profile Information</h3>
+                  {!editMode && (
+                    <button
+                      onClick={() => setEditMode(true)}
+                      className="text-sm font-medium text-fresh-green hover:text-fresh-green-dark transition-colors"
+                    >
+                      Edit
+                    </button>
+                  )}
+                </div>
+
+                {editMode ? (
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Full Name</label>
+                      <input type="text" name="name" value={formData.name} onChange={handleInputChange}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fresh-green focus:border-transparent outline-none"
+                        placeholder="Your name" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Email Address</label>
+                      <input type="email" name="email" value={formData.email} onChange={handleInputChange}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fresh-green focus:border-transparent outline-none"
+                        placeholder="your@email.com" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Phone Number (Cannot be changed)</label>
+                      <input type="tel" value={formData.phone} disabled
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-700 outline-none" />
+                    </div>
+                    <div className="flex gap-3 pt-4">
+                      <Button onClick={handleSaveProfile} loading={loading} className="flex-1">Save Changes</Button>
+                      <button onClick={() => { setEditMode(false); setFormData({ name: user?.name || '', email: user?.email || '', phone: user?.phone || '' }); }}
+                        className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50 transition-colors">
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div><p className="text-sm font-medium text-gray-500 mb-1">Full Name</p><p className="text-gray-900">{profile.name || 'Not provided'}</p></div>
+                    <div><p className="text-sm font-medium text-gray-500 mb-1">Email Address</p><p className="text-gray-900">{profile.email || 'Not provided'}</p></div>
+                    <div><p className="text-sm font-medium text-gray-500 mb-1">Phone Number</p><p className="text-gray-900">{profile.phone || 'Not provided'}</p></div>
+                    <div>
+                      <p className="text-sm font-medium text-gray-500 mb-1">Member Since</p>
+                      <p className="text-gray-900">
+                        {profile.created_at ? new Date(profile.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }) : 'Unknown'}
+                      </p>
+                    </div>
+                  </div>
                 )}
               </div>
+            )}
 
-              {editMode ? (
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Full Name
+            {/* ── Saved Addresses ── */}
+            {activeSection === 'addresses' && (
+              <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-lg font-semibold text-gray-900">Saved Addresses</h3>
+                  {!showAddressForm && (
+                    <button onClick={() => openAddressForm()}
+                      className="text-sm font-medium text-fresh-green hover:underline">
+                      + Add New
+                    </button>
+                  )}
+                </div>
+
+                {/* Add / Edit Form */}
+                {showAddressForm && (
+                  <div className="mb-6 p-4 bg-gray-50 rounded-xl border border-gray-200 space-y-3">
+                    <h4 className="font-semibold text-gray-800 text-sm">{editingAddress ? 'Edit Address' : 'Add New Address'}</h4>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">First Name *</label>
+                        <input type="text" name="firstName" value={addressForm.firstName} onChange={handleAddressFormChange}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-fresh-green focus:border-transparent outline-none"
+                          placeholder="First name" />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Last Name</label>
+                        <input type="text" name="lastName" value={addressForm.lastName} onChange={handleAddressFormChange}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-fresh-green focus:border-transparent outline-none"
+                          placeholder="Last name" />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Address Line *</label>
+                      <input type="text" name="addressLine" value={addressForm.addressLine} onChange={handleAddressFormChange}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-fresh-green focus:border-transparent outline-none"
+                        placeholder="House no., Street, Area" />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">City *</label>
+                        <input type="text" name="city" value={addressForm.city} onChange={handleAddressFormChange}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-fresh-green focus:border-transparent outline-none"
+                          placeholder="City" />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">State *</label>
+                        <input type="text" name="state" value={addressForm.state} onChange={handleAddressFormChange}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-fresh-green focus:border-transparent outline-none"
+                          placeholder="State" />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Pincode *</label>
+                        <input type="text" name="postalCode" value={addressForm.postalCode} onChange={handleAddressFormChange}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-fresh-green focus:border-transparent outline-none"
+                          placeholder="Pincode" />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Phone</label>
+                        <input type="tel" name="phone" value={addressForm.phone} onChange={handleAddressFormChange}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-fresh-green focus:border-transparent outline-none"
+                          placeholder="Phone number" />
+                      </div>
+                    </div>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input type="checkbox" name="isDefault" checked={addressForm.isDefault} onChange={handleAddressFormChange} className="w-4 h-4 accent-green-600" />
+                      <span className="text-sm text-gray-700">Set as default delivery address</span>
                     </label>
-                    <input
-                      type="text"
-                      name="name"
-                      value={formData.name}
-                      onChange={handleInputChange}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fresh-green focus:border-transparent outline-none"
-                      placeholder="Your name"
-                    />
+                    <div className="flex gap-3 pt-2">
+                      <Button onClick={handleSaveAddress} loading={addressLoading} className="flex-1 text-sm py-2">
+                        {editingAddress ? 'Update Address' : 'Save Address'}
+                      </Button>
+                      <button onClick={() => setShowAddressForm(false)}
+                        className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 text-sm font-medium hover:bg-gray-50 transition-colors">
+                        Cancel
+                      </button>
+                    </div>
                   </div>
+                )}
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Email Address
-                    </label>
-                    <input
-                      type="email"
-                      name="email"
-                      value={formData.email}
-                      onChange={handleInputChange}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fresh-green focus:border-transparent outline-none"
-                      placeholder="your@email.com"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Phone Number (Cannot be changed)
-                    </label>
-                    <input
-                      type="tel"
-                      value={formData.phone}
-                      disabled
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-700 outline-none"
-                    />
-                  </div>
-
-                  <div className="flex gap-3 pt-4">
-                    <Button
-                      onClick={handleSaveProfile}
-                      loading={loading}
-                      className="flex-1"
-                    >
-                      Save Changes
-                    </Button>
-                    <button
-                      onClick={() => {
-                        setEditMode(false);
-                        setFormData({
-                          name: user?.name || '',
-                          email: user?.email || '',
-                          phone: user?.phone || ''
-                        });
-                      }}
-                      className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50 transition-colors"
-                    >
-                      Cancel
+                {/* Address List */}
+                {addressLoading && !showAddressForm ? (
+                  <div className="text-center py-8 text-gray-400">Loading addresses...</div>
+                ) : addresses.length === 0 && !showAddressForm ? (
+                  <div className="text-center py-10">
+                    <div className="text-4xl mb-3">📍</div>
+                    <p className="text-gray-500 text-sm mb-4">No saved addresses yet.</p>
+                    <button onClick={() => openAddressForm()}
+                      className="px-4 py-2 bg-fresh-green text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors">
+                      Add Your First Address
                     </button>
                   </div>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  <div>
-                    <p className="text-sm font-medium text-gray-500 mb-1">Full Name</p>
-                    <p className="text-gray-900">{profile.name || 'Not provided'}</p>
+                ) : (
+                  <div className="space-y-3">
+                    {addresses.map(addr => (
+                      <div key={addr.id} className={`p-4 rounded-xl border-2 ${addr.is_default ? 'border-fresh-green bg-green-50' : 'border-gray-200 bg-white'}`}>
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <p className="font-semibold text-gray-900 text-sm">
+                                {addr.first_name} {addr.last_name}
+                              </p>
+                              {addr.is_default && (
+                                <span className="text-[10px] bg-fresh-green text-white px-2 py-0.5 rounded-full font-semibold">Default</span>
+                              )}
+                            </div>
+                            <p className="text-sm text-gray-600">{addr.address_line}</p>
+                            <p className="text-sm text-gray-600">{addr.city}, {addr.state} – {addr.postal_code}</p>
+                            {addr.phone && <p className="text-xs text-gray-500 mt-1">Ph: {addr.phone}</p>}
+                          </div>
+                          <div className="flex flex-col gap-1">
+                            <button onClick={() => openAddressForm(addr)}
+                              className="text-xs text-blue-600 hover:underline font-medium">Edit</button>
+                            <button onClick={() => handleDeleteAddress(addr.id)}
+                              className="text-xs text-red-500 hover:underline font-medium">Delete</button>
+                            {!addr.is_default && (
+                              <button onClick={() => handleSetDefault(addr.id)}
+                                className="text-xs text-fresh-green hover:underline font-medium">Set Default</button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-
-                  <div>
-                    <p className="text-sm font-medium text-gray-500 mb-1">Email Address</p>
-                    <p className="text-gray-900">{profile.email || 'Not provided'}</p>
-                  </div>
-
-                  <div>
-                    <p className="text-sm font-medium text-gray-500 mb-1">Phone Number</p>
-                    <p className="text-gray-900">{profile.phone || 'Not provided'}</p>
-                  </div>
-
-                  <div>
-                    <p className="text-sm font-medium text-gray-500 mb-1">Member Since</p>
-                    <p className="text-gray-900">
-                      {profile.created_at
-                        ? new Date(profile.created_at).toLocaleDateString('en-IN', {
-                            day: 'numeric',
-                            month: 'long',
-                            year: 'numeric'
-                          })
-                        : 'Unknown'}
-                    </p>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Security */}
-            <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
-              <div className="flex items-center justify-between mb-6">
-                <h3 className="text-lg font-semibold text-gray-900">
-                  Security
-                </h3>
+                )}
               </div>
+            )}
 
-              {!showPasswordForm ? (
-                <div>
-                  <p className="text-sm text-gray-600 mb-4">
-                    Manage your account security by changing your password regularly.
-                  </p>
-                  <button
-                    onClick={() => setShowPasswordForm(true)}
-                    className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50 transition-colors"
-                  >
-                    Change Password
-                  </button>
-                </div>
-              ) : (
-                <div className="space-y-4">
+            {/* ── Security ── */}
+            {activeSection === 'security' && (
+              <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-6">Security</h3>
+                {!showPasswordForm ? (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Current Password
-                    </label>
-                    <input
-                      type="password"
-                      name="currentPassword"
-                      value={passwordData.currentPassword}
-                      onChange={handlePasswordChange}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fresh-green focus:border-transparent outline-none"
-                      placeholder="Enter your current password"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      New Password
-                    </label>
-                    <input
-                      type="password"
-                      name="newPassword"
-                      value={passwordData.newPassword}
-                      onChange={handlePasswordChange}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fresh-green focus:border-transparent outline-none"
-                      placeholder="Enter new password"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Confirm Password
-                    </label>
-                    <input
-                      type="password"
-                      name="confirmPassword"
-                      value={passwordData.confirmPassword}
-                      onChange={handlePasswordChange}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fresh-green focus:border-transparent outline-none"
-                      placeholder="Confirm new password"
-                    />
-                  </div>
-
-                  <div className="flex gap-3 pt-4">
-                    <Button
-                      onClick={handleChangePassword}
-                      loading={loading}
-                      className="flex-1"
-                    >
-                      Update Password
-                    </Button>
-                    <button
-                      onClick={() => {
-                        setShowPasswordForm(false);
-                        setPasswordData({
-                          currentPassword: '',
-                          newPassword: '',
-                          confirmPassword: ''
-                        });
-                      }}
-                      className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50 transition-colors"
-                    >
-                      Cancel
+                    <p className="text-sm text-gray-600 mb-4">Manage your account security by changing your password regularly.</p>
+                    <button onClick={() => setShowPasswordForm(true)}
+                      className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50 transition-colors">
+                      Change Password
                     </button>
                   </div>
-                </div>
-              )}
-            </div>
-
-            {/* Preferences */}
-            <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-6">
-                Preferences
-              </h3>
-
-              <div className="space-y-4">
-                <label className="flex items-center gap-3 cursor-pointer">
-                  <input type="checkbox" defaultChecked className="w-4 h-4 text-fresh-green" />
-                  <span className="text-gray-700">Receive order updates via SMS</span>
-                </label>
-
-                <label className="flex items-center gap-3 cursor-pointer">
-                  <input type="checkbox" defaultChecked className="w-4 h-4 text-fresh-green" />
-                  <span className="text-gray-700">Receive promotional emails</span>
-                </label>
-
-                <label className="flex items-center gap-3 cursor-pointer">
-                  <input type="checkbox" className="w-4 h-4 text-fresh-green" />
-                  <span className="text-gray-700">Subscribe to weekly deals</span>
-                </label>
+                ) : (
+                  <div className="space-y-4">
+                    {[
+                      { label: 'Current Password', name: 'currentPassword', placeholder: 'Enter your current password' },
+                      { label: 'New Password', name: 'newPassword', placeholder: 'Enter new password' },
+                      { label: 'Confirm Password', name: 'confirmPassword', placeholder: 'Confirm new password' },
+                    ].map(field => (
+                      <div key={field.name}>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">{field.label}</label>
+                        <input type="password" name={field.name} value={passwordData[field.name]} onChange={handlePasswordChange}
+                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fresh-green focus:border-transparent outline-none"
+                          placeholder={field.placeholder} />
+                      </div>
+                    ))}
+                    <div className="flex gap-3 pt-4">
+                      <Button onClick={handleChangePassword} loading={loading} className="flex-1">Update Password</Button>
+                      <button onClick={() => { setShowPasswordForm(false); setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' }); }}
+                        className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50 transition-colors">
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
-            </div>
+            )}
           </div>
         </div>
       </div>

@@ -96,6 +96,28 @@
     @apply bg-saffron text-white px-6 py-3 rounded-lg font-medium hover:bg-saffron-600 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-saffron focus:ring-opacity-50;
   }
 
+  /* Gradient button */
+  .btn-gradient-green {
+    @apply bg-gradient-to-r from-green-600 to-emerald-500 hover:from-green-700 hover:to-emerald-600 text-white font-bold rounded-xl shadow-md hover:shadow-lg active:scale-[0.98] transition-all duration-200 disabled:opacity-60 disabled:cursor-not-allowed;
+  }
+
+  /* Icon-prefixed input wrapper */
+  .input-icon-wrapper {
+    @apply relative;
+  }
+
+  .input-icon-wrapper .input-icon {
+    @apply absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none;
+  }
+
+  .input-with-icon {
+    @apply w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl text-sm bg-gray-50 focus:bg-white transition-all outline-none focus:ring-2 focus:ring-green-500/30 focus:border-green-500;
+  }
+
+  .input-with-icon.input-error {
+    @apply border-red-400 focus:border-red-400 focus:ring-red-400/30;
+  }
+
   /* Input styles */
   .input-primary {
     @apply w-full px-4 py-3 border border-gray-300 rounded-lg bg-white text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-fresh-green focus:border-fresh-green transition-all duration-200;

@@ -66,7 +66,7 @@ const OrdersPage = () => {
   };
 
   const handleViewOrder = (orderId) => {
-    navigate(`/orders/${orderId}/confirmation`);
+    navigate(`/orders/${orderId}`);
   };
 
   if (loading) {
