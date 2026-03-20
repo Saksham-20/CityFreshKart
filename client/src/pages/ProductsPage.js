@@ -4,12 +4,18 @@ import ProductGrid from '../components/product/ProductGrid';
 import ProductCardSkeleton from '../components/product/ProductCardSkeleton';
 import api from '../services/api';
 
-const CATEGORIES = [
-  { name: 'All', emoji: '🛒' },
-  { name: 'Vegetables', emoji: '🥬' },
-  { name: 'Fruits', emoji: '🍎' },
-  { name: 'Herbs', emoji: '🌿' },
-];
+const DEFAULT_CATEGORY_NAMES = ['Vegetables', 'Fruits', 'Dairy', 'Bakery', 'Grains', 'Herbs & Spices', 'Other'];
+const getCategoryEmoji = (name) => {
+  const key = String(name || '').toLowerCase();
+  if (key.includes('veg')) return '🥬';
+  if (key.includes('fruit')) return '🍎';
+  if (key.includes('dairy')) return '🥛';
+  if (key.includes('bakery')) return '🍞';
+  if (key.includes('grain')) return '🌾';
+  if (key.includes('herb') || key.includes('spice')) return '🌿';
+  if (key.includes('other')) return '📦';
+  return '📦';
+};
 
 const SORT_OPTIONS = [
   { value: 'newest', label: 'Newest' },
@@ -26,10 +32,12 @@ const ProductsPage = () => {
   const [searchQuery, setSearchQuery] = useState(searchParams.get('search') || '');
   const [sortBy, setSortBy] = useState('newest');
   const [activeCategory, setActiveCategory] = useState('All');
+  const [categoryNames, setCategoryNames] = useState(DEFAULT_CATEGORY_NAMES);
   const categoryRef = useRef(null);
 
   useEffect(() => {
     fetchProducts();
+    fetchCategories();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -43,12 +51,12 @@ const ProductsPage = () => {
     const q = searchParams.get('search') || '';
     const cat = searchParams.get('category') || '';
     setSearchQuery(q);
-    if (cat && CATEGORIES.find(c => c.name === cat)) {
+    if (cat && categoryNames.some(c => c.toLowerCase() === cat.toLowerCase())) {
       setActiveCategory(cat);
     } else if (q) {
       setActiveCategory('All');
     }
-  }, [searchParams]);
+  }, [searchParams, categoryNames]);
 
   const fetchProducts = async () => {
     try {
@@ -62,6 +70,17 @@ const ProductsPage = () => {
       console.error(err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchCategories = async () => {
+    try {
+      const res = await api.get('/products/categories');
+      const next = res.data?.data;
+      if (Array.isArray(next) && next.length > 0) setCategoryNames(next);
+    } catch (_) {
+      // Keep defaults on error
+      setCategoryNames(DEFAULT_CATEGORY_NAMES);
     }
   };
 
@@ -123,36 +142,50 @@ const ProductsPage = () => {
         {/* Category chips */}
         <div
           ref={categoryRef}
-          className="flex items-center gap-2 overflow-x-auto no-scrollbar px-3 sm:px-4 pt-2.5 pb-1"
+          className="flex items-center gap-2 overflow-x-auto no-scrollbar px-3 sm:px-4 pt-2.5 pb-0"
           style={{ scrollbarWidth: 'none' }}
         >
-          {CATEGORIES.map(cat => (
+          <button
+            type="button"
+            onClick={() => { setActiveCategory('All'); setSearchQuery(''); }}
+            className={`flex-shrink-0 flex items-center gap-1.5 text-xs font-semibold px-3.5 py-1.5 rounded-full border transition-all whitespace-nowrap ${
+              activeCategory === 'All'
+                ? 'bg-gradient-to-r from-green-600 to-emerald-500 text-white border-transparent shadow-sm'
+                : 'text-gray-600 border-gray-200 bg-white hover:border-green-400 hover:text-green-700'
+            }`}
+          >
+            <span className="text-sm leading-none">🛒</span>
+            <span>All</span>
+          </button>
+
+          {categoryNames.map((catName) => (
             <button
-              key={cat.name}
-              onClick={() => { setActiveCategory(cat.name); setSearchQuery(''); }}
-                className={`flex-shrink-0 flex items-center gap-1.5 text-xs font-semibold px-3.5 py-1.5 rounded-full border transition-all whitespace-nowrap ${
-                activeCategory === cat.name
+              key={catName}
+              type="button"
+              onClick={() => { setActiveCategory(catName); setSearchQuery(''); }}
+              className={`flex-shrink-0 flex items-center gap-1.5 text-xs font-semibold px-3.5 py-1.5 rounded-full border transition-all whitespace-nowrap ${
+                String(activeCategory).toLowerCase() === String(catName).toLowerCase()
                   ? 'bg-gradient-to-r from-green-600 to-emerald-500 text-white border-transparent shadow-sm'
                   : 'text-gray-600 border-gray-200 bg-white hover:border-green-400 hover:text-green-700'
               }`}
             >
-              <span className="text-sm leading-none">{cat.emoji}</span>
-              <span>{cat.name}</span>
+              <span className="text-sm leading-none">{getCategoryEmoji(catName)}</span>
+              <span>{catName}</span>
             </button>
           ))}
         </div>
 
         {/* Sort + item count row */}
-        <div className="flex items-center justify-between px-3 sm:px-4 py-2.5 gap-2">
+        <div className="flex items-center justify-between px-3 sm:px-4 py-2">
           <span className="text-xs text-gray-400 font-medium">
             {loading ? '' : `${filteredProducts.length} products`}
           </span>
-          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
+          <div className="flex items-center gap-1.5">
             {SORT_OPTIONS.map(opt => (
               <button
                 key={opt.value}
                 onClick={() => setSortBy(opt.value)}
-                className={`text-xs px-2.5 py-1 rounded-lg font-medium transition-colors whitespace-nowrap ${
+                className={`text-xs px-2.5 py-1 rounded-lg font-medium transition-colors ${
                   sortBy === opt.value
                     ? 'bg-gray-900 text-white'
                     : 'text-gray-500 bg-gray-100 hover:bg-gray-200'
@@ -166,7 +199,7 @@ const ProductsPage = () => {
       </div>
 
       {/* Products Grid */}
-      <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6 py-3 sm:py-4">
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6 py-4">
         {loading ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4">
             <ProductCardSkeleton count={12} />
@@ -202,7 +235,7 @@ const ProductsPage = () => {
           <>
             {activeCategory !== 'All' && (
               <h2 className="text-base font-bold text-gray-800 mb-3">
-                {CATEGORIES.find(c => c.name === activeCategory)?.emoji} {activeCategory}
+                {getCategoryEmoji(activeCategory)} {activeCategory}
               </h2>
             )}
             <ProductGrid products={filteredProducts} loading={false} error={null} />

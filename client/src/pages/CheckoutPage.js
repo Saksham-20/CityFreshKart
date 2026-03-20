@@ -15,7 +15,15 @@ const CheckoutPage = () => {
   const [savedAddresses, setSavedAddresses] = useState([]);
   const [selectedAddressId, setSelectedAddressId] = useState(null);
   const [useNewAddress, setUseNewAddress] = useState(false);
-  const [newAddressText, setNewAddressText] = useState('');
+  const [newAddressForm, setNewAddressForm] = useState({
+    houseNumber: '',
+    floor: '',
+    society: '',
+    addressLine: '',
+    city: '',
+    state: '',
+    postalCode: '',
+  });
   const [saveNewAddress, setSaveNewAddress] = useState(false);
   const [deliveryNotes, setDeliveryNotes] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('cod');
@@ -60,8 +68,36 @@ const CheckoutPage = () => {
 
   const { subtotal, deliveryFee, total } = calculateSummary();
 
+  const validateNewAddress = () => {
+    if (!useNewAddress) return '';
+    const postalCode = String(newAddressForm.postalCode || '').trim();
+    if (!/^\d{6}$/.test(postalCode)) return 'Please enter a valid 6-digit pincode';
+    if (String(newAddressForm.houseNumber || '').trim().length > 100) return 'House number is too long';
+    if (String(newAddressForm.addressLine || '').trim().length < 5) return 'Address line is too short';
+    if (String(newAddressForm.city || '').trim().length < 2) return 'Please enter a valid city';
+    if (String(newAddressForm.state || '').trim().length < 2) return 'Please enter a valid state';
+    return '';
+  };
+
   const getDeliveryAddress = () => {
-    if (useNewAddress) return newAddressText.trim();
+    if (useNewAddress) {
+      const { houseNumber, addressLine, city, state, postalCode } = newAddressForm;
+      const ready = houseNumber && addressLine && city && state && postalCode;
+      if (!ready) return '';
+
+      return addressService.formatAddressText({
+        first_name: user?.name || 'User',
+        last_name: '',
+        house_number: newAddressForm.houseNumber,
+        floor: newAddressForm.floor,
+        society: newAddressForm.society,
+        address_line: newAddressForm.addressLine,
+        city: newAddressForm.city,
+        state: newAddressForm.state,
+        postal_code: newAddressForm.postalCode,
+        phone: user?.phone || '',
+      });
+    }
     const addr = savedAddresses.find(a => a.id === selectedAddressId);
     if (!addr) return '';
     return addressService.formatAddressText(addr);
@@ -98,6 +134,11 @@ const CheckoutPage = () => {
       setError(useNewAddress ? 'Please enter your delivery address' : 'Please select or enter a delivery address');
       return;
     }
+    const addressValidationError = validateNewAddress();
+    if (addressValidationError) {
+      setError(addressValidationError);
+      return;
+    }
 
     setLoading(true);
     setError('');
@@ -105,19 +146,16 @@ const CheckoutPage = () => {
     // Save new address to profile if checkbox is ticked
     if (useNewAddress && saveNewAddress && address) {
       try {
-        // Parse the free-text address into structured fields
-        const lines = address.split(',').map(s => s.trim()).filter(Boolean);
-        const addressLine = lines.slice(0, Math.max(1, lines.length - 3)).join(', ') || lines[0] || address;
-        const city = lines[lines.length - 3] || '';
-        const state = lines[lines.length - 2] || '';
-        const postalCode = lines[lines.length - 1] || '';
         await addressService.addAddress({
           firstName: user.name || 'User',
           lastName: '',
-          addressLine,
-          city,
-          state,
-          postalCode,
+          houseNumber: newAddressForm.houseNumber,
+          floor: newAddressForm.floor,
+          society: newAddressForm.society,
+          addressLine: newAddressForm.addressLine,
+          city: newAddressForm.city,
+          state: newAddressForm.state,
+          postalCode: newAddressForm.postalCode,
           phone: user.phone || '',
           isDefault: savedAddresses.length === 0,
         });
@@ -133,7 +171,6 @@ const CheckoutPage = () => {
       if (paymentMethod === 'razorpay') {
         await razorpayService.openCheckout({
           amount: total,
-          orderId: null,
           name: user.name || user.phone,
           email: user.email || '',
           phone: user.phone || '',
@@ -273,7 +310,13 @@ const CheckoutPage = () => {
                             <span className="text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded font-semibold">Default</span>
                           )}
                         </div>
-                        <p className="text-gray-600 mt-0.5">{addr.address_line}</p>
+                        <p className="text-gray-600 mt-0.5">
+                          {[addr.house_number,
+                            addr.floor ? `Floor ${addr.floor}` : '',
+                            addr.society ? `Society ${addr.society}` : '',
+                            addr.address_line,
+                          ].filter(Boolean).join(', ')}
+                        </p>
                         <p className="text-gray-600">{addr.city}, {addr.state} – {addr.postal_code}</p>
                         {addr.phone && <p className="text-gray-500 text-xs mt-0.5">Ph: {addr.phone}</p>}
                       </div>
@@ -302,13 +345,105 @@ const CheckoutPage = () => {
                       </span>
                       {useNewAddress && (
                         <div className="mt-2 space-y-2">
-                          <textarea
-                            value={newAddressText}
-                            onChange={(e) => { setNewAddressText(e.target.value); if (error) setError(''); }}
-                            placeholder="House no., Street, Area, City, State, Pincode"
-                            rows={3}
-                            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 resize-none bg-white transition-colors"
-                          />
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <label className="block text-xs font-medium text-gray-600 mb-1">House Number *</label>
+                              <input
+                                type="text"
+                                value={newAddressForm.houseNumber}
+                                onChange={(e) => {
+                                  setNewAddressForm(p => ({ ...p, houseNumber: e.target.value }));
+                                  if (error) setError('');
+                                }}
+                                placeholder="e.g. 12A"
+                                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-medium text-gray-600 mb-1">Floor</label>
+                              <input
+                                type="text"
+                                value={newAddressForm.floor}
+                                onChange={(e) => {
+                                  setNewAddressForm(p => ({ ...p, floor: e.target.value }));
+                                  if (error) setError('');
+                                }}
+                                placeholder="e.g. 2"
+                                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                              />
+                            </div>
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">Society</label>
+                            <input
+                              type="text"
+                              value={newAddressForm.society}
+                              onChange={(e) => {
+                                setNewAddressForm(p => ({ ...p, society: e.target.value }));
+                                if (error) setError('');
+                              }}
+                              placeholder="e.g. Shanti Nagar"
+                              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">Address Line *</label>
+                            <input
+                              type="text"
+                              value={newAddressForm.addressLine}
+                              onChange={(e) => {
+                                setNewAddressForm(p => ({ ...p, addressLine: e.target.value }));
+                                if (error) setError('');
+                              }}
+                              placeholder="House no., Street, Area"
+                              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                            />
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <label className="block text-xs font-medium text-gray-600 mb-1">City *</label>
+                              <input
+                                type="text"
+                                value={newAddressForm.city}
+                                onChange={(e) => {
+                                  setNewAddressForm(p => ({ ...p, city: e.target.value }));
+                                  if (error) setError('');
+                                }}
+                                placeholder="City"
+                                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-medium text-gray-600 mb-1">State *</label>
+                              <input
+                                type="text"
+                                value={newAddressForm.state}
+                                onChange={(e) => {
+                                  setNewAddressForm(p => ({ ...p, state: e.target.value }));
+                                  if (error) setError('');
+                                }}
+                                placeholder="State"
+                                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                              />
+                            </div>
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">Pincode *</label>
+                            <input
+                              type="text"
+                              value={newAddressForm.postalCode}
+                              onChange={(e) => {
+                                setNewAddressForm(p => ({ ...p, postalCode: e.target.value }));
+                                if (error) setError('');
+                              }}
+                              placeholder="Pincode"
+                              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                            />
+                          </div>
                           <label className="flex items-center gap-2 cursor-pointer select-none">
                             <input
                               type="checkbox"

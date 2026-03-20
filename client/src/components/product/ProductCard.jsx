@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Heart, ShoppingCart, Plus, Minus } from 'lucide-react';
+import { ShoppingCart, Plus, Minus } from 'lucide-react';
 import { cn } from '@/utils/cn';
-import { formatPrice, calculatePrice } from '@/utils/weightSystem';
+import { calculatePrice } from '@/utils/weightSystem';
 import WeightSelector from '../ui/WeightSelector';
 import Button from '../ui/Button';
+import { useCartStore } from '../../store/useCartStore';
 
 /**
  * ProductCard Component
@@ -13,14 +14,15 @@ import Button from '../ui/Button';
 const ProductCard = ({
   product,
   onAddToCart,
-  onToggleWishlist,
   isInCart = false,
-  isInWishlist = false,
   cartQuantity = 0,
   onUpdateQuantity,
 }) => {
   const [selectedWeight, setSelectedWeight] = useState(1);
   const [isExpanded, setIsExpanded] = useState(false);
+  const cartItems = useCartStore(state => state.items);
+  const addToCart = useCartStore(state => state.addToCart);
+  const updateItemQuantity = useCartStore(state => state.updateItemQuantity);
 
   const pricing = calculatePrice(
     product.price_per_kg,
@@ -28,16 +30,35 @@ const ProductCard = ({
     product.discount || 0
   );
 
+  const imageSrc = product.image_url || product.image;
+  const stockValue = product.quantity_available ?? product.stock_quantity ?? product.stock;
+  const inStock = typeof stockValue === 'number' ? stockValue > 0 : !!stockValue;
+  const cartItem = cartItems.find(item => item.id === product.id);
+  const safeIsInCart = typeof onAddToCart === 'function' ? isInCart : Boolean(cartItem);
+  const safeCartQuantity = typeof onAddToCart === 'function' ? cartQuantity : (cartItem?.quantity || 0);
+
   const handleAddClick = () => {
+    if (typeof onAddToCart !== 'function') {
+      addToCart(product, selectedWeight);
+      return;
+    }
     onAddToCart({
       id: product.id,
       name: product.name,
       pricePerKg: product.price_per_kg,
       weight: selectedWeight,
       price: pricing.finalPrice,
-      image: product.image,
+      image: imageSrc,
       discount: product.discount,
     });
+  };
+
+  const handleQuantityChange = (nextQty) => {
+    if (typeof onUpdateQuantity === 'function') {
+      onUpdateQuantity(product.id, nextQty);
+      return;
+    }
+    updateItemQuantity(product.id, nextQty);
   };
 
   return (
@@ -58,7 +79,7 @@ const ProductCard = ({
       {/* Image Section */}
       <div className="relative aspect-square bg-gray-100 overflow-hidden group">
         <img
-          src={product.image}
+          src={imageSrc}
           alt={product.name}
           className={cn(
             'w-full h-full object-cover',
@@ -77,27 +98,8 @@ const ProductCard = ({
           </div>
         )}
 
-        {/* Wishlist Button */}
-        <button
-          onClick={() => onToggleWishlist(product.id)}
-          className={cn(
-            'absolute top-3 right-3 p-2 rounded-full',
-            'transition-all duration-200',
-            'opacity-0 group-hover:opacity-100',
-            isInWishlist
-              ? 'bg-red-50 text-red-500'
-              : 'bg-white/90 text-gray-400 hover:text-red-400'
-          )}
-          aria-label={isInWishlist ? 'Remove from wishlist' : 'Add to wishlist'}
-        >
-          <Heart
-            className="w-5 h-5"
-            fill={isInWishlist ? 'currentColor' : 'none'}
-          />
-        </button>
-
         {/* Stock Info */}
-        {product.stock && (
+        {inStock && (
           <div className="absolute bottom-3 left-3 bg-green-500 text-white text-xs font-semibold px-2.5 py-1 rounded-full">
             In Stock
           </div>
@@ -192,7 +194,7 @@ const ProductCard = ({
 
         {/* Add to Cart Button */}
         <div className="mt-auto pt-2">
-          {!isInCart ? (
+          {!safeIsInCart ? (
             <Button
               onClick={handleAddClick}
               className="w-full"
@@ -205,7 +207,7 @@ const ProductCard = ({
           ) : (
             <div className="flex items-center gap-2 bg-green-50 rounded-lg p-1.5">
               <Button
-                onClick={() => onUpdateQuantity(product.id, cartQuantity - 1)}
+                onClick={() => handleQuantityChange(safeCartQuantity - 1)}
                 size="sm"
                 variant="ghost"
                 className="flex-1"
@@ -213,10 +215,10 @@ const ProductCard = ({
                 <Minus className="w-4 h-4" />
               </Button>
               <span className="flex-1 text-center text-sm font-semibold text-green-600" data-testid="cart-quantity">
-                {cartQuantity}
+                {safeCartQuantity}
               </span>
               <Button
-                onClick={() => onUpdateQuantity(product.id, cartQuantity + 1)}
+                onClick={() => handleQuantityChange(safeCartQuantity + 1)}
                 size="sm"
                 variant="ghost"
                 className="flex-1"

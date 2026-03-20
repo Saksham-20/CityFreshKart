@@ -19,6 +19,59 @@ if (process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET) {
   console.warn('⚠️  Razorpay keys not configured. Payment routes will return errors.');
 }
 
+// @route   POST /api/razorpay/create-order
+// @desc    Create Razorpay order for checkout
+// @access  Private
+router.post('/create-order', authenticateToken, [
+  body('amount').notEmpty().withMessage('Amount is required').bail()
+    .isFloat({ min: 1 }).withMessage('Amount must be at least ₹1'),
+  body('currency').optional().isString().withMessage('Currency must be a string'),
+], async (req, res) => {
+  try {
+    if (!razorpay) {
+      return res.status(503).json({
+        success: false,
+        message: 'Payment service not configured. Please use COD.',
+      });
+    }
+
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    const { amount, currency } = req.body;
+
+    // Frontend sends INR (rupees). Razorpay expects paise as integer.
+    const rupees = parseFloat(amount);
+    const paise = Math.round(rupees * 100);
+
+    const order = await razorpay.orders.create({
+      amount: paise,
+      currency: currency || 'INR',
+      receipt: `rcpt_${Date.now()}`,
+      payment_capture: 1,
+    });
+
+    return res.json({
+      success: true,
+      data: {
+        keyId: process.env.RAZORPAY_KEY_ID,
+        amount: order.amount, // paise
+        currency: order.currency,
+        orderId: order.id,
+      },
+    });
+  } catch (error) {
+    console.error('Create Razorpay order error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to create Razorpay order',
+      error: error.message,
+    });
+  }
+});
+
 // @route   POST /api/razorpay/payment-link
 // @desc    Create Razorpay payment link for order
 // @access  Private
@@ -41,12 +94,28 @@ router.post('/payment-link', authenticateToken, [
       return res.status(400).json({ errors: errors.array() });
     }
 
-    const { orderId, amount, userPhone, userName, userEmail } = req.body;
+    const { orderId, amount } = req.body;
+    const orderResult = await pool.query(
+      'SELECT id, user_id, total_price FROM orders WHERE id = $1',
+      [orderId],
+    );
+    if (orderResult.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Order not found' });
+    }
+    const dbOrder = orderResult.rows[0];
+    if (String(dbOrder.user_id) !== String(req.user.id)) {
+      return res.status(403).json({ success: false, message: 'Unauthorized order access' });
+    }
+    const requestedAmount = Number(amount);
+    const expectedAmount = Number(dbOrder.total_price || 0);
+    if (!Number.isFinite(requestedAmount) || Math.abs(requestedAmount - expectedAmount) > 0.01) {
+      return res.status(400).json({ success: false, message: 'Amount mismatch for order' });
+    }
 
     // Create payment link
     const paymentLinkResponse = await razorpay.paymentLink.create({
       upi_link: true,
-      amount: Math.round(amount * 100), // Razorpay expects amount in paise
+      amount: Math.round(expectedAmount * 100), // Razorpay expects amount in paise
       currency: 'INR',
       accept_partial: false,
       first_min_partial_amount: 100, // Minimum partial payment (₹1)
@@ -71,7 +140,7 @@ router.post('/payment-link', authenticateToken, [
       paymentLink: paymentLinkResponse.short_url,
       paymentLinkId: paymentLinkResponse.id,
       orderId: orderId,
-      amount: amount,
+      amount: expectedAmount,
     });
 
   } catch (error) {
@@ -108,10 +177,10 @@ router.post('/verify-payment', authenticateToken, [
     const { paymentId, orderId, signature } = req.body;
 
     // Verify signature
-    const body = paymentId + '|' + orderId;
+    const signaturePayload = `${orderId}|${paymentId}`;
     const expectedSignature = crypto
       .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET)
-      .update(body.toString())
+      .update(signaturePayload.toString())
       .digest('hex');
 
     const isSignatureValid = expectedSignature === signature;
@@ -127,15 +196,9 @@ router.post('/verify-payment', authenticateToken, [
     const payment = await razorpay.payments.fetch(paymentId);
 
     if (payment.status === 'captured') {
-      // Update order status to paid
-      await pool.query(
-        'UPDATE orders SET payment_status = $1, payment_method = $2, payment_intent_id = $3, status = $4 WHERE id = $5',
-        ['paid', 'razorpay', paymentId, 'processing', orderId],
-      );
-
       res.json({
         success: true,
-        message: 'Payment verified successfully',
+        message: 'Payment verified successfully (captured)',
         paymentStatus: 'paid',
       });
     } else {
@@ -170,10 +233,16 @@ router.post('/cod-order', authenticateToken, [
     const { orderId } = req.body;
 
     // Update order status to COD pending (payment not required)
-    await pool.query(
-      'UPDATE orders SET payment_method = $1, payment_status = $2, status = $3 WHERE id = $4',
-      ['cod', 'pending', 'processing', orderId],
+    const updateResult = await pool.query(
+      `UPDATE orders
+       SET payment_method = $1, status = $2, updated_at = CURRENT_TIMESTAMP
+       WHERE id = $3 AND user_id = $4
+       RETURNING id`,
+      ['cod', 'pending', orderId, req.user.id],
     );
+    if (updateResult.rowCount === 0) {
+      return res.status(404).json({ success: false, message: 'Order not found' });
+    }
 
     res.json({
       success: true,
@@ -196,6 +265,13 @@ router.post('/cod-order', authenticateToken, [
 // @access  Private
 router.get('/payment-status/:paymentId', authenticateToken, async (req, res) => {
   try {
+    if (!razorpay) {
+      return res.status(503).json({
+        success: false,
+        message: 'Payment service not configured.',
+      });
+    }
+
     const { paymentId } = req.params;
 
     const payment = await razorpay.payments.fetch(paymentId);

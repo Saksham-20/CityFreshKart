@@ -469,6 +469,10 @@
 }
 
 /* Print styles */
+@page {
+  size: 58mm auto;
+  margin: 0;
+}
 @media print {
   .no-print {
     display: none !important;

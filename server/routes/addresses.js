@@ -28,16 +28,21 @@ router.post('/', authenticateToken, async (req, res) => {
     const {
       firstName, first_name, lastName, last_name, 
       addressLine, address_line,
+      houseNumber, house_number,
+      floor, society,
       city, state, postalCode, postal_code, phone, isDefault, is_default,
     } = req.body;
 
     const fname = firstName || first_name;
-    const lname = lastName || last_name;
+    const lname = lastName || last_name || '';
     const line1 = addressLine || address_line;
+    const houseNo = houseNumber || house_number;
     const zip = postalCode || postal_code;
+    const floorValue = floor || '';
+    const societyValue = society || '';
     const deflt = isDefault !== undefined ? isDefault : (is_default || false);
 
-    if (!fname || !lname || !line1 || !city || !state || !zip) {
+    if (!fname || !line1 || !houseNo || !city || !state || !zip) {
       return res.status(400).json({
         success: false,
         error: { code: 'VALIDATION_ERROR', message: 'Required address fields are missing' },
@@ -53,10 +58,28 @@ router.post('/', authenticateToken, async (req, res) => {
     }
 
     const result = await query(`
-      INSERT INTO user_addresses (user_id, first_name, last_name, address_line, city, state, postal_code, phone, is_default)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      INSERT INTO user_addresses (
+        user_id, first_name, last_name, address_line,
+        house_number, floor, society,
+        city, state, postal_code,
+        phone, is_default
+      )
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
       RETURNING *
-    `, [req.user.id, fname, lname || '', line1, city, state, zip, phone || null, deflt]);
+    `, [
+      req.user.id,
+      fname,
+      lname,
+      line1,
+      houseNo,
+      floorValue,
+      societyValue,
+      city,
+      state,
+      zip,
+      phone || null,
+      deflt,
+    ]);
 
     res.status(201).json({ success: true, data: { address: result.rows[0] } });
   } catch (error) {
@@ -74,13 +97,18 @@ router.put('/:id', authenticateToken, async (req, res) => {
     const {
       firstName, first_name, lastName, last_name,
       addressLine, address_line,
+      houseNumber, house_number,
+      floor, society,
       city, state, postalCode, postal_code,
       phone, isDefault, is_default,
     } = req.body;
 
     const fname = firstName || first_name;
-    const lname = lastName || last_name;
+    const lname = lastName || last_name || '';
     const line1 = addressLine || address_line;
+    const houseNo = houseNumber !== undefined ? houseNumber : house_number;
+    const floorValue = floor !== undefined ? floor : undefined;
+    const societyValue = society !== undefined ? society : undefined;
     const zip = postalCode || postal_code;
     const deflt = isDefault !== undefined ? isDefault : is_default;
 
@@ -102,15 +130,18 @@ router.put('/:id', authenticateToken, async (req, res) => {
       SET first_name = COALESCE($1, first_name),
           last_name = COALESCE($2, last_name),
           address_line = COALESCE($3, address_line),
-          city = COALESCE($4, city),
-          state = COALESCE($5, state),
-          postal_code = COALESCE($6, postal_code),
-          phone = COALESCE($7, phone),
-          is_default = COALESCE($8, is_default),
+          house_number = COALESCE($4, house_number),
+          floor = COALESCE($5, floor),
+          society = COALESCE($6, society),
+          city = COALESCE($7, city),
+          state = COALESCE($8, state),
+          postal_code = COALESCE($9, postal_code),
+          phone = COALESCE($10, phone),
+          is_default = COALESCE($11, is_default),
           updated_at = CURRENT_TIMESTAMP
-      WHERE id = $9 AND user_id = $10
+      WHERE id = $12 AND user_id = $13
       RETURNING *
-    `, [fname, lname, line1, city, state, zip, phone, deflt, id, req.user.id]);
+    `, [fname, lname, line1, houseNo, floorValue, societyValue, city, state, zip, phone, deflt, id, req.user.id]);
 
     res.json({ success: true, data: { address: result.rows[0] } });
   } catch (error) {

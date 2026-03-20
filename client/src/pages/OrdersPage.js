@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { orderService } from '../services/orderService';
 import Button from '../components/ui/Button';
@@ -15,11 +15,7 @@ const OrdersPage = () => {
   const [totalPages, setTotalPages] = useState(1);
   const [statusFilter, setStatusFilter] = useState('all');
 
-  useEffect(() => {
-    fetchOrders(page);
-  }, [page, statusFilter]);
-
-  const fetchOrders = async (pageNumber) => {
+  const fetchOrders = useCallback(async (pageNumber) => {
     try {
       setLoading(true);
       const data = await orderService.getOrders(pageNumber, 10);
@@ -38,7 +34,7 @@ const OrdersPage = () => {
       }
       
       setOrders(filteredOrders);
-      setTotalPages(paginationInfo.total_pages || 1);
+      setTotalPages(paginationInfo.totalPages || paginationInfo.total_pages || 1);
       setError('');
     } catch (err) {
       setError('Failed to load orders');
@@ -47,7 +43,11 @@ const OrdersPage = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [statusFilter]);
+
+  useEffect(() => {
+    fetchOrders(page);
+  }, [page, fetchOrders]);
 
   const STATUS_LABELS = {
     pending: 'Pending',

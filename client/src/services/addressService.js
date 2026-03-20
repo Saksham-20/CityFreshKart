@@ -27,13 +27,30 @@ export const addressService = {
   },
 
   formatAddressText: (address) => {
+    const firstName = address.first_name ?? address.firstName ?? '';
+    const lastName = address.last_name ?? address.lastName ?? '';
+    const name = `${firstName} ${lastName}`.trim();
+
+    const addressLine = address.address_line ?? address.addressLine ?? '';
+    const houseNumber = address.house_number ?? address.houseNumber ?? '';
+    const floor = address.floor ?? '';
+    const society = address.society ?? '';
+
+    const streetBits = [
+      houseNumber ? `House ${houseNumber}` : '',
+      floor ? `Floor ${floor}` : '',
+      society ? `Society ${society}` : '',
+      addressLine,
+    ].filter(Boolean);
+
     const parts = [
-      `${address.first_name} ${address.last_name}`.trim(),
-      address.address_line,
+      name || null,
+      streetBits.length ? streetBits.join(', ') : (address.address_line ?? address.addressLine ?? null),
       address.city,
       address.state,
-      address.postal_code,
+      address.postal_code ?? address.postalCode,
     ].filter(Boolean);
+
     if (address.phone) parts.push(`Ph: ${address.phone}`);
     return parts.join(', ');
   },

@@ -7,8 +7,6 @@ import Loading from '../ui/Loading';
 import { getImageUrl, getPlaceholderImage } from '../../utils/imageUtils';
 import toast from 'react-hot-toast';
 
-const CATEGORIES = ['Vegetables', 'Fruits', 'Herbs'];
-
 const emptyForm = () => ({
   name: '',
   price_per_kg: '',
@@ -23,6 +21,8 @@ const emptyForm = () => ({
 const ProductManager = () => {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [categories, setCategories] = useState([]);
+  const [categoriesLoading, setCategoriesLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -34,7 +34,22 @@ const ProductManager = () => {
 
   useEffect(() => {
     fetchProducts();
+    fetchCategories();
   }, []);
+
+  const fetchCategories = async () => {
+    try {
+      setCategoriesLoading(true);
+      const res = await api.get('/products/categories');
+      const next = res.data?.data || [];
+      setCategories(next);
+    } catch (e) {
+      toast.error('Failed to load categories');
+      setCategories([]);
+    } finally {
+      setCategoriesLoading(false);
+    }
+  };
 
   const fetchProducts = async () => {
     try {
@@ -85,11 +100,6 @@ const ProductManager = () => {
     );
     setSelectedImages([...selectedImages, ...uniqueFiles]);
     setImagePreview([...imagePreview, ...uniqueFiles.map(f => URL.createObjectURL(f))]);
-  };
-
-  const removeImage = (index) => {
-    setSelectedImages(selectedImages.filter((_, i) => i !== index));
-    setImagePreview(imagePreview.filter((_, i) => i !== index));
   };
 
   const handleAddProduct = async (e) => {
@@ -220,9 +230,15 @@ const ProductManager = () => {
       )}
       {(!isEdit || existingImages.length === 0) && (
         <>
-          <p className="text-xs text-gray-500 mb-2">
-            Upload local image files only. Images are stored on your server under `/uploads`.
-          </p>
+          <Input label="Image URL (Pexels or any direct link)" name="image_url" type="url"
+            value={formData.image_url} onChange={handleInputChange} className="w-full mb-2"
+            placeholder="https://images.pexels.com/photos/..." />
+          {formData.image_url && (
+            <img src={formData.image_url} alt="Preview"
+              className="mb-2 h-20 w-20 object-cover rounded-lg border border-gray-200"
+              onError={(e) => { e.target.style.display = 'none'; }} />
+          )}
+          <p className="text-xs text-gray-400 mb-2 text-center">— or upload a file —</p>
           {selectedImages.length === 0 ? (
             <div className="border-2 border-dashed border-gray-300 rounded-lg p-5 text-center hover:border-gray-400 transition-colors">
               <input type="file" accept="image/*" multiple={!isEdit}
@@ -276,7 +292,11 @@ const ProductManager = () => {
         <select name="category" value={formData.category} onChange={handleInputChange} required
           className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
           <option value="">Select Category</option>
-          {CATEGORIES.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+          {categoriesLoading ? (
+            <option value="" disabled>Loading...</option>
+          ) : (
+            categories.map(cat => <option key={cat} value={cat}>{cat}</option>)
+          )}
         </select>
       </div>
 
@@ -300,70 +320,13 @@ const ProductManager = () => {
 
   return (
     <div>
-      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-6">
-        <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Product Management</h1>
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-bold text-gray-900">Product Management</h1>
         <Button onClick={() => { resetForm(); setShowAddModal(true); }}>Add New Product</Button>
       </div>
 
-      {/* Mobile product list */}
-      <div className="space-y-3 md:hidden">
-        {products.length === 0 ? (
-          <div className="bg-white border border-gray-200 rounded-xl p-6 text-center text-gray-400">No products found</div>
-        ) : products.map((product) => (
-          <div key={product.id} className="bg-white border border-gray-200 rounded-xl p-3">
-            <div className="flex items-start gap-3">
-              <img
-                className="h-14 w-14 rounded-lg object-cover border border-gray-200 flex-shrink-0"
-                src={getImageUrl(product.image_url)}
-                alt={product.name}
-                onError={(e) => { e.target.src = getPlaceholderImage(); }}
-              />
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-gray-900 truncate">{product.name}</p>
-                <p className="text-xs text-gray-500 mt-0.5">{product.category || 'Uncategorized'} · {product.pricing_type === 'per_piece' ? 'Per piece' : 'Per kg'}</p>
-                <p className="text-sm font-bold text-gray-900 mt-1">{priceDisplay(product)}</p>
-                {product.discount > 0 && <p className="text-xs text-green-600 font-medium">{product.discount}% off</p>}
-              </div>
-              <span className={`inline-flex px-2 py-1 text-[10px] font-semibold rounded-full ${product.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                {product.is_active ? 'Active' : 'Inactive'}
-              </span>
-            </div>
-            <div className="mt-3 flex items-center justify-between gap-2">
-              <div className="flex items-center space-x-1">
-                <button
-                  onClick={() => handleStockUpdate(product.id, Math.max(0, (parseFloat(product.quantity_available) || 0) - 1))}
-                  className="w-7 h-7 bg-red-100 hover:bg-red-200 text-red-700 rounded-full flex items-center justify-center text-sm font-bold"
-                >
-                  −
-                </button>
-                <span className="text-xs font-semibold text-gray-700 min-w-[4.25rem] text-center">
-                  {product.quantity_available}{product.pricing_type === 'per_piece' ? ' pc' : ' kg'}
-                </span>
-                <button
-                  onClick={() => handleStockUpdate(product.id, (parseFloat(product.quantity_available) || 0) + 1)}
-                  className="w-7 h-7 bg-green-100 hover:bg-green-200 text-green-700 rounded-full flex items-center justify-center text-sm font-bold"
-                >
-                  +
-                </button>
-              </div>
-              <div className="flex items-center gap-2">
-                <Button variant="outline" size="sm" onClick={() => openEditModal(product)}>Edit</Button>
-                <Button
-                  variant="danger"
-                  size="sm"
-                  onClick={() => { setSelectedProduct(product); setShowDeleteModal(true); }}
-                  className="bg-red-600 hover:bg-red-700"
-                >
-                  Remove
-                </Button>
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Desktop products table */}
-      <div className="hidden md:block bg-white shadow-md rounded-lg overflow-hidden">
+      {/* Products Table */}
+      <div className="bg-white shadow-md rounded-lg overflow-hidden">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">

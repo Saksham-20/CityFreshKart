@@ -18,6 +18,13 @@ const getImageUrl = (imagePath) => {
     return `${apiBaseUrl}${cleanPath}`;
   }
 
+  // Handle absolute disk paths like /some/path/uploads/products/xyz.jpg
+  if (imagePath.includes('/uploads/')) {
+    const uploadsIndex = imagePath.indexOf('/uploads/');
+    const relPath = imagePath.slice(uploadsIndex); // keep the leading /uploads/...
+    return `${apiBaseUrl}${relPath}`;
+  }
+
   // Bare filename — assume it lives under /uploads/products/
   return `${apiBaseUrl}/uploads/products/${imagePath}`;
 };

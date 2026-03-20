@@ -10,11 +10,17 @@ const apiClient = axios.create({
   baseURL: API_BASE_URL,
   timeout: 30000,
   withCredentials: true, // Send httpOnly cookies automatically
-  headers: { 'Content-Type': 'application/json' },
 });
 
 // Request interceptor — attach token from localStorage if available
 apiClient.interceptors.request.use((config) => {
+  // Let the browser/axios set multipart boundaries for FormData requests.
+  if (config.data instanceof FormData && config.headers) {
+    delete config.headers['Content-Type'];
+  } else if (config.headers && !config.headers['Content-Type']) {
+    config.headers['Content-Type'] = 'application/json';
+  }
+
   const token = localStorage.getItem('token');
   if (token && token !== 'authenticated_via_cookie') {
     config.headers.Authorization = `Bearer ${token}`;

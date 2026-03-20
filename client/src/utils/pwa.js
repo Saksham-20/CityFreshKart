@@ -4,13 +4,18 @@
  */
 
 let deferredPrompt;
+const installPromptListeners = new Set();
 
 /**
  * Initialize PWA functionality
  */
 export const initPWA = () => {
   // Register service worker
-  if (process.env.NODE_ENV === 'production' && 'serviceWorker' in navigator) {
+  const shouldRegisterServiceWorker =
+    'serviceWorker' in navigator &&
+    (process.env.NODE_ENV === 'production' || window.location.hostname === 'localhost');
+
+  if (shouldRegisterServiceWorker) {
     window.addEventListener('load', () => {
       navigator.serviceWorker
         .register('/sw.js', { scope: '/' })
@@ -32,6 +37,7 @@ export const initPWA = () => {
   window.addEventListener('beforeinstallprompt', (e) => {
     e.preventDefault();
     deferredPrompt = e;
+    installPromptListeners.forEach(cb => cb(true));
     showInstallPrompt();
   });
 
@@ -40,6 +46,7 @@ export const initPWA = () => {
     console.log('✓ App installed successfully');
     deferredPrompt = null;
     localStorage.setItem('cityfreshkart-app-installed', 'true');
+    installPromptListeners.forEach(cb => cb(false));
   });
 };
 
@@ -51,6 +58,14 @@ export const showInstallPrompt = () => {
   if (banner && deferredPrompt) {
     banner.classList.remove('hidden');
   }
+};
+
+export const isInstallPromptAvailable = () => !!deferredPrompt;
+
+export const onInstallPromptChange = (callback) => {
+  installPromptListeners.add(callback);
+  callback(!!deferredPrompt);
+  return () => installPromptListeners.delete(callback);
 };
 
 /**
@@ -67,6 +82,7 @@ export const handleInstallClick = async () => {
 
   if (outcome === 'accepted') {
     deferredPrompt = null;
+    installPromptListeners.forEach(cb => cb(false));
   }
 };
 
@@ -128,6 +144,66 @@ export const sendNotification = (title, options = {}) => {
   }
 };
 
+const urlBase64ToUint8Array = (base64String) => {
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const rawData = window.atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+  for (let i = 0; i < rawData.length; i += 1) {
+    outputArray[i] = rawData.charCodeAt(i);
+  }
+  return outputArray;
+};
+
+/**
+ * Subscribe current browser for server Web Push notifications
+ */
+export const subscribeToWebPush = async () => {
+  const hasPermission = await requestNotificationPermission();
+  if (!hasPermission) {
+    throw new Error('Notification permission not granted');
+  }
+
+  if (!('serviceWorker' in navigator)) {
+    throw new Error('Service worker not supported in this browser');
+  }
+
+  const vapidPublicKey = process.env.REACT_APP_VAPID_PUBLIC_KEY;
+  if (!vapidPublicKey) {
+    throw new Error('VAPID public key missing (REACT_APP_VAPID_PUBLIC_KEY)');
+  }
+
+  const registration = await navigator.serviceWorker.register('/sw.js', { scope: '/' });
+  let subscription = await registration.pushManager.getSubscription();
+
+  if (!subscription) {
+    subscription = await registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
+    });
+  }
+
+  const response = await fetch(
+    `${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/notifications/subscribe`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${localStorage.getItem('token') || ''}`,
+      },
+      credentials: 'include',
+      body: JSON.stringify({ subscription }),
+    },
+  );
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.message || 'Failed to save push subscription');
+  }
+
+  return subscription;
+};
+
 /**
  * Check online status
  */
@@ -137,18 +213,29 @@ export const isOnline = () => navigator.onLine;
  * Listen to online/offline events
  */
 export const onOnlineStatusChange = (callback) => {
-  window.addEventListener('online', () => callback(true));
-  window.addEventListener('offline', () => callback(false));
+  const onlineHandler = () => callback(true);
+  const offlineHandler = () => callback(false);
+  window.addEventListener('online', onlineHandler);
+  window.addEventListener('offline', offlineHandler);
+  return () => {
+    window.removeEventListener('online', onlineHandler);
+    window.removeEventListener('offline', offlineHandler);
+  };
 };
 
-export default {
+const pwa = {
   initPWA,
   showInstallPrompt,
+  isInstallPromptAvailable,
+  onInstallPromptChange,
   handleInstallClick,
   isAppInstalled,
   getPWACapabilities,
   requestNotificationPermission,
   sendNotification,
+  subscribeToWebPush,
   isOnline,
   onOnlineStatusChange,
 };
+
+export default pwa;

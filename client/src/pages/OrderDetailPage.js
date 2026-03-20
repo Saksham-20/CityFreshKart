@@ -94,7 +94,6 @@ const OrderDetailPage = () => {
   const { orderId } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { addItem } = useCartStore();
 
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -225,7 +224,7 @@ const OrderDetailPage = () => {
       </div>
 
       {/* Print header — only visible when printing */}
-      <div className="hidden print:block px-8 pt-6 pb-4 border-b border-gray-300">
+      <div className="hidden print:block px-2 pt-2 pb-2 border-b border-gray-300">
         <h1 className="text-2xl font-bold">CityFreshKart</h1>
         <p className="text-sm text-gray-600">Order Bill / Receipt</p>
         <p className="text-sm mt-1"><strong>Order:</strong> #{order.order_number}</p>
@@ -233,7 +232,7 @@ const OrderDetailPage = () => {
         <p className="text-sm"><strong>Status:</strong> {STATUS_LABELS[status] || status}</p>
       </div>
 
-      <div className="max-w-2xl mx-auto px-4 pt-4 space-y-4 print:px-8 print:pt-2">
+      <div className="mx-auto px-4 pt-4 space-y-4 print:px-1 print:pt-1 print:w-[58mm] print:max-w-[58mm]">
 
         {/* Status Timeline — hidden on print */}
         <div className="bg-white rounded-xl border border-gray-200 p-5 print:hidden">

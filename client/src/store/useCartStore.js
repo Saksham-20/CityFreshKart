@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import api from '../services/api';
 
 const useCartStore = create((set, get) => ({
   // State
@@ -14,11 +15,22 @@ const useCartStore = create((set, get) => ({
   // Load store settings from the public API endpoint
   loadSettings: async () => {
     try {
-      const res = await fetch(
-        `${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/settings`,
-      );
-      const json = await res.json();
-      const data = json.data || {};
+      // Prefer configured API base (axios instance), then fall back to common dev ports.
+      let json;
+      try {
+        const res = await api.get('/settings');
+        json = res.data;
+      } catch (e) {
+        try {
+          const res = await fetch('http://localhost:5000/api/settings');
+          json = await res.json();
+        } catch (e2) {
+          const res = await fetch('/api/settings');
+          json = await res.json();
+        }
+      }
+
+      const data = json?.data || {};
       set({
         freeDeliveryThreshold: parseFloat(data.free_delivery_threshold) || 300,
         deliveryFeeAmount: parseFloat(data.delivery_fee) || 50,

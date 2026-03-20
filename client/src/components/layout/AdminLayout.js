@@ -11,6 +11,7 @@ const AdminLayout = ({ children }) => {
   const navigation = [
     { name: 'Dashboard', href: '/admin', icon: '📊' },
     { name: 'Products', href: '/admin/products', icon: '🛍️' },
+    { name: 'Categories', href: '/admin/categories', icon: '🏷️' },
     { name: 'Orders', href: '/admin/orders', icon: '📦' },
     { name: 'Users', href: '/admin/users', icon: '👥' },
     // { name: 'Analytics', href: '/admin/analytics', icon: '📈' }, // hidden temporarily

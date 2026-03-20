@@ -6,6 +6,7 @@ import { getFeaturedProducts } from '../data/vegetableProducts';
 import LazyImage from '../components/common/LazyImage';
 import useCart from '../hooks/useCart';
 import QuantitySelector from '../components/ui/QuantitySelector';
+import DiscountFreshCarousel from '../components/home/DiscountFreshCarousel';
 
 const FeaturedProductCard = ({ product }) => {
   const { addToCart, isItemInCart, items: cartItems, updateItemQuantity, removeFromCart } = useCart();
@@ -269,6 +270,10 @@ const HomePage = () => {
               Handpicked from local farms this morning — guaranteed fresh or your money back
             </p>
           </motion.div>
+
+          <div className="mb-10">
+            <DiscountFreshCarousel />
+          </div>
 
           <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
             {featuredProducts.map((product) => (

@@ -3,35 +3,26 @@ const pool = require('../database/config');
 const { authenticateToken, requireAdmin } = require('../middleware/auth');
 const { body, validationResult } = require('express-validator');
 const { upload, handleUploadError } = require('../middleware/upload');
-const path = require('path');
+const webPushService = require('../services/webPushService');
 
 const router = express.Router();
-const ALLOWED_CATEGORIES = ['Vegetables', 'Fruits', 'Herbs'];
 
-const normalizeCategory = (rawCategory = '') => {
-  const trimmed = String(rawCategory).trim().toLowerCase();
-  const aliasMap = {
-    vegetables: 'Vegetables',
-    vegetable: 'Vegetables',
-    fruits: 'Fruits',
-    fruit: 'Fruits',
-    herbs: 'Herbs',
-    'herbs & spices': 'Herbs',
-    'herbs and spices': 'Herbs',
-  };
-  return aliasMap[trimmed] || null;
-};
+const toPublicUploadPath = (file) => {
+  if (!file) return '';
+  if (file.secure_url || file.url) return file.secure_url || file.url;
 
-const normalizeImagePath = (rawPath = '', { allowRemote = true } = {}) => {
-  if (!rawPath) return '';
-  if (String(rawPath).startsWith('http')) {
-    return allowRemote ? rawPath : '';
+  const normalizedPath = String(file.path || '').replace(/\\/g, '/');
+  const uploadsIndex = normalizedPath.lastIndexOf('/uploads/');
+  if (uploadsIndex >= 0) return normalizedPath.slice(uploadsIndex);
+
+  if (file.filename) {
+    const folder = file.destination && String(file.destination).toLowerCase().includes('products')
+      ? 'products'
+      : 'general';
+    return `/uploads/${folder}/${file.filename}`;
   }
 
-  const unixPath = String(rawPath).replace(/\\/g, '/');
-  if (unixPath.startsWith('/uploads/')) return unixPath;
-  if (unixPath.startsWith('uploads/')) return `/${unixPath}`;
-  return `/uploads/products/${path.basename(unixPath)}`;
+  return '';
 };
 
 // Apply admin auth to all routes
@@ -182,13 +173,6 @@ router.get('/products', async (req, res) => {
 router.post('/products', upload.array('images', 10), handleUploadError, async (req, res) => {
   try {
     const { name, description, price_per_kg, discount, category, stock_quantity, is_active, pricing_type } = req.body;
-    const normalizedCategory = normalizeCategory(category || 'Vegetables');
-    if (!normalizedCategory || !ALLOWED_CATEGORIES.includes(normalizedCategory)) {
-      return res.status(400).json({
-        message: 'Invalid category. Allowed values: Vegetables, Fruits, Herbs',
-      });
-    }
-
 
     // Validate required fields
     if (!name || !price_per_kg) {
@@ -204,11 +188,8 @@ router.post('/products', upload.array('images', 10), handleUploadError, async (r
     }
 
     // Get image URL: prefer uploaded file, fall back to direct URL from form
-    let imageUrl = normalizeImagePath(req.body.image_url || '', { allowRemote: false });
-    if (req.files && req.files.length > 0) {
-      const primaryImage = req.files[0];
-      imageUrl = normalizeImagePath(primaryImage.path || primaryImage.url || primaryImage.secure_url || '', { allowRemote: false });
-    }
+    let imageUrl = req.body.image_url || '';
+    if (req.files && req.files.length > 0) imageUrl = toPublicUploadPath(req.files[0]) || imageUrl;
 
     const validPricingType = ['per_kg', 'per_piece'].includes(pricing_type) ? pricing_type : 'per_kg';
 
@@ -220,7 +201,7 @@ router.post('/products', upload.array('images', 10), handleUploadError, async (r
       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW())
       RETURNING *
     `, [
-      name, description || '', normalizedCategory, imageUrl,
+      name, description || '', category || 'Uncategorized', imageUrl,
       parseFloat(price_per_kg) || 0, parseFloat(discount) || 0,
       parseFloat(stock_quantity) || 0,
       is_active !== 'false' && is_active !== false,
@@ -228,6 +209,24 @@ router.post('/products', upload.array('images', 10), handleUploadError, async (r
     ]);
 
     const product = newProduct.rows[0];
+
+    // Promo notifications: discounted and fresh item alerts
+    Promise.allSettled([
+      parseFloat(product.discount || 0) > 0
+        ? webPushService.sendToAllSubscribers({
+          type: 'promo_discount',
+          title: 'Discounted item added',
+          body: `${product.name} is now available with ${parseFloat(product.discount).toFixed(0)}% off.`,
+          url: '/',
+        })
+        : Promise.resolve(),
+      webPushService.sendToAllSubscribers({
+        type: 'promo_fresh',
+        title: 'Fresh item added',
+        body: `${product.name} was just added and is fresh in the last 24 hours.`,
+        url: '/',
+      }),
+    ]).catch(() => undefined);
 
     res.status(201).json({
       success: true,
@@ -260,32 +259,16 @@ router.put('/products/:id', upload.array('images', 1), handleUploadError, [
 
     const { id } = req.params;
     const updateData = req.body || {};
-    if (updateData.category !== undefined) {
-      const normalizedCategory = normalizeCategory(updateData.category);
-      if (!normalizedCategory) {
-        return res.status(400).json({
-          message: 'Invalid category. Allowed values: Vegetables, Fruits, Herbs',
-        });
-      }
-      updateData.category = normalizedCategory;
-    }
-
 
     // Check if product exists
-    const existingProduct = await pool.query('SELECT id FROM products WHERE id = $1', [id]);
+    const existingProduct = await pool.query('SELECT id, discount, name FROM products WHERE id = $1', [id]);
     if (existingProduct.rows.length === 0) {
       return res.status(404).json({ message: 'Product not found' });
     }
+    const previousDiscount = parseFloat(existingProduct.rows[0].discount || 0);
 
     // Handle new image if uploaded
-    if (req.files && req.files.length > 0) {
-      const imageFile = req.files[0];
-      updateData.image_url = normalizeImagePath(imageFile.path || imageFile.url || imageFile.secure_url || '', { allowRemote: false });
-    }
-
-    if (updateData.image_url !== undefined) {
-      updateData.image_url = normalizeImagePath(updateData.image_url, { allowRemote: false });
-    }
+    if (req.files && req.files.length > 0) updateData.image_url = toPublicUploadPath(req.files[0]);
 
     // Map stock_quantity form field to quantity_available column
     if (updateData.stock_quantity !== undefined) {
@@ -322,10 +305,24 @@ router.put('/products/:id', upload.array('images', 1), handleUploadError, [
     `;
 
     const updatedProduct = await pool.query(updateQuery, updateValues);
+    const updated = updatedProduct.rows[0];
+    const nextDiscount = parseFloat(updated.discount || 0);
+
+    // Promo notification only when discount transitions to > 0
+    if (previousDiscount <= 0 && nextDiscount > 0) {
+      Promise.resolve(
+        webPushService.sendToAllSubscribers({
+          type: 'promo_discount',
+          title: 'New discounted deal',
+          body: `${updated.name || existingProduct.rows[0].name || 'A product'} is now on discount (${nextDiscount.toFixed(0)}% off).`,
+          url: '/',
+        }),
+      ).catch(() => undefined);
+    }
 
     res.json({
       success: true,
-      data: { product: updatedProduct.rows[0] },
+      data: { product: updated },
     });
 
   } catch (error) {
@@ -473,7 +470,7 @@ router.put('/orders/:id/status', [
     const { status, admin_note } = req.body;
 
     // Check if order exists
-    const existingOrder = await pool.query('SELECT id, notes FROM orders WHERE id = $1', [id]);
+    const existingOrder = await pool.query('SELECT id, notes, user_id, order_number FROM orders WHERE id = $1', [id]);
     if (existingOrder.rows.length === 0) {
       return res.status(404).json({ message: 'Order not found' });
     }
@@ -493,6 +490,33 @@ router.put('/orders/:id/status', [
         [status, id],
       );
     }
+
+    // Notify customer and admins about status updates
+    const orderRow = existingOrder.rows[0];
+    const statusLabelMap = {
+      pending: 'Pending',
+      confirmed: 'Accepted',
+      delivered: 'Delivered',
+      cancelled: 'Rejected',
+    };
+    const label = statusLabelMap[status] || status;
+
+    Promise.allSettled([
+      webPushService.sendToUser(orderRow.user_id, {
+        type: 'order_status',
+        title: `Order ${label}`,
+        body: `Your order #${orderRow.order_number || id} is now ${label}.`,
+        orderId: id,
+        url: `/orders/${id}`,
+      }),
+      webPushService.sendToAdmins({
+        type: 'order_status_admin',
+        title: 'Order status updated',
+        body: `Order #${orderRow.order_number || id} marked as ${label}.`,
+        orderId: id,
+        url: '/admin/orders',
+      }),
+    ]).catch(() => undefined);
 
     res.json({ message: 'Order status updated successfully' });
 
@@ -552,6 +576,7 @@ router.get('/users', async (req, res) => {
   try {
     const { page = 1, limit = 20, search, role, sortOrder = 'DESC' } = req.query;
     const offset = (page - 1) * limit;
+    const normalizedSortOrder = String(sortOrder).toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
 
     let query = `
       SELECT 
@@ -575,7 +600,7 @@ router.get('/users', async (req, res) => {
       queryParams.push(role === 'admin');
     }
 
-    query += ` ORDER BY created_at ${sortOrder} LIMIT $${paramCount + 1} OFFSET $${paramCount + 2}`;
+    query += ` ORDER BY created_at ${normalizedSortOrder} LIMIT $${paramCount + 1} OFFSET $${paramCount + 2}`;
     queryParams.push(parseInt(limit), offset);
 
     const users = await pool.query(query, queryParams);
@@ -719,11 +744,6 @@ router.delete('/users/:id', async (req, res) => {
 
   } catch (error) {
     console.error('Delete admin user error:', error);
-    if (error.code === '23503') {
-      return res.status(409).json({
-        message: 'Cannot delete this user because they have existing orders.',
-      });
-    }
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -772,12 +792,13 @@ router.put('/products/:id/stock', [
 router.get('/analytics', async (req, res) => {
   try {
     const { period = '30d' } = req.query;
+    const normalizedPeriod = ['24h', '7d', '30d', '90d', '1y'].includes(period) ? period : '30d';
 
     // Calculate date range based on period
     let dateFilter = '';
     let groupBy = '';
 
-    switch (period) {
+    switch (normalizedPeriod) {
     case '24h':
       dateFilter = 'AND o.created_at >= NOW() - INTERVAL \'24 hours\'';
       groupBy = 'DATE(o.created_at)';
@@ -873,7 +894,7 @@ router.get('/analytics', async (req, res) => {
     `);
 
     res.json({
-      period,
+      period: normalizedPeriod,
       salesData: salesData.rows,
       topProducts: topProducts.rows,
       recentOrders: recentOrders.rows,
@@ -939,6 +960,145 @@ router.put('/settings', async (req, res) => {
   } catch (error) {
     console.error('Update settings error:', error);
     res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// ── Category Management (product category names) ─────────────────────────
+const PRODUCT_CATEGORIES_KEY = 'product_categories';
+const DEFAULT_PRODUCT_CATEGORIES = [
+  'Vegetables',
+  'Fruits',
+  'Dairy',
+  'Bakery',
+  'Grains',
+  'Herbs & Spices',
+  'Other',
+];
+
+async function getProductCategories() {
+  const result = await pool.query('SELECT value FROM store_settings WHERE key = $1', [PRODUCT_CATEGORIES_KEY]);
+  if (result.rows.length === 0) return DEFAULT_PRODUCT_CATEGORIES;
+
+  try {
+    const parsed = JSON.parse(result.rows[0].value);
+    if (Array.isArray(parsed) && parsed.every(v => typeof v === 'string' && v.trim())) return parsed;
+  } catch (_) {
+    // ignore parse error and fall back to defaults
+  }
+
+  return DEFAULT_PRODUCT_CATEGORIES;
+}
+
+async function setProductCategories(categories) {
+  const jsonValue = JSON.stringify(categories);
+  await pool.query(
+    'INSERT INTO store_settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value = $2, updated_at = CURRENT_TIMESTAMP',
+    [PRODUCT_CATEGORIES_KEY, jsonValue],
+  );
+}
+
+// @route   GET /api/admin/categories
+// @desc    Get all product categories
+// @access  Admin
+router.get('/categories', async (req, res) => {
+  try {
+    const categories = await getProductCategories();
+    res.json({ success: true, data: { categories } });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Failed to load categories' });
+  }
+});
+
+// @route   POST /api/admin/categories
+// @desc    Add a product category
+// @access  Admin
+router.post(
+  '/categories',
+  [body('name').notEmpty().trim().withMessage('Category name is required')],
+  async (req, res) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
+
+      const { name } = req.body;
+      const trimmed = String(name).trim();
+      const categories = await getProductCategories();
+
+      const exists = categories.some(c => c.toLowerCase() === trimmed.toLowerCase());
+      if (exists) {
+        return res.status(400).json({ success: false, message: 'Category already exists' });
+      }
+
+      categories.push(trimmed);
+      await setProductCategories(categories);
+
+      res.json({ success: true, data: { categories } });
+    } catch (error) {
+      console.error('Add category error:', error);
+      res.status(500).json({ success: false, message: 'Failed to add category' });
+    }
+  },
+);
+
+// @route   PUT /api/admin/categories
+// @desc    Rename a product category
+// @access  Admin
+router.put(
+  '/categories',
+  [
+    body('oldName').notEmpty().trim().withMessage('oldName is required'),
+    body('newName').notEmpty().trim().withMessage('newName is required'),
+  ],
+  async (req, res) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
+
+      const { oldName, newName } = req.body;
+      const from = String(oldName).trim();
+      const to = String(newName).trim();
+
+      const categories = await getProductCategories();
+      const fromIdx = categories.findIndex(c => c.toLowerCase() === from.toLowerCase());
+      if (fromIdx === -1) {
+        return res.status(404).json({ success: false, message: 'Category not found' });
+      }
+
+      const toExists = categories.some(c => c.toLowerCase() === to.toLowerCase());
+      if (toExists) {
+        return res.status(400).json({ success: false, message: 'Target category already exists' });
+      }
+
+      categories[fromIdx] = to;
+      await setProductCategories(categories);
+      res.json({ success: true, data: { categories } });
+    } catch (error) {
+      console.error('Rename category error:', error);
+      res.status(500).json({ success: false, message: 'Failed to rename category' });
+    }
+  },
+);
+
+// @route   DELETE /api/admin/categories/:name
+// @desc    Delete a product category
+// @access  Admin
+router.delete('/categories/:name', async (req, res) => {
+  try {
+    const { name } = req.params;
+    const trimmed = String(name).trim();
+
+    const categories = await getProductCategories();
+    const filtered = categories.filter(c => c.toLowerCase() !== trimmed.toLowerCase());
+
+    if (filtered.length === categories.length) {
+      return res.status(404).json({ success: false, message: 'Category not found' });
+    }
+
+    await setProductCategories(filtered);
+    res.json({ success: true, data: { categories: filtered } });
+  } catch (error) {
+    console.error('Delete category error:', error);
+    res.status(500).json({ success: false, message: 'Failed to delete category' });
   }
 });
 

@@ -91,6 +91,13 @@ jspm_packages/
 .cache/
 public
 
+# Allow tracking of PWA assets (used by CRA client build)
+!client/public/icons/
+!client/public/icons/*.png
+!client/public/screenshots/
+!client/public/screenshots/*.png
+!client/public/favicon.ico
+
 # Storybook build outputs
 .out
 .storybook-out

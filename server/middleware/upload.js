@@ -2,6 +2,13 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const uploadRoot = path.join(__dirname, '..', 'uploads');
+const maxFileSizeBytes = parseInt(process.env.MAX_FILE_SIZE, 10) || 5 * 1024 * 1024;
+
+const formatFileSize = (bytes) => {
+  if (!Number.isFinite(bytes) || bytes <= 0) return '5MB';
+  const mb = bytes / (1024 * 1024);
+  return Number.isInteger(mb) ? `${mb}MB` : `${mb.toFixed(1)}MB`;
+};
 
 const diskStorage = multer.diskStorage({
   destination: (req, file, cb) => {
@@ -45,7 +52,7 @@ const fileFilter = (req, file, cb) => {
 const upload = multer({
   storage: diskStorage,
   limits: {
-    fileSize: parseInt(process.env.MAX_FILE_SIZE) || 5 * 1024 * 1024, // Use env variable or default 5MB
+    fileSize: maxFileSizeBytes,
   },
   fileFilter: fileFilter,
 });
@@ -53,12 +60,33 @@ const upload = multer({
 // Error handling middleware
 const handleUploadError = (error, req, res, next) => {
   if (error instanceof multer.MulterError) {
+    console.error('Upload middleware error:', {
+      code: error.code,
+      field: error.field,
+      route: `${req.method} ${req.baseUrl}${req.path}`,
+    });
+
     if (error.code === 'LIMIT_FILE_SIZE') {
       return res.status(400).json({
-        message: 'File too large. Maximum size is 5MB.',
+        message: `File too large. Maximum size is ${formatFileSize(maxFileSizeBytes)}.`,
       });
     }
+
+    if (error.code === 'LIMIT_UNEXPECTED_FILE') {
+      return res.status(400).json({
+        message: `Unexpected file field "${error.field || 'unknown'}". Use "images".`,
+      });
+    }
+
+    return res.status(400).json({
+      message: `Upload error: ${error.message}`,
+    });
   } else if (error.message === 'Only image files are allowed!') {
+    console.error('Upload validation error:', {
+      message: error.message,
+      route: `${req.method} ${req.baseUrl}${req.path}`,
+    });
+
     return res.status(400).json({
       message: error.message,
     });

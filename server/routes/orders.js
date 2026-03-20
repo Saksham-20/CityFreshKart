@@ -1,6 +1,7 @@
 const express = require('express');
 const { query, pool } = require('../database/config');
 const { authenticateToken } = require('../middleware/auth');
+const webPushService = require('../services/webPushService');
 
 const router = express.Router();
 
@@ -60,7 +61,7 @@ router.get('/:id', authenticateToken, async (req, res) => {
 
     // Get order
     const orderResult = await query(
-      `SELECT o.* FROM orders o WHERE o.id = $1 AND o.user_id = $2`,
+      'SELECT o.* FROM orders o WHERE o.id = $1 AND o.user_id = $2',
       [id, req.user.id],
     );
 
@@ -127,12 +128,37 @@ router.post('/', authenticateToken, async (req, res) => {
     const deliveryFeeAmount = await getSetting('delivery_fee', 50);
     const minOrderAmount = await getSetting('min_order_amount', 0);
 
-    // Recalculate totals server-side for integrity
+    const uniqueProductIds = [...new Set(items.map(item => item.product_id).filter(Boolean))];
+    if (uniqueProductIds.length !== items.length) {
+      return res.status(400).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Each order item must reference a valid unique product' } });
+    }
+
+    const productsResult = await query(
+      `SELECT id, name, price_per_kg, discount, pricing_type, is_active
+       FROM products
+       WHERE id = ANY($1::uuid[])`,
+      [uniqueProductIds],
+    );
+    const productsById = new Map(productsResult.rows.map(p => [p.id, p]));
+
+    for (const item of items) {
+      const product = productsById.get(item.product_id);
+      if (!product || !product.is_active) {
+        return res.status(400).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'One or more items are invalid or unavailable' } });
+      }
+      const qty = parseFloat(item.quantity_kg || 0);
+      if (!Number.isFinite(qty) || qty <= 0) {
+        return res.status(400).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Invalid item quantity' } });
+      }
+    }
+
+    // Recalculate totals strictly from DB values for integrity
     let subtotal = 0;
     for (const item of items) {
-      const pricePerKg = parseFloat(item.price_per_kg || 0);
+      const product = productsById.get(item.product_id);
+      const pricePerKg = parseFloat(product.price_per_kg || 0);
       const quantityKg = parseFloat(item.quantity_kg || 0);
-      const discount = parseFloat(item.discount || 0);
+      const discount = parseFloat(product.discount || 0);
       const itemTotal = pricePerKg * quantityKg * (1 - discount / 100);
       subtotal += itemTotal;
     }
@@ -156,8 +182,8 @@ router.post('/', authenticateToken, async (req, res) => {
 
       // Insert order — includes notes and optional razorpay fields
       const orderResult = await client.query(`
-        INSERT INTO orders (order_number, user_id, phone, delivery_address, notes, subtotal, delivery_fee, total_price, payment_method, razorpay_payment_id, status)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+        INSERT INTO orders (order_number, user_id, phone, delivery_address, notes, subtotal, delivery_fee, total_price, payment_method, razorpay_payment_id, razorpay_order_id, status)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
         RETURNING *
       `, [
         orderNumber,
@@ -170,6 +196,7 @@ router.post('/', authenticateToken, async (req, res) => {
         totalPrice,
         payment_method,
         razorpay_payment_id || null,
+        razorpay_order_id || null,
         'pending',
       ]);
 
@@ -177,11 +204,12 @@ router.post('/', authenticateToken, async (req, res) => {
 
       // Insert order items — include pricing_type snapshot
       for (const item of items) {
-        const pricePerKg = parseFloat(item.price_per_kg || 0);
+        const product = productsById.get(item.product_id);
+        const pricePerKg = parseFloat(product.price_per_kg || 0);
         const quantityKg = parseFloat(item.quantity_kg || 0);
-        const discount = parseFloat(item.discount || 0);
+        const discount = parseFloat(product.discount || 0);
         const itemTotal = parseFloat((pricePerKg * quantityKg * (1 - discount / 100)).toFixed(2));
-        const pricingType = item.pricing_type || 'per_kg';
+        const pricingType = product.pricing_type || 'per_kg';
 
         await client.query(`
           INSERT INTO order_items (order_id, product_id, product_name, quantity_kg, price_per_kg, total_price, pricing_type)
@@ -189,7 +217,7 @@ router.post('/', authenticateToken, async (req, res) => {
         `, [
           order.id,
           item.product_id,
-          item.product_name || '',
+          product.name || '',
           quantityKg,
           pricePerKg,
           itemTotal,
@@ -197,16 +225,37 @@ router.post('/', authenticateToken, async (req, res) => {
         ]);
 
         // Decrement available stock
-        await client.query(
+        const stockUpdate = await client.query(
           'UPDATE products SET quantity_available = quantity_available - $1 WHERE id = $2 AND quantity_available >= $1',
           [quantityKg, item.product_id],
         );
+        if (stockUpdate.rowCount !== 1) {
+          throw new Error(`Insufficient stock for product ${item.product_id}`);
+        }
       }
 
       // Clear user's cart
       await client.query('DELETE FROM cart WHERE user_id = $1', [req.user.id]);
 
       await client.query('COMMIT');
+
+      // Fire push notifications after successful commit (non-blocking)
+      Promise.allSettled([
+        webPushService.sendToUser(req.user.id, {
+          type: 'order_created',
+          title: 'Order placed successfully',
+          body: `Your order #${order.order_number} has been placed.`,
+          orderId: order.id,
+          url: `/orders/${order.id}`,
+        }),
+        webPushService.sendToAdmins({
+          type: 'new_order',
+          title: 'New order received',
+          body: `Order #${order.order_number} is ready for processing.`,
+          orderId: order.id,
+          url: '/admin/orders',
+        }),
+      ]).catch(() => undefined);
 
       res.status(201).json({
         success: true,

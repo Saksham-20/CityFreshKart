@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Button from '../ui/Button';
 import Modal from '../ui/Modal';
 import Loading from '../ui/Loading';
@@ -41,11 +41,7 @@ const OrderManager = () => {
   const [adminNote, setAdminNote] = useState('');
   const [updatingStatus, setUpdatingStatus] = useState(false);
 
-  useEffect(() => {
-    fetchOrders();
-  }, [statusFilter]);
-
-  const fetchOrders = async () => {
+  const fetchOrders = useCallback(async () => {
     try {
       setLoading(true);
       const params = { limit: 100 };
@@ -57,7 +53,21 @@ const OrderManager = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [statusFilter]);
+
+  useEffect(() => {
+    fetchOrders();
+  }, [fetchOrders]);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (document.visibilityState !== 'visible') return;
+      if (updatingStatus || showDetailsModal || showStatusModal) return;
+      fetchOrders();
+    }, 15000);
+
+    return () => clearInterval(interval);
+  }, [fetchOrders, updatingStatus, showDetailsModal, showStatusModal]);
 
   const handleStatusUpdate = async () => {
     if (!selectedOrder) return;

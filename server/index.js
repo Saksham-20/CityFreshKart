@@ -16,7 +16,7 @@ const adminRoutes = require('./routes/admin');
 const razorpayRoutes = require('./routes/razorpay');
 const cartRoutes = require('./routes/cart');
 const addressRoutes = require('./routes/addresses');
-const wishlistRoutes = require('./routes/wishlist');
+const notificationRoutes = require('./routes/notifications');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -107,6 +107,15 @@ app.use('/api/razorpay', razorpayRoutes);
 console.log('✅ Razorpay routes registered at /api/razorpay');
 app.use('/api/cart', cartRoutes);
 app.use('/api/addresses', addressRoutes);
+app.use('/api/notifications', notificationRoutes);
+
+// Explicit deprecation for removed wishlist feature
+app.use('/api/wishlist', (req, res) => {
+  res.status(410).json({
+    success: false,
+    message: 'Wishlist feature has been removed',
+  });
+});
 
 // Public store settings endpoint (read-only, no auth required)
 app.get('/api/settings', async (req, res) => {
@@ -120,7 +129,6 @@ app.get('/api/settings', async (req, res) => {
     res.json({ success: true, data: { free_delivery_threshold: '300', delivery_fee: '50', min_order_amount: '0' } });
   }
 });
-app.use('/api/wishlist', wishlistRoutes);
 
 // Serve React build in production (single-origin deploy: web + api)
 if (process.env.NODE_ENV === 'production') {

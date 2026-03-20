@@ -8,6 +8,7 @@ import Breadcrumb from '../components/common/Breadcrumb';
 import api from '../services/api';
 import toast from 'react-hot-toast';
 import { addressService } from '../services/addressService';
+import { subscribeToWebPush } from '../utils/pwa';
 
 const ProfilePage = () => {
   const navigate = useNavigate();
@@ -34,6 +35,7 @@ const ProfilePage = () => {
   const [editingAddress, setEditingAddress] = useState(null);
   const [addressForm, setAddressForm] = useState({
     firstName: '', lastName: '', addressLine: '',
+    houseNumber: '', floor: '', society: '',
     city: '', state: '', postalCode: '', phone: '', isDefault: false,
   });
   const [activeSection, setActiveSection] = useState('profile');
@@ -41,6 +43,7 @@ const ProfilePage = () => {
   // Recent orders state
   const [recentOrders, setRecentOrders] = useState([]);
   const [ordersLoading, setOrdersLoading] = useState(false);
+  const [notificationLoading, setNotificationLoading] = useState(false);
 
   const ORDER_STATUS_LABELS = {
     pending: 'Pending', confirmed: 'Accepted', delivered: 'Delivered', cancelled: 'Rejected',
@@ -99,6 +102,9 @@ const ProfilePage = () => {
         firstName: address.first_name || '',
         lastName: address.last_name || '',
         addressLine: address.address_line || '',
+        houseNumber: address.house_number || '',
+        floor: address.floor || '',
+        society: address.society || '',
         city: address.city || '',
         state: address.state || '',
         postalCode: address.postal_code || '',
@@ -109,6 +115,7 @@ const ProfilePage = () => {
       setEditingAddress(null);
       setAddressForm({
         firstName: '', lastName: '', addressLine: '',
+        houseNumber: '', floor: '', society: '',
         city: '', state: '', postalCode: '', phone: '', isDefault: false,
       });
     }
@@ -121,7 +128,7 @@ const ProfilePage = () => {
   };
 
   const handleSaveAddress = async () => {
-    if (!addressForm.firstName || !addressForm.addressLine || !addressForm.city || !addressForm.state || !addressForm.postalCode) {
+    if (!addressForm.firstName || !addressForm.addressLine || !addressForm.houseNumber || !addressForm.city || !addressForm.state || !addressForm.postalCode) {
       toast.error('Please fill all required address fields');
       return;
     }
@@ -188,11 +195,9 @@ const ProfilePage = () => {
         email: formData.email
       });
 
-      if (response.data?.success) {
-        toast.success('Profile updated successfully!');
-        setProfile(response.data.data?.user || formData);
-        setEditMode(false);
-      }
+      toast.success(response.data?.message || 'Profile updated successfully!');
+      setProfile(response.data?.data?.user || { ...profile, ...formData });
+      setEditMode(false);
     } catch (error) {
       const msg = error.response?.data?.message || 'Failed to update profile';
       toast.error(msg);
@@ -225,15 +230,16 @@ const ProfilePage = () => {
         newPassword: passwordData.newPassword
       });
 
-      if (response.data?.success) {
-        toast.success('Password changed successfully!');
-        setPasswordData({
-          currentPassword: '',
-          newPassword: '',
-          confirmPassword: ''
-        });
-        setShowPasswordForm(false);
+      if (!response.data?.success) {
+        throw new Error(response.data?.message || 'Password change failed');
       }
+      toast.success(response.data?.message || 'Password changed successfully!');
+      setPasswordData({
+        currentPassword: '',
+        newPassword: '',
+        confirmPassword: ''
+      });
+      setShowPasswordForm(false);
     } catch (error) {
       const msg = error.response?.data?.message || 'Failed to change password';
       toast.error(msg);
@@ -246,6 +252,18 @@ const ProfilePage = () => {
     logout();
     navigate('/');
     toast.success('Logged out successfully');
+  };
+
+  const handleEnableNotifications = async () => {
+    try {
+      setNotificationLoading(true);
+      await subscribeToWebPush();
+      toast.success('Push notifications enabled successfully');
+    } catch (error) {
+      toast.error(error.message || 'Failed to enable notifications');
+    } finally {
+      setNotificationLoading(false);
+    }
   };
 
   if (!user) {
@@ -308,12 +326,6 @@ const ProfilePage = () => {
                     className="w-full text-left px-4 py-2 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
                   >
                     📦 My Orders
-                  </button>
-                  <button
-                    onClick={() => navigate('/wishlist')}
-                    className="w-full text-left px-4 py-2 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
-                  >
-                    ❤️ Wishlist
                   </button>
                   <button
                     onClick={handleLogout}
@@ -424,6 +436,41 @@ const ProfilePage = () => {
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-fresh-green focus:border-transparent outline-none"
                         placeholder="House no., Street, Area" />
                     </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">House Number *</label>
+                      <input
+                        type="text"
+                        name="houseNumber"
+                        value={addressForm.houseNumber}
+                        onChange={handleAddressFormChange}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-fresh-green focus:border-transparent outline-none"
+                        placeholder="e.g. 12A"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Floor</label>
+                        <input
+                          type="text"
+                          name="floor"
+                          value={addressForm.floor}
+                          onChange={handleAddressFormChange}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-fresh-green focus:border-transparent outline-none"
+                          placeholder="e.g. 2"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Society</label>
+                        <input
+                          type="text"
+                          name="society"
+                          value={addressForm.society}
+                          onChange={handleAddressFormChange}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-fresh-green focus:border-transparent outline-none"
+                          placeholder="e.g. Shanti Nagar"
+                        />
+                      </div>
+                    </div>
                     <div className="grid grid-cols-2 gap-3">
                       <div>
                         <label className="block text-xs font-medium text-gray-600 mb-1">City *</label>
@@ -494,7 +541,11 @@ const ProfilePage = () => {
                                 <span className="text-[10px] bg-fresh-green text-white px-2 py-0.5 rounded-full font-semibold">Default</span>
                               )}
                             </div>
-                            <p className="text-sm text-gray-600">{addr.address_line}</p>
+                            <p className="text-sm text-gray-600">
+                              {[addr.house_number, addr.floor ? `Floor ${addr.floor}` : '', addr.society ? `Society ${addr.society}` : '', addr.address_line]
+                                .filter(Boolean)
+                                .join(', ')}
+                            </p>
                             <p className="text-sm text-gray-600">{addr.city}, {addr.state} – {addr.postal_code}</p>
                             {addr.phone && <p className="text-xs text-gray-500 mt-1">Ph: {addr.phone}</p>}
                           </div>
@@ -571,10 +622,19 @@ const ProfilePage = () => {
                 {!showPasswordForm ? (
                   <div>
                     <p className="text-sm text-gray-600 mb-4">Manage your account security by changing your password regularly.</p>
-                    <button onClick={() => setShowPasswordForm(true)}
-                      className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50 transition-colors">
-                      Change Password
-                    </button>
+                    <div className="flex flex-wrap gap-3">
+                      <button onClick={() => setShowPasswordForm(true)}
+                        className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50 transition-colors">
+                        Change Password
+                      </button>
+                      <button
+                        onClick={handleEnableNotifications}
+                        disabled={notificationLoading}
+                        className="px-4 py-2 border border-green-300 rounded-lg text-green-700 font-medium hover:bg-green-50 transition-colors disabled:opacity-60"
+                      >
+                        {notificationLoading ? 'Enabling...' : 'Enable Push Notifications'}
+                      </button>
+                    </div>
                   </div>
                 ) : (
                   <div className="space-y-4">

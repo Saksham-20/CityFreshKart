@@ -19,7 +19,7 @@ CREATE TABLE IF NOT EXISTS products (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     name VARCHAR(255) NOT NULL,
     description TEXT,
-    category VARCHAR(100) DEFAULT 'Vegetables',
+    category VARCHAR(100) DEFAULT 'Uncategorized',
     price_per_kg DECIMAL(10,2) NOT NULL,
     discount DECIMAL(10,2) DEFAULT 0,
     image_url VARCHAR(500),
@@ -53,6 +53,7 @@ CREATE TABLE IF NOT EXISTS orders (
     total_price DECIMAL(10,2) NOT NULL,
     payment_method VARCHAR(50),
     razorpay_payment_id VARCHAR(255),
+    razorpay_order_id VARCHAR(255),
     status VARCHAR(50) NOT NULL DEFAULT 'pending', -- pending, confirmed, delivered, cancelled
     notes TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
@@ -78,6 +79,9 @@ CREATE TABLE IF NOT EXISTS user_addresses (
     first_name VARCHAR(100) NOT NULL,
     last_name VARCHAR(100) DEFAULT '',
     address_line TEXT NOT NULL,
+    house_number VARCHAR(100) NOT NULL DEFAULT '',
+    floor VARCHAR(100) DEFAULT '',
+    society VARCHAR(150) DEFAULT '',
     city VARCHAR(100) NOT NULL,
     state VARCHAR(100) NOT NULL,
     postal_code VARCHAR(20) NOT NULL,
@@ -86,6 +90,11 @@ CREATE TABLE IF NOT EXISTS user_addresses (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Backward compatible schema additions for existing deployments
+ALTER TABLE user_addresses ADD COLUMN IF NOT EXISTS house_number VARCHAR(100) NOT NULL DEFAULT '';
+ALTER TABLE user_addresses ADD COLUMN IF NOT EXISTS floor VARCHAR(100) DEFAULT '';
+ALTER TABLE user_addresses ADD COLUMN IF NOT EXISTS society VARCHAR(150) DEFAULT '';
 
 -- Create indexes for better performance
 CREATE INDEX IF NOT EXISTS idx_products_is_active ON products(is_active);
@@ -128,12 +137,7 @@ CREATE INDEX IF NOT EXISTS idx_user_addresses_is_default ON user_addresses(user_
 -- Per-piece / per-kg pricing support
 ALTER TABLE products ADD COLUMN IF NOT EXISTS pricing_type VARCHAR(20) DEFAULT 'per_kg';
 ALTER TABLE order_items ADD COLUMN IF NOT EXISTS pricing_type VARCHAR(20) DEFAULT 'per_kg';
-ALTER TABLE products ADD COLUMN IF NOT EXISTS category VARCHAR(100);
-ALTER TABLE products ALTER COLUMN category SET DEFAULT 'Vegetables';
-ALTER TABLE products
-    DROP CONSTRAINT IF EXISTS products_category_check;
-ALTER TABLE products
-    ADD CONSTRAINT products_category_check CHECK (category IN ('Vegetables', 'Fruits', 'Herbs'));
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS razorpay_order_id VARCHAR(255);
 
 -- Store settings (min order amount, free delivery threshold, delivery fee)
 CREATE TABLE IF NOT EXISTS store_settings (
@@ -144,8 +148,28 @@ CREATE TABLE IF NOT EXISTS store_settings (
 INSERT INTO store_settings (key, value) VALUES
     ('min_order_amount', '0'),
     ('free_delivery_threshold', '300'),
-    ('delivery_fee', '50')
+    ('delivery_fee', '50'),
+    ('product_categories', '["Vegetables","Fruits","Dairy","Bakery","Grains","Herbs & Spices","Other"]')
 ON CONFLICT (key) DO NOTHING;
 
 DROP TRIGGER IF EXISTS update_store_settings_updated_at ON store_settings;
 CREATE TRIGGER update_store_settings_updated_at BEFORE UPDATE ON store_settings FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- Web push subscriptions (for browser push notifications)
+CREATE TABLE IF NOT EXISTS push_subscriptions (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    endpoint TEXT NOT NULL UNIQUE,
+    subscription JSONB NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+DROP TRIGGER IF EXISTS update_push_subscriptions_updated_at ON push_subscriptions;
+CREATE TRIGGER update_push_subscriptions_updated_at BEFORE UPDATE ON push_subscriptions FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE INDEX IF NOT EXISTS idx_push_subscriptions_user_id ON push_subscriptions(user_id);
+
+-- Wishlist tables removed (feature fully disabled)
+DROP TABLE IF EXISTS wishlist CASCADE;
+DROP TABLE IF EXISTS wishlists CASCADE;
+DROP TABLE IF EXISTS wishlist_items CASCADE;

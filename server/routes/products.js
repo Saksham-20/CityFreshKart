@@ -3,6 +3,98 @@ const { query } = require('../database/config');
 
 const router = express.Router();
 
+const DEFAULT_PRODUCT_CATEGORIES = [
+  'Vegetables',
+  'Fruits',
+  'Dairy',
+  'Bakery',
+  'Grains',
+  'Herbs & Spices',
+  'Other',
+];
+
+// @route   GET /api/products/categories
+// @desc    Get public product categories (used for chips/dropdowns)
+// @access  Public
+router.get('/categories', async (req, res) => {
+  try {
+    const { pool } = require('../database/config');
+    const result = await pool.query(
+      'SELECT value FROM store_settings WHERE key = $1',
+      ['product_categories'],
+    );
+
+    if (result.rows.length > 0) {
+      try {
+        const parsed = JSON.parse(result.rows[0].value);
+        if (Array.isArray(parsed) && parsed.every(v => typeof v === 'string' && v.trim())) {
+          return res.json({ success: true, data: parsed });
+        }
+      } catch (_) {
+        // ignore JSON parsing errors and fall back to defaults
+      }
+    }
+
+    return res.json({ success: true, data: DEFAULT_PRODUCT_CATEGORIES });
+  } catch (error) {
+    console.error('Get categories error:', error);
+    return res.json({ success: true, data: DEFAULT_PRODUCT_CATEGORIES });
+  }
+});
+
+// @route   GET /api/products/carousel
+// @desc    Get products for home carousels (discounted + fresh)
+// @access  Public
+router.get('/carousel', async (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit || 8);
+    const discounted = await query(`
+      SELECT
+        id,
+        name,
+        image_url,
+        price_per_kg,
+        discount,
+        quantity_available,
+        pricing_type,
+        created_at
+      FROM products
+      WHERE is_active = true
+        AND discount > 0
+      ORDER BY discount DESC, created_at DESC
+      LIMIT $1
+    `, [limit]);
+
+    const fresh = await query(`
+      SELECT
+        id,
+        name,
+        image_url,
+        price_per_kg,
+        discount,
+        quantity_available,
+        pricing_type,
+        created_at
+      FROM products
+      WHERE is_active = true
+        AND created_at >= NOW() - INTERVAL '24 hours'
+      ORDER BY created_at DESC
+      LIMIT $1
+    `, [limit]);
+
+    res.json({
+      success: true,
+      data: {
+        discounted: discounted.rows,
+        fresh: fresh.rows,
+      },
+    });
+  } catch (error) {
+    console.error('Carousel products error:', error);
+    res.status(500).json({ success: false, message: 'Failed to load carousel products' });
+  }
+});
+
 // @route   GET /api/products/search?q=keyword
 // @desc    Fast product search by name
 // @access  Public

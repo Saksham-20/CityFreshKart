@@ -7,6 +7,7 @@ import AdminLayout from './components/layout/AdminLayout';
 import Header from './components/layout/Header';
 import Footer from './components/layout/Footer';
 import MobileBottomNav from './components/layout/MobileBottomNav';
+import WhatsAppFloatingButton from './components/common/WhatsAppFloatingButton';
 import InstallPrompt from './components/pwa/InstallPrompt';
 
 // Auth Components
@@ -24,6 +25,7 @@ const OrderConfirmationPage = lazy(() => import('./pages/OrderConfirmationPage')
 const LoginPage = lazy(() => import('./pages/LoginPage'));
 const AdminDashboardPage = lazy(() => import('./pages/AdminDashboardPage'));
 const AdminProductsPage = lazy(() => import('./pages/AdminProductsPage'));
+const AdminCategoriesPage = lazy(() => import('./pages/AdminCategoriesPage'));
 const AdminOrdersPage = lazy(() => import('./pages/AdminOrdersPage'));
 const AdminUsersPage = lazy(() => import('./pages/AdminUsersPage'));
 const AdminAnalyticsPage = lazy(() => import('./pages/AdminAnalyticsPage'));
@@ -39,6 +41,17 @@ const PageLoader = () => (
       <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-fresh-green mx-auto mb-4"></div>
       <p className="text-fresh-green font-semibold text-lg">Loading FreshCart...</p>
     </div>
+  </div>
+);
+
+const MainLayout = ({ children }) => (
+  <div className="min-h-screen bg-white flex flex-col">
+    <Header />
+    <main className="flex-1 pb-16 md:pb-0">{children}</main>
+    <Footer />
+    <MobileBottomNav />
+    <WhatsAppFloatingButton />
+    <InstallPrompt />
   </div>
 );
 
@@ -60,107 +73,79 @@ function App() {
     <Router>
       <Suspense fallback={<PageLoader />}>
         <Routes>
-                {/* Auth Routes - No Header */}
-                <Route path="/login" element={<LoginPage />} />
+          <Route path="/login" element={<LoginPage />} />
 
-                {/* Admin Routes - explicit routes to avoid nested matching issues */}
-                <Route path="/admin" element={
-                  <AdminRoute>
-                    <AdminLayout>
-                      <AdminDashboardPage />
-                    </AdminLayout>
-                  </AdminRoute>
-                } />
-                <Route path="/admin/products" element={
-                  <AdminRoute>
-                    <AdminLayout>
-                      <AdminProductsPage />
-                    </AdminLayout>
-                  </AdminRoute>
-                } />
-                <Route path="/admin/orders" element={
-                  <AdminRoute>
-                    <AdminLayout>
-                      <AdminOrdersPage />
-                    </AdminLayout>
-                  </AdminRoute>
-                } />
-                <Route path="/admin/users" element={
-                  <AdminRoute>
-                    <AdminLayout>
-                      <AdminUsersPage />
-                    </AdminLayout>
-                  </AdminRoute>
-                } />
-                <Route path="/admin/analytics" element={
-                  <AdminRoute>
-                    <AdminLayout>
-                      <AdminAnalyticsPage />
-                    </AdminLayout>
-                  </AdminRoute>
-                } />
-                <Route path="/admin/settings" element={
-                  <AdminRoute>
-                    <AdminLayout>
-                      <AdminSettingsPage />
-                    </AdminLayout>
-                  </AdminRoute>
-                } />
-                <Route path="/admin/*" element={<Navigate to="/admin" replace />} />
+          <Route
+            path="/admin"
+            element={(
+              <AdminRoute>
+                <AdminLayout><AdminDashboardPage /></AdminLayout>
+              </AdminRoute>
+            )}
+          />
+          <Route
+            path="/admin/products"
+            element={(
+              <AdminRoute>
+                <AdminLayout><AdminProductsPage /></AdminLayout>
+              </AdminRoute>
+            )}
+          />
+          <Route
+            path="/admin/categories"
+            element={(
+              <AdminRoute>
+                <AdminLayout><AdminCategoriesPage /></AdminLayout>
+              </AdminRoute>
+            )}
+          />
+          <Route
+            path="/admin/orders"
+            element={(
+              <AdminRoute>
+                <AdminLayout><AdminOrdersPage /></AdminLayout>
+              </AdminRoute>
+            )}
+          />
+          <Route
+            path="/admin/users"
+            element={(
+              <AdminRoute>
+                <AdminLayout><AdminUsersPage /></AdminLayout>
+              </AdminRoute>
+            )}
+          />
+          <Route
+            path="/admin/analytics"
+            element={(
+              <AdminRoute>
+                <AdminLayout><AdminAnalyticsPage /></AdminLayout>
+              </AdminRoute>
+            )}
+          />
+          <Route
+            path="/admin/settings"
+            element={(
+              <AdminRoute>
+                <AdminLayout><AdminSettingsPage /></AdminLayout>
+              </AdminRoute>
+            )}
+          />
 
-                {/* Main App Routes - With Header, authenticated users only */}
-                <Route path="/*" element={
-                  isAuthenticated ? (
-                    <div className="min-h-screen bg-white flex flex-col">
-                      <Header />
-                      <main className="flex-1 pb-[calc(4.5rem+env(safe-area-inset-bottom))] md:pb-0">
-                        <Routes>
-                          <Route path="/" element={<ProductsPage />} />
-                          <Route path="/products" element={<ProductsPage />} />
-                          <Route path="/cart" element={<CartPage />} />
-                          <Route path="/checkout" element={
-                            <ProtectedRoute>
-                              <CheckoutPage />
-                            </ProtectedRoute>
-                          } />
-                          <Route path="/orders" element={
-                            <ProtectedRoute>
-                              <OrdersPage />
-                            </ProtectedRoute>
-                          } />
-                          <Route path="/orders/:orderId/confirmation" element={
-                            <ProtectedRoute>
-                              <OrderConfirmationPage />
-                            </ProtectedRoute>
-                          } />
-                          <Route path="/orders/:orderId" element={
-                            <ProtectedRoute>
-                              <OrderDetailPage />
-                            </ProtectedRoute>
-                          } />
-                          <Route path="/profile" element={
-                            <ProtectedRoute>
-                              <ProfilePage />
-                            </ProtectedRoute>
-                          } />
-                          <Route path="*" element={<Navigate to="/products" replace />} />
-                        </Routes>
-                      </main>
-                      <div className="hidden md:block">
-                        <Footer />
-                      </div>
-                      <InstallPrompt />
-                      <MobileBottomNav />
-                    </div>
-                  ) : (
-                    <Navigate to="/login" replace />
-                  )
-                } />
-
-                {/* Catch all unmatched routes */}
-                <Route path="*" element={
-                  isAuthenticated ? <Navigate to="/products" replace /> : <Navigate to="/login" replace />
-                } />
+          <Route
+            path="/"
+            element={isAuthenticated ? (
+              <MainLayout><ProductsPage /></MainLayout>
+            ) : <Navigate to="/login" replace />}
+          />
+          <Route path="/products" element={<Navigate to="/" replace />} />
+          <Route path="/cart" element={isAuthenticated ? <MainLayout><CartPage /></MainLayout> : <Navigate to="/login" replace />} />
+          <Route path="/checkout" element={<ProtectedRoute><MainLayout><CheckoutPage /></MainLayout></ProtectedRoute>} />
+          <Route path="/orders" element={<ProtectedRoute><MainLayout><OrdersPage /></MainLayout></ProtectedRoute>} />
+          <Route path="/orders/:orderId/confirmation" element={<ProtectedRoute><MainLayout><OrderConfirmationPage /></MainLayout></ProtectedRoute>} />
+          <Route path="/orders/:orderId" element={<ProtectedRoute><MainLayout><OrderDetailPage /></MainLayout></ProtectedRoute>} />
+          <Route path="/profile" element={<ProtectedRoute><MainLayout><ProfilePage /></MainLayout></ProtectedRoute>} />
+          <Route path="*" element={isAuthenticated ? <Navigate to="/" replace /> : <Navigate to="/login" replace />} />
         </Routes>
       </Suspense>
       <Toaster />
