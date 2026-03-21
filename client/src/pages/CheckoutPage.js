@@ -200,22 +200,22 @@ const CheckoutPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 pt-14 pb-[10.5rem]">
+    <div className="min-h-screen bg-surface pt-14 pb-[10.5rem]">
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 px-4 py-3 flex items-center gap-3 sticky top-14 z-10">
-        <button onClick={() => navigate('/cart')} className="text-gray-600 p-1 -ml-1 rounded-lg hover:bg-gray-100">
+      <div className="glass-header border-b border-outline-variant/10 px-4 py-3 flex items-center gap-3 sticky top-14 z-10">
+        <button type="button" onClick={() => navigate('/cart')} className="text-on-surface-variant p-1 -ml-1 rounded-lg hover:bg-surface-container-low">
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
           </svg>
         </button>
-        <h1 className="text-lg font-bold text-gray-900">Checkout</h1>
+        <h1 className="text-lg font-headline font-bold text-on-surface">Checkout</h1>
       </div>
 
       <div className="max-w-lg mx-auto px-3 sm:px-4 pt-3 sm:pt-4 space-y-3">
         {/* Order Summary */}
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-          <div className="px-4 py-3 border-b border-gray-100">
-            <h3 className="font-semibold text-gray-900 text-sm">Order Summary ({items.length} {items.length === 1 ? 'item' : 'items'})</h3>
+        <div className="bg-surface-container-lowest rounded-2xl outline outline-1 outline-outline-variant/15 overflow-hidden shadow-editorial">
+          <div className="px-4 py-3 border-b border-surface-container">
+            <h3 className="font-semibold text-on-surface text-sm">Order Summary ({items.length} {items.length === 1 ? 'item' : 'items'})</h3>
           </div>
           <div className="px-4 py-3 space-y-2">
             {items.map(item => {
@@ -223,60 +223,60 @@ const CheckoutPage = () => {
                 ? item.price_per_kg * item.quantity * (1 - item.discount / 100)
                 : item.price_per_kg * item.quantity;
               return (
-                <div key={item.id} className="flex justify-between text-sm text-gray-600">
+                <div key={item.id} className="flex justify-between text-sm text-on-surface-variant">
                   <span className="flex-1 pr-2">{item.name} × {item.quantity} kg</span>
-                  <span className="font-medium text-gray-900">₹{itemPrice.toFixed(2)}</span>
+                  <span className="font-medium text-on-surface">₹{itemPrice.toFixed(2)}</span>
                 </div>
               );
             })}
           </div>
-          <div className="border-t border-gray-100 px-4 py-3 space-y-2">
-            <div className="flex justify-between text-sm text-gray-600">
+          <div className="border-t border-surface-container px-4 py-3 space-y-2">
+            <div className="flex justify-between text-sm text-on-surface-variant">
               <span>Subtotal</span>
               <span>₹{subtotal.toFixed(2)}</span>
             </div>
-            <div className="flex justify-between text-sm text-gray-600">
+            <div className="flex justify-between text-sm text-on-surface-variant">
               <span>Delivery {subtotal >= 300 ? '(FREE)' : ''}</span>
-              <span className={deliveryFee === 0 ? 'text-green-600 font-medium' : ''}>
+              <span className={deliveryFee === 0 ? 'text-primary font-medium' : ''}>
                 {deliveryFee === 0 ? 'FREE' : `₹${deliveryFee}`}
               </span>
             </div>
             {subtotal < 300 && (
-              <p className="text-xs text-green-600">Add ₹{(300 - subtotal).toFixed(2)} more for free delivery</p>
+              <p className="text-xs text-primary">Add ₹{(300 - subtotal).toFixed(2)} more for free delivery</p>
             )}
-            <div className="flex justify-between font-bold text-gray-900 border-t border-gray-100 pt-2">
+            <div className="flex justify-between font-bold text-on-surface border-t border-surface-container pt-2">
               <span>Total</span>
-              <span className="text-green-700">₹{total.toFixed(2)}</span>
+              <span className="text-primary">₹{total.toFixed(2)}</span>
             </div>
           </div>
         </div>
 
         {/* Delivery Address */}
         <form onSubmit={handleOrderSubmit} id="checkout-form">
-          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-            <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
-              <h3 className="font-semibold text-gray-900 text-sm">Delivery Address</h3>
+          <div className="bg-surface-container-lowest rounded-2xl outline outline-1 outline-outline-variant/15 overflow-hidden shadow-editorial">
+            <div className="px-4 py-3 border-b border-surface-container flex items-center justify-between">
+              <h3 className="font-semibold text-on-surface text-sm">Delivery Address</h3>
               <button
                 type="button"
                 onClick={() => navigate('/profile')}
-                className="text-xs text-fresh-green hover:underline font-medium"
+                className="text-xs text-primary hover:underline font-medium"
               >
                 Manage Addresses
               </button>
             </div>
             <div className="px-4 py-3 space-y-3">
               {addressesLoading ? (
-                <p className="text-sm text-gray-400">Loading saved addresses...</p>
+                <p className="text-sm text-on-surface-variant">Loading saved addresses...</p>
               ) : (
                 <>
                   {/* Saved address radio cards */}
                   {savedAddresses.map(addr => (
                     <label
                       key={addr.id}
-                      className={`flex items-start gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all ${
+                      className={`flex items-start gap-3 p-3 rounded-xl outline outline-2 cursor-pointer transition-all ${
                         !useNewAddress && selectedAddressId === addr.id
-                          ? 'border-green-500 bg-green-50'
-                          : 'border-gray-200 bg-white hover:border-gray-300'
+                          ? 'outline-primary bg-secondary-container/25'
+                          : 'outline-outline-variant/20 bg-surface-container-lowest hover:outline-primary/30'
                       }`}
                     >
                       <input
@@ -284,16 +284,16 @@ const CheckoutPage = () => {
                         name="deliveryAddress"
                         checked={!useNewAddress && selectedAddressId === addr.id}
                         onChange={() => { setSelectedAddressId(addr.id); setUseNewAddress(false); if (error) setError(''); }}
-                        className="mt-0.5 accent-green-600"
+                        className="mt-0.5 accent-primary"
                       />
                       <div className="flex-1 text-sm">
                         <div className="flex items-center gap-2">
-                          <span className="font-semibold text-gray-900">Saved Address</span>
+                          <span className="font-semibold text-on-surface">Saved Address</span>
                           {addr.is_default && (
-                            <span className="text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded font-semibold">Default</span>
+                            <span className="text-[10px] bg-secondary-container text-on-secondary-container px-1.5 py-0.5 rounded font-semibold">Default</span>
                           )}
                         </div>
-                        <p className="text-gray-600 mt-0.5">
+                        <p className="text-on-surface-variant mt-0.5">
                           {[addr.house_number,
                             addr.floor ? `Floor ${addr.floor}` : '',
                             addr.address_line,
@@ -301,15 +301,15 @@ const CheckoutPage = () => {
                         </p>
                       </div>
                       {!useNewAddress && selectedAddressId === addr.id && (
-                        <span className="text-green-600 text-xs font-bold mt-0.5">✓</span>
+                        <span className="text-primary text-xs font-bold mt-0.5">✓</span>
                       )}
                     </label>
                   ))}
 
                   {/* Use new address option */}
                   <label
-                    className={`flex items-start gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all ${
-                      useNewAddress ? 'border-green-500 bg-green-50' : 'border-gray-200 bg-white hover:border-gray-300'
+                    className={`flex items-start gap-3 p-3 rounded-xl outline outline-2 cursor-pointer transition-all ${
+                      useNewAddress ? 'outline-primary bg-secondary-container/25' : 'outline-outline-variant/20 bg-surface-container-lowest hover:outline-primary/30'
                     }`}
                   >
                     <input
@@ -317,17 +317,17 @@ const CheckoutPage = () => {
                       name="deliveryAddress"
                       checked={useNewAddress}
                       onChange={() => { setUseNewAddress(true); if (error) setError(''); }}
-                      className="mt-0.5 accent-green-600"
+                      className="mt-0.5 accent-primary"
                     />
                     <div className="flex-1 text-sm">
-                      <span className="font-semibold text-gray-900">
+                      <span className="font-semibold text-on-surface">
                         {savedAddresses.length > 0 ? '+ Use a different address' : 'Enter delivery address'}
                       </span>
                       {useNewAddress && (
                         <div className="mt-2 space-y-2">
                           <div className="grid grid-cols-2 gap-3">
                             <div>
-                              <label className="block text-xs font-medium text-gray-600 mb-1">House Number *</label>
+                              <label className="block text-xs font-medium text-on-surface-variant mb-1">House Number *</label>
                               <input
                                 type="text"
                                 value={newAddressForm.houseNumber}
@@ -336,11 +336,11 @@ const CheckoutPage = () => {
                                   if (error) setError('');
                                 }}
                                 placeholder="e.g. 12A"
-                                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                                className="w-full px-3 py-2 rounded-lg text-sm bg-surface-container-highest focus:bg-surface-container-lowest focus:outline-none focus:ring-2 focus:ring-primary/25 ghost-outline-primary"
                               />
                             </div>
                             <div>
-                              <label className="block text-xs font-medium text-gray-600 mb-1">Floor</label>
+                              <label className="block text-xs font-medium text-on-surface-variant mb-1">Floor</label>
                               <input
                                 type="text"
                                 value={newAddressForm.floor}
@@ -349,13 +349,13 @@ const CheckoutPage = () => {
                                   if (error) setError('');
                                 }}
                                 placeholder="e.g. 2"
-                                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                                className="w-full px-3 py-2 rounded-lg text-sm bg-surface-container-highest focus:bg-surface-container-lowest focus:outline-none focus:ring-2 focus:ring-primary/25 ghost-outline-primary"
                               />
                             </div>
                           </div>
 
                           <div>
-                            <label className="block text-xs font-medium text-gray-600 mb-1">Address Line *</label>
+                            <label className="block text-xs font-medium text-on-surface-variant mb-1">Address Line *</label>
                             <input
                               type="text"
                               value={newAddressForm.addressLine}
@@ -364,7 +364,7 @@ const CheckoutPage = () => {
                                 if (error) setError('');
                               }}
                               placeholder="House no., Street, Area"
-                              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                              className="w-full px-3 py-2 rounded-lg text-sm bg-surface-container-highest focus:bg-surface-container-lowest focus:outline-none focus:ring-2 focus:ring-primary/25 ghost-outline-primary"
                             />
                           </div>
 
@@ -373,9 +373,9 @@ const CheckoutPage = () => {
                               type="checkbox"
                               checked={saveNewAddress}
                               onChange={(e) => setSaveNewAddress(e.target.checked)}
-                              className="w-4 h-4 accent-green-600 rounded"
+                              className="w-4 h-4 accent-primary rounded"
                             />
-                            <span className="text-xs text-gray-600 font-medium">
+                            <span className="text-xs text-on-surface-variant font-medium">
                               Save this address to my profile
                             </span>
                           </label>
@@ -385,14 +385,14 @@ const CheckoutPage = () => {
                   </label>
                 </>
               )}
-              {error && <p className="text-red-600 text-xs mt-1">{error}</p>}
+              {error && <p className="text-error text-xs mt-1">{error}</p>}
             </div>
           </div>
 
           {/* Delivery Notes */}
-          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden mt-3">
-            <div className="px-4 py-3 border-b border-gray-100">
-              <h3 className="font-semibold text-gray-900 text-sm">Delivery Instructions <span className="text-gray-400 font-normal">(Optional)</span></h3>
+          <div className="bg-surface-container-lowest rounded-2xl outline outline-1 outline-outline-variant/15 overflow-hidden mt-3 shadow-editorial">
+            <div className="px-4 py-3 border-b border-surface-container">
+              <h3 className="font-semibold text-on-surface text-sm">Delivery Instructions <span className="text-on-surface-variant font-normal">(Optional)</span></h3>
             </div>
             <div className="px-4 py-3">
               <textarea
@@ -400,51 +400,51 @@ const CheckoutPage = () => {
                 onChange={(e) => setDeliveryNotes(e.target.value)}
                 placeholder="e.g. Leave at the door, Ring bell twice, etc."
                 rows={2}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 resize-none bg-gray-50 focus:bg-white transition-colors"
+                className="w-full px-3 py-2 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/25 resize-none bg-surface-container-highest focus:bg-surface-container-lowest transition-colors ghost-outline-primary"
               />
             </div>
           </div>
         </form>
 
         {/* Payment Method */}
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-          <div className="px-4 py-3 border-b border-gray-100">
-            <h3 className="font-semibold text-gray-900 text-sm">Payment Method</h3>
+        <div className="bg-surface-container-lowest rounded-2xl outline outline-1 outline-outline-variant/15 overflow-hidden shadow-editorial">
+          <div className="px-4 py-3 border-b border-surface-container">
+            <h3 className="font-semibold text-on-surface text-sm">Payment Method</h3>
           </div>
           <div className="p-3 space-y-2">
             <label
-              className={`flex items-start gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all ${
-                paymentMethod === 'cod' ? 'border-green-500 bg-green-50' : 'border-gray-200 bg-white hover:border-gray-300'
+              className={`flex items-start gap-3 p-3 rounded-xl outline outline-2 cursor-pointer transition-all ${
+                paymentMethod === 'cod' ? 'outline-primary bg-secondary-container/25' : 'outline-outline-variant/20 bg-surface-container-lowest hover:outline-primary/30'
               }`}
             >
               <input type="radio" name="paymentMethod" value="cod" checked={paymentMethod === 'cod'}
-                onChange={() => setPaymentMethod('cod')} className="mt-0.5 accent-green-600" />
+                onChange={() => setPaymentMethod('cod')} className="mt-0.5 accent-primary" />
               <div className="flex-1">
                 <div className="flex items-center gap-2">
                   <span className="text-lg">💵</span>
-                  <span className="text-sm font-semibold text-gray-900">Cash on Delivery / UPI on Delivery</span>
+                  <span className="text-sm font-semibold text-on-surface">Cash on Delivery / UPI on Delivery</span>
                 </div>
-                <p className="text-xs text-gray-500 mt-0.5 ml-7">Pay cash or scan UPI QR code when your order arrives.</p>
+                <p className="text-xs text-on-surface-variant mt-0.5 ml-7">Pay cash or scan UPI QR code when your order arrives.</p>
               </div>
-              {paymentMethod === 'cod' && <span className="text-green-600 text-xs font-bold mt-0.5">✓</span>}
+              {paymentMethod === 'cod' && <span className="text-primary text-xs font-bold mt-0.5">✓</span>}
             </label>
 
             <label
-              className={`flex items-start gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all ${
-                paymentMethod === 'razorpay' ? 'border-blue-500 bg-blue-50' : 'border-gray-200 bg-white hover:border-gray-300'
+              className={`flex items-start gap-3 p-3 rounded-xl outline outline-2 cursor-pointer transition-all ${
+                paymentMethod === 'razorpay' ? 'outline-primary bg-secondary-container/25' : 'outline-outline-variant/20 bg-surface-container-lowest hover:outline-primary/30'
               }`}
             >
               <input type="radio" name="paymentMethod" value="razorpay" checked={paymentMethod === 'razorpay'}
-                onChange={() => setPaymentMethod('razorpay')} className="mt-0.5 accent-blue-600" />
+                onChange={() => setPaymentMethod('razorpay')} className="mt-0.5 accent-primary" />
               <div className="flex-1">
                 <div className="flex items-center gap-2">
                   <span className="text-lg">💳</span>
-                  <span className="text-sm font-semibold text-gray-900">Pay Online</span>
-                  <span className="text-[10px] bg-blue-100 text-blue-700 font-semibold px-1.5 py-0.5 rounded">Razorpay</span>
+                  <span className="text-sm font-semibold text-on-surface">Pay Online</span>
+                  <span className="text-[10px] bg-surface-container text-primary font-semibold px-1.5 py-0.5 rounded outline outline-1 outline-outline-variant/20">Razorpay</span>
                 </div>
-                <p className="text-xs text-gray-500 mt-0.5 ml-7">UPI, Credit/Debit Card, Netbanking — secure & instant.</p>
+                <p className="text-xs text-on-surface-variant mt-0.5 ml-7">UPI, Credit/Debit Card, Netbanking — secure & instant.</p>
               </div>
-              {paymentMethod === 'razorpay' && <span className="text-blue-600 text-xs font-bold mt-0.5">✓</span>}
+              {paymentMethod === 'razorpay' && <span className="text-primary text-xs font-bold mt-0.5">✓</span>}
             </label>
           </div>
         </div>
@@ -452,14 +452,14 @@ const CheckoutPage = () => {
 
       {/* Sticky Place Order Button */}
       <div
-        className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 z-40"
+        className="fixed bottom-0 left-0 right-0 glass-header border-t border-outline-variant/10 p-4 z-40"
         style={{ paddingBottom: 'calc(1rem + env(safe-area-inset-bottom))' }}
       >
         <button
           type="submit"
           form="checkout-form"
           disabled={loading}
-          className="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-300 text-white font-bold py-3.5 rounded-xl text-base transition-colors shadow-lg"
+          className="w-full bg-gradient-to-r from-primary to-primary-container hover:opacity-95 disabled:opacity-40 text-on-primary font-bold py-3.5 rounded-full text-base transition-opacity shadow-primary-glow"
         >
           {loading
             ? 'Processing...'
@@ -470,7 +470,7 @@ const CheckoutPage = () => {
         <button
           type="button"
           onClick={() => navigate('/')}
-          className="w-full text-gray-500 text-sm font-medium py-2 mt-1"
+          className="w-full text-on-surface-variant text-sm font-medium py-2 mt-1"
         >
           Continue Shopping
         </button>

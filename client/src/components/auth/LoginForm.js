@@ -72,24 +72,24 @@ const LoginForm = ({ onSwitchToRegister }) => {
   return (
     <div>
       <div className="mb-7">
-        <h2 className="text-2xl font-extrabold text-gray-900">Welcome back</h2>
-        <p className="text-sm text-gray-500 mt-1">Sign in to continue shopping</p>
+        <h2 className="text-2xl font-headline font-extrabold text-on-surface">Welcome back</h2>
+        <p className="text-sm text-on-surface-variant mt-1">Sign in to continue shopping</p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
         {errors.general && (
-          <div className="flex items-start gap-2.5 bg-red-50 border-l-4 border-red-400 text-red-700 text-sm px-4 py-3 rounded-xl">
+          <div className="flex items-start gap-2.5 bg-error-container/50 border-l-4 border-error text-error text-sm px-4 py-3 rounded-xl">
             <FiAlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
             <span>{errors.general}</span>
           </div>
         )}
 
         <div>
-          <label htmlFor="phone" className="text-xs font-semibold text-gray-600 uppercase tracking-wide block mb-1.5">
+          <label htmlFor="phone" className="text-xs font-semibold text-on-surface-variant uppercase tracking-wide block mb-1.5">
             Phone Number
           </label>
           <div className="relative">
-            <FiPhone className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+            <FiPhone className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-on-surface-variant pointer-events-none" />
             <input
               id="phone"
               name="phone"
@@ -99,20 +99,20 @@ const LoginForm = ({ onSwitchToRegister }) => {
               value={formData.phone}
               onChange={handleChange}
               placeholder="Enter your 10-digit number"
-              className={`w-full pl-10 pr-4 py-3 border rounded-xl text-sm bg-gray-50 focus:bg-white transition-all outline-none focus:ring-2 focus:ring-green-500/30 ${
-                errors.phone ? 'border-red-400 focus:border-red-400 focus:ring-red-400/30' : 'border-gray-200 focus:border-green-500'
+              className={`w-full pl-10 pr-4 py-3 rounded-xl text-sm bg-surface-container-highest focus:bg-surface-container-lowest transition-all outline-none ghost-outline-primary focus:ring-2 focus:ring-primary/20 ${
+                errors.phone ? 'ring-2 ring-error/40' : ''
               }`}
             />
           </div>
-          {errors.phone && <p className="text-red-500 text-xs mt-1.5 flex items-center gap-1"><FiAlertCircle className="w-3 h-3" />{errors.phone}</p>}
+          {errors.phone && <p className="text-error text-xs mt-1.5 flex items-center gap-1"><FiAlertCircle className="w-3 h-3" />{errors.phone}</p>}
         </div>
 
         <div>
-          <label htmlFor="password" className="text-xs font-semibold text-gray-600 uppercase tracking-wide block mb-1.5">
+          <label htmlFor="password" className="text-xs font-semibold text-on-surface-variant uppercase tracking-wide block mb-1.5">
             Password
           </label>
           <div className="relative">
-            <FiLock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+            <FiLock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-on-surface-variant pointer-events-none" />
             <input
               id="password"
               name="password"
@@ -120,8 +120,8 @@ const LoginForm = ({ onSwitchToRegister }) => {
               value={formData.password}
               onChange={handleChange}
               placeholder="Enter your password"
-              className={`w-full pl-10 pr-10 py-3 border rounded-xl text-sm bg-gray-50 focus:bg-white transition-all outline-none focus:ring-2 focus:ring-green-500/30 ${
-                errors.password ? 'border-red-400 focus:border-red-400 focus:ring-red-400/30' : 'border-gray-200 focus:border-green-500'
+              className={`w-full pl-10 pr-10 py-3 rounded-xl text-sm bg-surface-container-highest focus:bg-surface-container-lowest transition-all outline-none ghost-outline-primary focus:ring-2 focus:ring-primary/20 ${
+                errors.password ? 'ring-2 ring-error/40' : ''
               }`}
             />
             <button
@@ -133,13 +133,13 @@ const LoginForm = ({ onSwitchToRegister }) => {
               {showPassword ? <FiEyeOff className="w-4 h-4" /> : <FiEye className="w-4 h-4" />}
             </button>
           </div>
-          {errors.password && <p className="text-red-500 text-xs mt-1.5 flex items-center gap-1"><FiAlertCircle className="w-3 h-3" />{errors.password}</p>}
+          {errors.password && <p className="text-error text-xs mt-1.5 flex items-center gap-1"><FiAlertCircle className="w-3 h-3" />{errors.password}</p>}
         </div>
 
         <button
           type="submit"
           disabled={isLoading}
-          className="w-full bg-gradient-to-r from-green-600 to-emerald-500 hover:from-green-700 hover:to-emerald-600 active:scale-[0.98] text-white font-bold py-3 rounded-xl text-sm transition-all duration-200 shadow-md hover:shadow-lg mt-2 disabled:opacity-60 disabled:cursor-not-allowed"
+          className="w-full bg-gradient-to-r from-primary to-primary-container hover:opacity-95 active:scale-[0.98] text-on-primary font-bold py-3 rounded-full text-sm transition-all duration-200 shadow-primary-glow mt-2 disabled:opacity-60 disabled:cursor-not-allowed"
         >
           {isLoading ? (
             <span className="flex items-center justify-center gap-2">
@@ -153,12 +153,12 @@ const LoginForm = ({ onSwitchToRegister }) => {
         </button>
       </form>
 
-      <p className="mt-6 text-center text-sm text-gray-500">
+      <p className="mt-6 text-center text-sm text-on-surface-variant">
         New here?{' '}
         <button
           type="button"
           onClick={onSwitchToRegister}
-          className="text-green-600 hover:text-green-700 font-semibold hover:underline"
+          className="text-primary font-semibold hover:underline"
         >
           Create an account
         </button>

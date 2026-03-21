@@ -32,9 +32,9 @@ const LoginPage = () => {
   }
 
   return (
-    <div className="min-h-screen flex">
+    <div className="min-h-screen flex bg-surface">
       {/* Left Hero Panel — hidden on mobile */}
-      <div className="hidden lg:flex lg:w-1/2 xl:w-5/12 relative overflow-hidden bg-gradient-to-br from-green-800 via-green-600 to-emerald-500 flex-col justify-between p-12">
+      <div className="hidden lg:flex lg:w-1/2 xl:w-5/12 relative overflow-hidden bg-gradient-to-br from-primary via-primary to-primary-container flex-col justify-between p-12 text-on-primary">
         {/* Decorative blobs */}
         <div className="absolute -top-20 -left-20 w-72 h-72 bg-white/10 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute bottom-10 -right-16 w-80 h-80 bg-emerald-300/20 rounded-full blur-3xl pointer-events-none" />
@@ -42,13 +42,11 @@ const LoginPage = () => {
 
         {/* Brand */}
         <div className="relative z-10">
-          <div className="flex items-center gap-3 mb-3">
-            <div className="w-11 h-11 bg-white/20 rounded-2xl flex items-center justify-center text-2xl shadow-lg backdrop-blur-sm">
-              🌿
-            </div>
-            <span className="text-white text-2xl font-extrabold tracking-tight">CityFreshKart</span>
+          <div className="flex items-center gap-2 mb-3">
+            <span className="material-symbols-outlined text-4xl text-on-primary" aria-hidden>eco</span>
+            <span className="text-2xl font-headline font-extrabold tracking-tight">CityFreshKart</span>
           </div>
-          <p className="text-green-100 text-sm font-medium">India's freshest vegetables, delivered in 30 minutes.</p>
+          <p className="text-on-primary/90 text-sm font-medium">India&apos;s freshest produce, delivered in 30 minutes.</p>
         </div>
 
         {/* Central illustration */}
@@ -57,7 +55,7 @@ const LoginPage = () => {
           <h2 className="text-white text-3xl font-extrabold leading-tight mb-3">
             Khet Se<br />Aapki Thali Tak
           </h2>
-          <p className="text-green-100 text-sm max-w-xs leading-relaxed">
+          <p className="text-on-primary/85 text-sm max-w-xs leading-relaxed">
             Farm-fresh vegetables and fruits delivered to your doorstep. Same-day delivery — order before 11 AM!
           </p>
         </div>
@@ -69,7 +67,7 @@ const LoginPage = () => {
               <span className="text-xl flex-shrink-0 mt-0.5">{f.icon}</span>
               <div>
                 <p className="text-white text-sm font-semibold">{f.title}</p>
-                <p className="text-green-100 text-xs mt-0.5">{f.desc}</p>
+                <p className="text-on-primary/80 text-xs mt-0.5">{f.desc}</p>
               </div>
             </div>
           ))}
@@ -77,35 +75,37 @@ const LoginPage = () => {
       </div>
 
       {/* Right Form Panel */}
-      <div className="flex-1 flex flex-col justify-center items-center bg-white px-6 py-12 sm:px-12">
+      <div className="flex-1 flex flex-col justify-center items-center bg-surface px-6 py-12 sm:px-12">
         {/* Mobile brand header */}
         <div className="flex lg:hidden flex-col items-center mb-8">
-          <div className="w-14 h-14 bg-gradient-to-br from-green-600 to-emerald-500 rounded-2xl flex items-center justify-center text-3xl shadow-lg mb-3">
-            🌿
+          <div className="w-14 h-14 bg-gradient-to-br from-primary to-primary-container rounded-2xl flex items-center justify-center shadow-primary-glow mb-3">
+            <span className="material-symbols-outlined text-on-primary text-4xl">eco</span>
           </div>
-          <h1 className="text-2xl font-extrabold text-gray-900">CityFreshKart</h1>
-          <p className="text-green-600 text-sm mt-1 font-medium">Farm-fresh, delivered in 30 min</p>
+          <h1 className="text-2xl font-headline font-extrabold text-on-surface">CityFreshKart</h1>
+          <p className="text-primary text-sm mt-1 font-medium">Farm-fresh, delivered in 30 min</p>
         </div>
 
         <div className="w-full max-w-sm">
           {/* Tab switcher */}
-          <div className="flex bg-gray-100 rounded-2xl p-1 mb-8 gap-1">
+          <div className="flex bg-surface-container-low rounded-2xl p-1 mb-8 gap-1 outline outline-1 outline-outline-variant/10">
             <button
+              type="button"
               onClick={() => setIsLogin(true)}
               className={`flex-1 py-2.5 rounded-xl text-sm font-bold transition-all duration-200 ${
                 isLogin
-                  ? 'bg-white text-gray-900 shadow-sm'
-                  : 'text-gray-500 hover:text-gray-700'
+                  ? 'bg-surface-container-lowest text-on-surface shadow-editorial'
+                  : 'text-on-surface-variant hover:text-on-surface'
               }`}
             >
               Sign In
             </button>
             <button
+              type="button"
               onClick={() => setIsLogin(false)}
               className={`flex-1 py-2.5 rounded-xl text-sm font-bold transition-all duration-200 ${
                 !isLogin
-                  ? 'bg-white text-gray-900 shadow-sm'
-                  : 'text-gray-500 hover:text-gray-700'
+                  ? 'bg-surface-container-lowest text-on-surface shadow-editorial'
+                  : 'text-on-surface-variant hover:text-on-surface'
               }`}
             >
               Create Account
@@ -119,7 +119,7 @@ const LoginPage = () => {
           )}
         </div>
 
-        <p className="mt-10 text-xs text-gray-400 text-center max-w-xs">
+        <p className="mt-10 text-xs text-on-surface-variant text-center max-w-xs">
           By continuing, you agree to our Terms of Service and Privacy Policy.
         </p>
       </div>

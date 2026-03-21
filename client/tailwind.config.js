@@ -7,6 +7,53 @@ module.exports = {
   theme: {
     extend: {
       colors: {
+        // Stitch "Editorial Freshness" — shopper UI (M3-style tokens)
+        primary: '#006c49',
+        'primary-container': '#10b981',
+        'on-primary': '#ffffff',
+        'on-primary-container': '#00422b',
+        'primary-fixed': '#6ffbbe',
+        'on-primary-fixed': '#002113',
+        'on-primary-fixed-variant': '#005236',
+        secondary: '#1b6b51',
+        'on-secondary': '#ffffff',
+        'secondary-container': '#a6f2d1',
+        'on-secondary-container': '#237157',
+        'secondary-fixed': '#a6f2d1',
+        'on-secondary-fixed': '#002116',
+        'on-secondary-fixed-variant': '#00513b',
+        'secondary-fixed-dim': '#8bd6b6',
+        tertiary: '#a43a3a',
+        'on-tertiary': '#ffffff',
+        'tertiary-container': '#fc7c78',
+        'tertiary-fixed': '#ffdad7',
+        'on-tertiary-fixed': '#410005',
+        'on-tertiary-fixed-variant': '#842225',
+        'tertiary-fixed-dim': '#ffb3af',
+        error: '#ba1a1a',
+        'on-error': '#ffffff',
+        'error-container': '#ffdad6',
+        'on-error-container': '#93000a',
+        surface: '#f8f9fb',
+        'on-surface': '#191c1e',
+        'on-surface-variant': '#3c4a42',
+        'surface-variant': '#e1e2e4',
+        'surface-bright': '#f8f9fb',
+        background: '#f8f9fb',
+        'on-background': '#191c1e',
+        'surface-container': '#edeef0',
+        'surface-container-low': '#f3f4f6',
+        'surface-container-high': '#e7e8ea',
+        'surface-container-highest': '#e1e2e4',
+        'surface-container-lowest': '#ffffff',
+        'surface-dim': '#d9dadc',
+        outline: '#6c7a71',
+        'outline-variant': '#bbcabf',
+        'inverse-surface': '#2e3132',
+        'inverse-on-surface': '#f0f1f3',
+        'inverse-primary': '#4edea3',
+        'surface-tint': '#006c49',
+
         // Primary brand colors — FrashCart Green
         'fresh-green': {
           50: '#f0fdf4',
@@ -105,7 +152,10 @@ module.exports = {
         'serif': ['Nunito', 'Georgia', 'serif'],
         'mono': ['JetBrains Mono', 'monospace'],
         'display': ['Nunito', 'sans-serif'],
-        'body': ['Nunito', 'sans-serif']
+        'body': ['Nunito', 'sans-serif'],
+        headline: ['"Plus Jakarta Sans"', 'system-ui', 'sans-serif'],
+        label: ['Inter', 'system-ui', 'sans-serif'],
+        stitch: ['Inter', 'system-ui', 'sans-serif']
       },
 
       fontSize: {
@@ -141,7 +191,9 @@ module.exports = {
         'medium': '0 4px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
         'strong': '0 10px 40px -10px rgba(0, 0, 0, 0.15), 0 20px 25px -5px rgba(0, 0, 0, 0.1)',
         'glow': '0 0 20px rgba(22, 163, 74, 0.3)',
-        'glow-lg': '0 0 40px rgba(22, 163, 74, 0.4)'
+        'glow-lg': '0 0 40px rgba(22, 163, 74, 0.4)',
+        editorial: '0 12px 32px -4px rgba(0, 108, 73, 0.08)',
+        'primary-glow': '0 12px 32px -4px rgba(0, 108, 73, 0.12)'
       },
 
       animation: {
@@ -270,6 +322,14 @@ module.exports = {
             background: theme('colors.gray.300'),
             borderRadius: '3px'
           }
+        },
+        '.glass-header': {
+          backgroundColor: 'rgba(255, 255, 255, 0.82)',
+          backdropFilter: 'blur(12px)',
+          WebkitBackdropFilter: 'blur(12px)'
+        },
+        '.product-image-offset': {
+          transform: 'translateY(-8px)'
         }
       };
 

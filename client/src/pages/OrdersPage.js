@@ -58,12 +58,12 @@ const OrdersPage = () => {
 
   const getStatusColor = (status) => {
     const colors = {
-      pending: 'bg-yellow-100 text-yellow-800',
-      confirmed: 'bg-blue-100 text-blue-800',
-      delivered: 'bg-green-100 text-green-800',
-      cancelled: 'bg-red-100 text-red-800',
+      pending: 'bg-secondary-container/50 text-on-secondary-container',
+      confirmed: 'bg-surface-container text-on-surface',
+      delivered: 'bg-secondary-container text-secondary',
+      cancelled: 'bg-error-container/40 text-error',
     };
-    return colors[status] || 'bg-gray-100 text-gray-800';
+    return colors[status] || 'bg-surface-container-high text-on-surface-variant';
   };
 
   const getStatusText = (status) => STATUS_LABELS[status] || (status ? status.charAt(0).toUpperCase() + status.slice(1) : 'Unknown');
@@ -78,16 +78,16 @@ const OrdersPage = () => {
 
   return (
     <>
-      <div className="min-h-screen bg-gray-50 pt-20 pb-24 md:pb-8">
+      <div className="min-h-screen bg-surface pt-14 pb-24 md:pb-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
           <Breadcrumb />
         
         {/* Page Header */}
         <div className="mb-6">
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-1">
+          <h1 className="text-2xl sm:text-3xl font-headline font-bold text-on-surface mb-1">
             My Orders
           </h1>
-          <p className="text-sm text-gray-500">
+          <p className="text-sm text-on-surface-variant">
             Track and manage all your orders
           </p>
         </div>
@@ -101,10 +101,11 @@ const OrdersPage = () => {
                 setStatusFilter(status);
                 setPage(1);
               }}
-              className={`px-4 py-2 rounded-lg font-medium text-sm transition-all ${
+              type="button"
+              className={`px-4 py-2 rounded-full font-medium text-sm transition-all ${
                 statusFilter === status
-                  ? 'bg-fresh-green text-white'
-                  : 'bg-white text-gray-700 border border-gray-200 hover:border-fresh-green hover:text-fresh-green'
+                  ? 'bg-gradient-to-r from-primary to-primary-container text-on-primary shadow-primary-glow'
+                  : 'bg-surface-container-lowest text-on-surface outline outline-1 outline-outline-variant/20 hover:outline-primary/40'
               }`}
             >
               {status === 'all' ? 'All Orders' : getStatusText(status)}
@@ -114,7 +115,7 @@ const OrdersPage = () => {
 
         {/* Error Message */}
         {error && (
-          <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">
+          <div className="mb-6 bg-error-container/30 outline outline-1 outline-error/30 rounded-xl p-4 text-error">
             {error}
           </div>
         )}
@@ -125,13 +126,13 @@ const OrdersPage = () => {
             orders.map((order) => (
               <div
                 key={order.id || order.order_id}
-                className="bg-white rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition-shadow overflow-hidden"
+                className="bg-surface-container-lowest rounded-2xl outline outline-1 outline-outline-variant/15 shadow-editorial hover:shadow-primary-glow transition-shadow overflow-hidden"
               >
                 <div className="p-4 sm:p-6">
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
                     {/* Order ID & Status */}
                     <div>
-                      <h3 className="text-lg font-semibold text-gray-900">
+                      <h3 className="text-lg font-headline font-semibold text-on-surface">
                         Order #{order.order_number || order.id}
                       </h3>
                       <p className="text-sm text-gray-500 mt-1">
@@ -149,16 +150,16 @@ const OrdersPage = () => {
                   </div>
 
                   {/* Order Details */}
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-4 py-4 border-t border-gray-100">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-4 py-4 border-t border-surface-container">
                     <div>
-                      <p className="text-xs text-gray-500 uppercase font-semibold">Items</p>
-                      <p className="text-lg font-bold text-gray-900 mt-1">
+                      <p className="text-xs text-on-surface-variant uppercase font-semibold">Items</p>
+                      <p className="text-lg font-bold text-on-surface mt-1">
                         {order.item_count || order.items?.length || order.total_items || '—'}
                       </p>
                     </div>
                     <div>
-                      <p className="text-xs text-gray-500 uppercase font-semibold">Total</p>
-                      <p className="text-lg font-bold text-gray-900 mt-1">
+                      <p className="text-xs text-on-surface-variant uppercase font-semibold">Total</p>
+                      <p className="text-lg font-bold text-primary mt-1">
                         {formatPrice(order.total_price || order.total_amount || 0)}
                       </p>
                     </div>
@@ -172,15 +173,15 @@ const OrdersPage = () => {
 
                   {/* Items Preview */}
                   {order.items && order.items.length > 0 && (
-                    <div className="mb-4 pt-4 border-t border-gray-100">
+                    <div className="mb-4 pt-4 border-t border-surface-container">
                       <div className="space-y-2">
                         {order.items.slice(0, 2).map((item, idx) => (
-                          <div key={idx} className="text-sm text-gray-600">
+                          <div key={idx} className="text-sm text-on-surface-variant">
                             • {item.product_name || item.name} ({item.weight || '1'} kg)
                           </div>
                         ))}
                         {order.items.length > 2 && (
-                          <div className="text-sm text-gray-500">
+                          <div className="text-sm text-on-surface-variant">
                             +{order.items.length - 2} more item{order.items.length - 2 > 1 ? 's' : ''}
                           </div>
                         )}
@@ -211,22 +212,22 @@ const OrdersPage = () => {
               </div>
             ))
           ) : (
-            <div className="bg-white rounded-lg border border-gray-200 p-12 text-center">
+            <div className="bg-surface-container-lowest rounded-2xl outline outline-1 outline-outline-variant/15 p-12 text-center shadow-editorial">
               <div className="mb-4">
-                <svg className="w-16 h-16 text-gray-300 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-16 h-16 text-on-surface-variant mx-auto opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
                 </svg>
               </div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">
+              <h3 className="text-lg font-headline font-semibold text-on-surface mb-2">
                 {statusFilter === 'all' ? 'No Orders Yet' : `No ${statusFilter} Orders`}
               </h3>
-              <p className="text-gray-500 mb-6">
+              <p className="text-on-surface-variant mb-6">
                 {statusFilter === 'all' 
                   ? "You haven't placed any orders yet. Start shopping for fresh produce!"
                   : `You don't have any ${statusFilter} orders.`
                 }
               </p>
-              <Button onClick={() => navigate('/products')} className="mx-auto">
+              <Button onClick={() => navigate('/')} className="mx-auto">
                 🛒 Start Shopping
               </Button>
             </div>
@@ -246,12 +247,13 @@ const OrdersPage = () => {
             <div className="flex gap-1">
               {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
                 <button
+                  type="button"
                   key={p}
                   onClick={() => setPage(p)}
-                  className={`px-3 py-2 rounded-lg font-medium transition-colors ${
+                  className={`px-3 py-2 rounded-full font-medium transition-colors ${
                     page === p
-                      ? 'bg-fresh-green text-white'
-                      : 'border border-gray-200 text-gray-700 hover:bg-gray-50'
+                      ? 'bg-gradient-to-r from-primary to-primary-container text-on-primary shadow-primary-glow'
+                      : 'outline outline-1 outline-outline-variant/20 text-on-surface hover:bg-surface-container-low'
                   }`}
                 >
                   {p}
@@ -259,9 +261,10 @@ const OrdersPage = () => {
               ))}
             </div>
             <button
+              type="button"
               onClick={() => setPage(Math.min(totalPages, page + 1))}
               disabled={page === totalPages}
-              className="px-4 py-2 rounded-lg border border-gray-200 text-gray-700 font-medium hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-4 py-2 rounded-full outline outline-1 outline-outline-variant/20 text-on-surface font-medium hover:bg-surface-container-low disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Next
             </button>

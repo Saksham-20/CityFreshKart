@@ -29,21 +29,21 @@ const MobileBottomNav = () => {
 
   return (
     <nav
-      className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur border-t border-gray-100 shadow-[0_-2px_10px_rgba(0,0,0,0.08)]"
+      className="md:hidden fixed bottom-0 left-0 right-0 z-40 glass-header border-t border-outline-variant/10 shadow-[0_-8px_32px_-4px_rgba(0,108,73,0.08)]"
       style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
     >
       <div className="flex justify-around items-center h-[4.5rem] px-2">
 
         {/* Shop */}
         <Link
-          to="/products"
+          to="/"
           className={`flex flex-col items-center py-2 px-3 rounded-xl transition-all duration-200 ${
-            isActive('/products') || location.pathname === '/'
-              ? 'text-green-600 bg-green-50'
-              : 'text-gray-500 hover:text-green-600 hover:bg-green-50'
+            location.pathname === '/'
+              ? 'text-primary bg-secondary-container/35'
+              : 'text-on-surface-variant hover:text-primary hover:bg-secondary-container/20'
           }`}
         >
-          <FiHome size={21} strokeWidth={isActive('/products') || location.pathname === '/' ? 2.5 : 1.75} />
+          <FiHome size={21} strokeWidth={location.pathname === '/' ? 2.5 : 1.75} />
           <span className="text-xs mt-0.5 font-medium">Shop</span>
         </Link>
 
@@ -52,8 +52,8 @@ const MobileBottomNav = () => {
           to="/cart"
           className={`flex flex-col items-center py-2 px-3 rounded-xl transition-all duration-200 relative ${
             isActive('/cart')
-              ? 'text-green-600 bg-green-50'
-              : 'text-gray-500 hover:text-green-600 hover:bg-green-50'
+              ? 'text-primary bg-secondary-container/35'
+              : 'text-on-surface-variant hover:text-primary hover:bg-secondary-container/20'
           }`}
         >
           <div className="relative">
@@ -72,8 +72,8 @@ const MobileBottomNav = () => {
           to="/orders"
           className={`flex flex-col items-center py-2 px-3 rounded-xl transition-all duration-200 ${
             isActive('/orders')
-              ? 'text-green-600 bg-green-50'
-              : 'text-gray-500 hover:text-green-600 hover:bg-green-50'
+              ? 'text-primary bg-secondary-container/35'
+              : 'text-on-surface-variant hover:text-primary hover:bg-secondary-container/20'
           }`}
         >
           <FiList size={21} strokeWidth={isActive('/orders') ? 2.5 : 1.75} />
@@ -85,8 +85,8 @@ const MobileBottomNav = () => {
           to={isAuthenticated ? '/profile' : '/login'}
           className={`flex flex-col items-center py-2 px-3 rounded-xl transition-all duration-200 ${
             isActive('/profile')
-              ? 'text-green-600 bg-green-50'
-              : 'text-gray-500 hover:text-green-600 hover:bg-green-50'
+              ? 'text-primary bg-secondary-container/35'
+              : 'text-on-surface-variant hover:text-primary hover:bg-secondary-container/20'
           }`}
         >
           <FiUser size={21} strokeWidth={isActive('/profile') ? 2.5 : 1.75} />

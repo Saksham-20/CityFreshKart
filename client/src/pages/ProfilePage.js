@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import useAuth from '../hooks/useAuth';
-import Navbar from '../components/layout/Navbar';
 import Button from '../components/ui/Button';
 import Loading from '../components/ui/Loading';
 import Breadcrumb from '../components/common/Breadcrumb';
@@ -267,17 +266,16 @@ const ProfilePage = () => {
 
   return (
     <>
-      <Navbar onCartClick={() => navigate('/cart')} />
-      <div className="min-h-screen bg-gray-50 pt-20 pb-24 md:pb-8">
+      <div className="min-h-screen bg-surface pt-14 pb-24 md:pb-8">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
           <Breadcrumb />
 
           {/* Page Header */}
           <div className="mb-8">
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-1">
+          <h1 className="text-2xl sm:text-3xl font-headline font-bold text-on-surface mb-1">
             My Profile
           </h1>
-          <p className="text-sm text-gray-500">
+          <p className="text-sm text-on-surface-variant">
             Manage your account information and settings
           </p>
         </div>
@@ -285,14 +283,14 @@ const ProfilePage = () => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Sidebar */}
           <div className="lg:col-span-1">
-            <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6 sticky top-24">
+            <div className="bg-surface-container-lowest rounded-2xl outline outline-1 outline-outline-variant/15 shadow-editorial p-6 sticky top-24">
               {/* Avatar */}
               <div className="text-center mb-6">
-                <div className="w-24 h-24 bg-fresh-green text-white rounded-full flex items-center justify-center text-4xl font-bold mx-auto mb-4">
+                <div className="w-24 h-24 bg-gradient-to-br from-primary to-primary-container text-on-primary rounded-full flex items-center justify-center text-4xl font-headline font-bold mx-auto mb-4 shadow-primary-glow">
                   {(user?.name || 'U').charAt(0).toUpperCase()}
                 </div>
-                <h2 className="font-semibold text-gray-900">{user?.name || 'User'}</h2>
-                <p className="text-sm text-gray-500">{user?.email || user?.phone}</p>
+                <h2 className="font-semibold text-on-surface">{user?.name || 'User'}</h2>
+                <p className="text-sm text-on-surface-variant">{user?.email || user?.phone}</p>
               </div>
 
               {/* Menu */}
@@ -305,20 +303,22 @@ const ProfilePage = () => {
                 ].map(item => (
                   <button
                     key={item.id}
+                    type="button"
                     onClick={() => setActiveSection(item.id)}
-                    className={`w-full text-left px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    className={`w-full text-left px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
                       activeSection === item.id
-                        ? 'bg-green-50 text-fresh-green'
-                        : 'text-gray-700 hover:bg-gray-50'
+                        ? 'bg-secondary-container/40 text-primary'
+                        : 'text-on-surface hover:bg-surface-container-low'
                     }`}
                   >
                     {item.icon} {item.label}
                   </button>
                 ))}
-                <div className="border-t border-gray-100 pt-1 mt-1">
+                <div className="border-t border-surface-container pt-1 mt-1">
                   <button
+                    type="button"
                     onClick={handleLogout}
-                    className="w-full text-left px-4 py-2 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50 transition-colors"
+                    className="w-full text-left px-4 py-2 rounded-xl text-sm font-medium text-error hover:bg-error-container/30 transition-colors"
                   >
                     🚪 Logout
                   </button>
@@ -332,13 +332,13 @@ const ProfilePage = () => {
 
             {/* ── Profile Information ── */}
             {activeSection === 'profile' && (
-              <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
+              <div className="bg-surface-container-lowest rounded-2xl outline outline-1 outline-outline-variant/15 shadow-editorial p-6">
                 <div className="flex items-center justify-between mb-6">
-                  <h3 className="text-lg font-semibold text-gray-900">Profile Information</h3>
+                  <h3 className="text-lg font-semibold text-on-surface">Profile Information</h3>
                   {!editMode && (
                     <button
                       onClick={() => setEditMode(true)}
-                      className="text-sm font-medium text-fresh-green hover:text-fresh-green-dark transition-colors"
+                      className="text-sm font-medium text-fresh-green hover:text-primary transition-colors"
                     >
                       Edit
                     </button>
@@ -348,38 +348,38 @@ const ProfilePage = () => {
                 {editMode ? (
                   <div className="space-y-4">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Full Name</label>
+                      <label className="block text-sm font-medium text-on-surface mb-2">Full Name</label>
                       <input type="text" name="name" value={formData.name} onChange={handleInputChange}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fresh-green focus:border-transparent outline-none"
+                        className="w-full px-4 py-2 rounded-lg bg-surface-container-highest focus:ring-2 focus:ring-2 focus:ring-primary/25 ghost-outline-primary outline-none"
                         placeholder="Your name" />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Email Address</label>
+                      <label className="block text-sm font-medium text-on-surface mb-2">Email Address</label>
                       <input type="email" name="email" value={formData.email} onChange={handleInputChange}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fresh-green focus:border-transparent outline-none"
+                        className="w-full px-4 py-2 rounded-lg bg-surface-container-highest focus:ring-2 focus:ring-2 focus:ring-primary/25 ghost-outline-primary outline-none"
                         placeholder="your@email.com" />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Phone Number (Cannot be changed)</label>
+                      <label className="block text-sm font-medium text-on-surface mb-2">Phone Number (Cannot be changed)</label>
                       <input type="tel" value={formData.phone} disabled
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-700 outline-none" />
+                        className="w-full px-4 py-2 rounded-lg bg-surface-container-highest bg-gray-50 text-on-surface outline-none" />
                     </div>
                     <div className="flex gap-3 pt-4">
                       <Button onClick={handleSaveProfile} loading={loading} className="flex-1">Save Changes</Button>
                       <button onClick={() => { setEditMode(false); setFormData({ name: user?.name || '', email: user?.email || '', phone: user?.phone || '' }); }}
-                        className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50 transition-colors">
+                        className="flex-1 px-4 py-2 rounded-lg bg-surface-container-highest text-on-surface font-medium hover:bg-gray-50 transition-colors">
                         Cancel
                       </button>
                     </div>
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    <div><p className="text-sm font-medium text-gray-500 mb-1">Full Name</p><p className="text-gray-900">{profile.name || 'Not provided'}</p></div>
-                    <div><p className="text-sm font-medium text-gray-500 mb-1">Email Address</p><p className="text-gray-900">{profile.email || 'Not provided'}</p></div>
-                    <div><p className="text-sm font-medium text-gray-500 mb-1">Phone Number</p><p className="text-gray-900">{profile.phone || 'Not provided'}</p></div>
+                    <div><p className="text-sm font-medium text-on-surface-variant mb-1">Full Name</p><p className="text-on-surface">{profile.name || 'Not provided'}</p></div>
+                    <div><p className="text-sm font-medium text-on-surface-variant mb-1">Email Address</p><p className="text-on-surface">{profile.email || 'Not provided'}</p></div>
+                    <div><p className="text-sm font-medium text-on-surface-variant mb-1">Phone Number</p><p className="text-on-surface">{profile.phone || 'Not provided'}</p></div>
                     <div>
-                      <p className="text-sm font-medium text-gray-500 mb-1">Member Since</p>
-                      <p className="text-gray-900">
+                      <p className="text-sm font-medium text-on-surface-variant mb-1">Member Since</p>
+                      <p className="text-on-surface">
                         {profile.created_at ? new Date(profile.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }) : 'Unknown'}
                       </p>
                     </div>
@@ -390,9 +390,9 @@ const ProfilePage = () => {
 
             {/* ── Saved Addresses ── */}
             {activeSection === 'addresses' && (
-              <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
+              <div className="bg-surface-container-lowest rounded-2xl outline outline-1 outline-outline-variant/15 shadow-editorial p-6">
                 <div className="flex items-center justify-between mb-6">
-                  <h3 className="text-lg font-semibold text-gray-900">Saved Addresses</h3>
+                  <h3 className="text-lg font-semibold text-on-surface">Saved Addresses</h3>
                   {!showAddressForm && (
                     <button onClick={() => openAddressForm()}
                       className="text-sm font-medium text-fresh-green hover:underline">
@@ -404,47 +404,47 @@ const ProfilePage = () => {
                 {/* Add / Edit Form */}
                 {showAddressForm && (
                   <div className="mb-6 p-4 bg-gray-50 rounded-xl border border-gray-200 space-y-3">
-                    <h4 className="font-semibold text-gray-800 text-sm">{editingAddress ? 'Edit Address' : 'Add New Address'}</h4>
+                    <h4 className="font-semibold text-on-surface text-sm">{editingAddress ? 'Edit Address' : 'Add New Address'}</h4>
                     <div>
-                      <label className="block text-xs font-medium text-gray-600 mb-1">Address Line *</label>
+                      <label className="block text-xs font-medium text-on-surface-variant mb-1">Address Line *</label>
                       <input type="text" name="addressLine" value={addressForm.addressLine} onChange={handleAddressFormChange}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-fresh-green focus:border-transparent outline-none"
+                        className="w-full px-3 py-2 rounded-lg bg-surface-container-highest text-sm focus:ring-2 focus:ring-2 focus:ring-primary/25 ghost-outline-primary outline-none"
                         placeholder="House no., Street, Area" />
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-gray-600 mb-1">House Number *</label>
+                      <label className="block text-xs font-medium text-on-surface-variant mb-1">House Number *</label>
                       <input
                         type="text"
                         name="houseNumber"
                         value={addressForm.houseNumber}
                         onChange={handleAddressFormChange}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-fresh-green focus:border-transparent outline-none"
+                        className="w-full px-3 py-2 rounded-lg bg-surface-container-highest text-sm focus:ring-2 focus:ring-2 focus:ring-primary/25 ghost-outline-primary outline-none"
                         placeholder="e.g. 12A"
                       />
                     </div>
                     <div className="grid grid-cols-2 gap-3">
                       <div>
-                        <label className="block text-xs font-medium text-gray-600 mb-1">Floor</label>
+                        <label className="block text-xs font-medium text-on-surface-variant mb-1">Floor</label>
                         <input
                           type="text"
                           name="floor"
                           value={addressForm.floor}
                           onChange={handleAddressFormChange}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-fresh-green focus:border-transparent outline-none"
+                          className="w-full px-3 py-2 rounded-lg bg-surface-container-highest text-sm focus:ring-2 focus:ring-2 focus:ring-primary/25 ghost-outline-primary outline-none"
                           placeholder="e.g. 2"
                         />
                       </div>
                     </div>
                     <label className="flex items-center gap-2 cursor-pointer">
                       <input type="checkbox" name="isDefault" checked={addressForm.isDefault} onChange={handleAddressFormChange} className="w-4 h-4 accent-green-600" />
-                      <span className="text-sm text-gray-700">Set as default delivery address</span>
+                      <span className="text-sm text-on-surface">Set as default delivery address</span>
                     </label>
                     <div className="flex gap-3 pt-2">
                       <Button onClick={handleSaveAddress} loading={addressLoading} className="flex-1 text-sm py-2">
                         {editingAddress ? 'Update Address' : 'Save Address'}
                       </Button>
                       <button onClick={() => setShowAddressForm(false)}
-                        className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 text-sm font-medium hover:bg-gray-50 transition-colors">
+                        className="flex-1 px-4 py-2 rounded-lg bg-surface-container-highest text-on-surface text-sm font-medium hover:bg-gray-50 transition-colors">
                         Cancel
                       </button>
                     </div>
@@ -453,29 +453,29 @@ const ProfilePage = () => {
 
                 {/* Address List */}
                 {addressLoading && !showAddressForm ? (
-                  <div className="text-center py-8 text-gray-400">Loading addresses...</div>
+                  <div className="text-center py-8 text-on-surface-variant">Loading addresses...</div>
                 ) : addresses.length === 0 && !showAddressForm ? (
                   <div className="text-center py-10">
                     <div className="text-4xl mb-3">📍</div>
-                    <p className="text-gray-500 text-sm mb-4">No saved addresses yet.</p>
+                    <p className="text-on-surface-variant text-sm mb-4">No saved addresses yet.</p>
                     <button onClick={() => openAddressForm()}
-                      className="px-4 py-2 bg-fresh-green text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors">
+                      className="px-4 py-2 bg-gradient-to-r from-primary to-primary-container text-on-primary rounded-lg text-sm font-medium hover:opacity-95 transition-colors">
                       Add Your First Address
                     </button>
                   </div>
                 ) : (
                   <div className="space-y-3">
                     {addresses.map(addr => (
-                      <div key={addr.id} className={`p-4 rounded-xl border-2 ${addr.is_default ? 'border-fresh-green bg-green-50' : 'border-gray-200 bg-white'}`}>
+                      <div key={addr.id} className={`p-4 rounded-xl border-2 ${addr.is_default ? 'outline-primary bg-secondary-container/20' : 'outline-outline-variant/20 bg-surface-container-lowest'}`}>
                         <div className="flex items-start justify-between gap-3">
                           <div className="flex-1">
                             <div className="flex items-center gap-2 mb-1">
-                              <p className="font-semibold text-gray-900 text-sm">Saved Address</p>
+                              <p className="font-semibold text-on-surface text-sm">Saved Address</p>
                               {addr.is_default && (
-                                <span className="text-[10px] bg-fresh-green text-white px-2 py-0.5 rounded-full font-semibold">Default</span>
+                                <span className="text-[10px] bg-gradient-to-r from-primary to-primary-container text-on-primary px-2 py-0.5 rounded-full font-semibold">Default</span>
                               )}
                             </div>
-                            <p className="text-sm text-gray-600">
+                            <p className="text-sm text-on-surface-variant">
                               {[addr.house_number, addr.floor ? `Floor ${addr.floor}` : '', addr.address_line]
                                 .filter(Boolean)
                                 .join(', ')}
@@ -501,20 +501,20 @@ const ProfilePage = () => {
 
             {/* ── Orders ── */}
             {activeSection === 'orders' && (
-              <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
+              <div className="bg-surface-container-lowest rounded-2xl outline outline-1 outline-outline-variant/15 shadow-editorial overflow-hidden">
                 <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-                  <h3 className="text-lg font-semibold text-gray-900">Recent Orders</h3>
+                  <h3 className="text-lg font-semibold text-on-surface">Recent Orders</h3>
                   <button onClick={() => navigate('/orders')}
                     className="text-sm text-green-600 hover:text-green-700 font-medium">View All →</button>
                 </div>
                 {ordersLoading ? (
-                  <div className="py-12 text-center text-gray-400">Loading orders…</div>
+                  <div className="py-12 text-center text-on-surface-variant">Loading orders…</div>
                 ) : recentOrders.length === 0 ? (
                   <div className="py-12 text-center">
                     <div className="text-4xl mb-3">📦</div>
-                    <p className="text-gray-500 text-sm">No orders yet.</p>
+                    <p className="text-on-surface-variant text-sm">No orders yet.</p>
                     <button onClick={() => navigate('/products')}
-                      className="mt-4 px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors">
+                      className="mt-4 px-4 py-2 bg-gradient-to-r from-primary to-primary-container text-on-primary rounded-lg text-sm font-medium hover:opacity-95 transition-colors">
                       Start Shopping
                     </button>
                   </div>
@@ -523,17 +523,17 @@ const ProfilePage = () => {
                     {recentOrders.map(order => (
                       <div key={order.id} className="px-6 py-4 flex items-center gap-4 hover:bg-gray-50 transition-colors">
                         <div className="flex-1 min-w-0">
-                          <p className="font-semibold text-gray-900 text-sm">#{order.order_number || order.id?.slice(0, 8)}</p>
-                          <p className="text-xs text-gray-500 mt-0.5">
+                          <p className="font-semibold text-on-surface text-sm">#{order.order_number || order.id?.slice(0, 8)}</p>
+                          <p className="text-xs text-on-surface-variant mt-0.5">
                             {new Date(order.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
                             {' · '}
                             {order.item_count || '?'} item{(order.item_count || 0) !== 1 ? 's' : ''}
                           </p>
                         </div>
-                        <p className="font-bold text-gray-900 text-sm">
+                        <p className="font-bold text-on-surface text-sm">
                           ₹{parseFloat(order.total_price || 0).toLocaleString('en-IN')}
                         </p>
-                        <span className={`inline-flex px-2.5 py-1 rounded-full text-[11px] font-semibold ${ORDER_STATUS_COLORS[order.status] || 'bg-gray-100 text-gray-800'}`}>
+                        <span className={`inline-flex px-2.5 py-1 rounded-full text-[11px] font-semibold ${ORDER_STATUS_COLORS[order.status] || 'bg-gray-100 text-on-surface'}`}>
                           {ORDER_STATUS_LABELS[order.status] || order.status}
                         </span>
                         <button onClick={() => navigate(`/orders/${order.id}`)}
@@ -549,20 +549,20 @@ const ProfilePage = () => {
 
             {/* ── Security ── */}
             {activeSection === 'security' && (
-              <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-6">Security</h3>
+              <div className="bg-surface-container-lowest rounded-2xl outline outline-1 outline-outline-variant/15 shadow-editorial p-6">
+                <h3 className="text-lg font-semibold text-on-surface mb-6">Security</h3>
                 {!showPasswordForm ? (
                   <div>
-                    <p className="text-sm text-gray-600 mb-4">Manage your account security by changing your password regularly.</p>
+                    <p className="text-sm text-on-surface-variant mb-4">Manage your account security by changing your password regularly.</p>
                     <div className="flex flex-wrap gap-3">
                       <button onClick={() => setShowPasswordForm(true)}
-                        className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50 transition-colors">
+                        className="px-4 py-2 rounded-lg bg-surface-container-highest text-on-surface font-medium hover:bg-gray-50 transition-colors">
                         Change Password
                       </button>
                       <button
                         onClick={handleEnableNotifications}
                         disabled={notificationLoading}
-                        className="px-4 py-2 border border-green-300 rounded-lg text-green-700 font-medium hover:bg-green-50 transition-colors disabled:opacity-60"
+                        className="px-4 py-2 outline outline-2 outline-primary/40 rounded-lg text-primary font-medium hover:bg-secondary-container/30 transition-colors disabled:opacity-60"
                       >
                         {notificationLoading ? 'Enabling...' : 'Enable Push Notifications'}
                       </button>
@@ -576,16 +576,16 @@ const ProfilePage = () => {
                       { label: 'Confirm Password', name: 'confirmPassword', placeholder: 'Confirm new password' },
                     ].map(field => (
                       <div key={field.name}>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">{field.label}</label>
+                        <label className="block text-sm font-medium text-on-surface mb-2">{field.label}</label>
                         <input type="password" name={field.name} value={passwordData[field.name]} onChange={handlePasswordChange}
-                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fresh-green focus:border-transparent outline-none"
+                          className="w-full px-4 py-2 rounded-lg bg-surface-container-highest focus:ring-2 focus:ring-2 focus:ring-primary/25 ghost-outline-primary outline-none"
                           placeholder={field.placeholder} />
                       </div>
                     ))}
                     <div className="flex gap-3 pt-4">
                       <Button onClick={handleChangePassword} loading={loading} className="flex-1">Update Password</Button>
                       <button onClick={() => { setShowPasswordForm(false); setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' }); }}
-                        className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50 transition-colors">
+                        className="flex-1 px-4 py-2 rounded-lg bg-surface-container-highest text-on-surface font-medium hover:bg-gray-50 transition-colors">
                         Cancel
                       </button>
                     </div>

@@ -41,14 +41,14 @@ const OrderConfirmationPage = () => {
 
   const getStatusColor = (status) => {
     const colors = {
-      pending: 'bg-yellow-100 text-yellow-800',
-      processing: 'bg-blue-100 text-blue-800',
-      shipped: 'bg-purple-100 text-purple-800',
-      delivered: 'bg-green-100 text-green-800',
-      cancelled: 'bg-red-100 text-red-800',
-      refunded: 'bg-gray-100 text-gray-800'
+      pending: 'bg-secondary-container/50 text-on-secondary-container',
+      processing: 'bg-surface-container text-on-surface',
+      shipped: 'bg-primary-fixed/30 text-on-primary-fixed-variant',
+      delivered: 'bg-secondary-container text-secondary',
+      cancelled: 'bg-error-container/50 text-error',
+      refunded: 'bg-surface-container-high text-on-surface-variant'
     };
-    return colors[status] || 'bg-gray-100 text-gray-800';
+    return colors[status] || 'bg-surface-container text-on-surface-variant';
   };
 
   const getStatusText = (status) => {
@@ -61,16 +61,16 @@ const OrderConfirmationPage = () => {
 
   if (error || !order) {
     return (
-      <div className="min-h-screen bg-gray-50 pt-20">
+      <div className="min-h-screen bg-surface pt-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="text-center">
-            <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100 mb-4">
-              <svg className="h-6 w-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-error-container/40 mb-4">
+              <svg className="h-6 w-6 text-error" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
             </div>
-            <h3 className="text-lg font-medium text-gray-900 mb-2">Order Not Found</h3>
-            <p className="text-sm text-gray-500 mb-6">{error || 'The order you are looking for does not exist.'}</p>
+            <h3 className="text-lg font-headline font-medium text-on-surface mb-2">Order Not Found</h3>
+            <p className="text-sm text-on-surface-variant mb-6">{error || 'The order you are looking for does not exist.'}</p>
             <Button onClick={() => navigate('/orders')}>
               View All Orders
             </Button>
@@ -99,8 +99,8 @@ const OrderConfirmationPage = () => {
               </svg>
             </div>
             <div className="ml-3">
-              <h3 className="text-sm font-medium text-green-800">Order Placed Successfully!</h3>
-              <div className="mt-2 text-sm text-green-700">
+              <h3 className="text-sm font-medium text-primary">Order Placed Successfully!</h3>
+              <div className="mt-2 text-sm text-on-surface-variant">
                 <p>Your order has been received and is being processed. You will be notified when your order status is updated.</p>
               </div>
             </div>
@@ -111,28 +111,28 @@ const OrderConfirmationPage = () => {
           {/* Order Details */}
           <div className="lg:col-span-2 space-y-6">
             {/* Order Information */}
-            <div className="bg-white rounded-lg shadow p-6">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Order Information</h3>
+            <div className="bg-surface-container-lowest rounded-2xl outline outline-1 outline-outline-variant/15 shadow-editorial p-6">
+              <h3 className="text-lg font-headline font-medium text-on-surface mb-4">Order Information</h3>
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
-                  <p className="text-gray-500">Order Number</p>
-                  <p className="font-medium text-gray-900">#{order.orderNumber || order.order_number}</p>
+                  <p className="text-on-surface-variant">Order Number</p>
+                  <p className="font-medium text-on-surface">#{order.orderNumber || order.order_number}</p>
                 </div>
                 <div>
-                  <p className="text-gray-500">Order Date</p>
-                  <p className="font-medium text-gray-900">
+                  <p className="text-on-surface-variant">Order Date</p>
+                  <p className="font-medium text-on-surface">
                     {new Date(order.createdAt || order.created_at).toLocaleDateString()}
                   </p>
                 </div>
                 <div>
-                  <p className="text-gray-500">Status</p>
+                  <p className="text-on-surface-variant">Status</p>
                   <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(order.status)}`}>
                     {getStatusText(order.status)}
                   </span>
                 </div>
                 <div>
-                  <p className="text-gray-500">Total Amount</p>
-                  <p className="font-medium text-gray-900">
+                  <p className="text-on-surface-variant">Total Amount</p>
+                  <p className="font-medium text-on-surface">
                     ₹{(order.total_price || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </p>
                 </div>
@@ -140,11 +140,11 @@ const OrderConfirmationPage = () => {
             </div>
 
             {/* Order Items */}
-            <div className="bg-white rounded-lg shadow p-6">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Order Items</h3>
+            <div className="bg-surface-container-lowest rounded-2xl outline outline-1 outline-outline-variant/15 shadow-editorial p-6">
+              <h3 className="text-lg font-headline font-medium text-on-surface mb-4">Order Items</h3>
               <div className="space-y-4">
                 {(order.items || []).map((item, index) => (
-                  <div key={index} className="flex items-center space-x-4 p-4 bg-gray-50 rounded-lg">
+                  <div key={index} className="flex items-center space-x-4 p-4 bg-surface-container-low rounded-xl outline outline-1 outline-outline-variant/10">
                     <img
                       src={item.product_image || '/default-product.png'}
                       alt={item.product_name}
@@ -152,11 +152,11 @@ const OrderConfirmationPage = () => {
                       onError={(e) => { e.target.src = '/default-product.png'; }}
                     />
                     <div className="flex-1">
-                      <p className="font-medium text-gray-900">{item.product_name}</p>
-                      <p className="text-sm text-gray-500">{item.quantity_kg} kg × ₹{(item.price_per_kg || 0).toLocaleString('en-IN')}/kg</p>
+                      <p className="font-medium text-on-surface">{item.product_name}</p>
+                      <p className="text-sm text-on-surface-variant">{item.quantity_kg} kg × ₹{(item.price_per_kg || 0).toLocaleString('en-IN')}/kg</p>
                     </div>
                     <div className="text-right">
-                      <p className="font-medium text-gray-900">
+                      <p className="font-medium text-on-surface">
                         ₹{(item.total_price || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </p>
                     </div>
@@ -167,34 +167,34 @@ const OrderConfirmationPage = () => {
 
             {/* Delivery Address */}
             {order.delivery_address && (
-              <div className="bg-white rounded-lg shadow p-6">
-                <h3 className="text-lg font-medium text-gray-900 mb-4">Delivery Address</h3>
-                <p className="text-sm text-gray-700 whitespace-pre-line">{order.delivery_address}</p>
+              <div className="bg-surface-container-lowest rounded-2xl outline outline-1 outline-outline-variant/15 shadow-editorial p-6">
+                <h3 className="text-lg font-headline font-medium text-on-surface mb-4">Delivery Address</h3>
+                <p className="text-sm text-on-surface-variant whitespace-pre-line">{order.delivery_address}</p>
               </div>
             )}
           </div>
 
           {/* Order Summary */}
           <div className="lg:col-span-1">
-            <div className="bg-white rounded-lg shadow p-6 sticky top-4">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Order Summary</h3>
+            <div className="bg-surface-container-lowest rounded-2xl outline outline-1 outline-outline-variant/15 shadow-editorial p-6 sticky top-4">
+              <h3 className="text-lg font-headline font-medium text-on-surface mb-4">Order Summary</h3>
               <div className="space-y-3">
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Items ({(order.items || []).length})</span>
-                  <span className="text-gray-900">
+                  <span className="text-on-surface-variant">Items ({(order.items || []).length})</span>
+                  <span className="text-on-surface">
                     ₹{(order.subtotal || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Delivery</span>
-                  <span className="text-gray-900">
+                  <span className="text-on-surface-variant">Delivery</span>
+                  <span className="text-on-surface">
                     {(order.delivery_fee || 0) === 0 ? 'Free' : `₹${(order.delivery_fee || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
                   </span>
                 </div>
-                <div className="border-t pt-3">
+                <div className="border-t border-surface-container pt-3">
                   <div className="flex justify-between text-lg font-semibold">
-                    <span className="text-gray-900">Total</span>
-                    <span className="text-gray-900">
+                    <span className="text-on-surface">Total</span>
+                    <span className="text-primary">
                       ₹{(order.total_price || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </span>
                   </div>
@@ -209,7 +209,7 @@ const OrderConfirmationPage = () => {
                   View All Orders
                 </Button>
                 <Button
-                  onClick={() => navigate('/products')}
+                  onClick={() => navigate('/')}
                   variant="outline"
                   className="w-full"
                 >

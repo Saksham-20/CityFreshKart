@@ -43,51 +43,90 @@ router.get('/categories', async (req, res) => {
 });
 
 // @route   GET /api/products/carousel
-// @desc    Get products for home carousels (discounted + new)
+// @desc    Promo carousel: discounted, new (14d), or featured when column exists
 // @access  Public
 router.get('/carousel', async (req, res) => {
   try {
-    const limit = parseInt(req.query.limit || 8);
-    const discounted = await query(`
-      SELECT
-        id,
-        name,
-        image_url,
-        price_per_kg,
-        discount,
-        quantity_available,
-        pricing_type,
-        created_at
-      FROM products
-      WHERE is_active = true
-        AND discount > 0
-      ORDER BY discount DESC, created_at DESC
-      LIMIT $1
-    `, [limit]);
+    const limit = Math.min(24, Math.max(1, parseInt(req.query.limit || '12', 10) || 12));
 
-    const newProducts = await query(`
+    const runFeatured = async () => (await query(`
       SELECT
         id,
         name,
-        image_url,
+        COALESCE(NULLIF(TRIM(image_url), ''), NULLIF(TRIM(image), '')) AS image_url,
         price_per_kg,
         discount,
         quantity_available,
-        pricing_type,
+        created_at,
+        COALESCE(pricing_type, 'per_kg') AS pricing_type,
+        COALESCE(is_featured, false) AS is_featured
+      FROM products
+      WHERE is_active = true
+        AND (
+          discount > 0
+          OR created_at >= NOW() - INTERVAL '14 days'
+          OR COALESCE(is_featured, false) = true
+        )
+      ORDER BY
+        CASE WHEN discount > 0 THEN 0 ELSE 1 END,
+        CASE WHEN COALESCE(is_featured, false) THEN 0 ELSE 1 END,
+        created_at DESC
+      LIMIT $1
+    `, [limit])).rows;
+
+    const runBasic = async () => (await query(`
+      SELECT
+        id,
+        name,
+        COALESCE(NULLIF(TRIM(image_url), ''), NULLIF(TRIM(image), '')) AS image_url,
+        price_per_kg,
+        discount,
+        quantity_available,
         created_at
       FROM products
       WHERE is_active = true
-        AND created_at >= NOW() - INTERVAL '24 hours'
-      ORDER BY created_at DESC
+        AND (
+          discount > 0
+          OR created_at >= NOW() - INTERVAL '14 days'
+        )
+      ORDER BY
+        CASE WHEN discount > 0 THEN 0 ELSE 1 END,
+        created_at DESC
       LIMIT $1
-    `, [limit]);
+    `, [limit])).rows;
+
+    let rows;
+    try {
+      rows = await runFeatured();
+    } catch (e) {
+      if (e.code !== '42703') throw e;
+      rows = (await runBasic()).map((r) => ({ ...r, is_featured: false, pricing_type: 'per_kg' }));
+    }
+
+    const items = rows.map((r) => {
+      const discountNum = parseFloat(r.discount) || 0;
+      const created = r.created_at ? new Date(r.created_at) : null;
+      const isNew = created
+        ? (Date.now() - created.getTime()) <= 14 * 24 * 60 * 60 * 1000
+        : false;
+      return {
+        ...r,
+        discount: discountNum,
+        pricing_type: r.pricing_type || 'per_kg',
+        is_discounted: discountNum > 0,
+        is_new: isNew,
+        is_featured: !!r.is_featured,
+      };
+    });
 
     res.json({
       success: true,
       data: {
-        discounted: discounted.rows,
-        new_products: newProducts.rows,
-        fresh: newProducts.rows, // backward compatibility for older clients
+        items,
+        products: items,
+        discounted: items.filter((i) => i.is_discounted),
+        new_products: items.filter((i) => i.is_new),
+        fresh: items.filter((i) => i.is_new),
       },
     });
   } catch (error) {

@@ -36,16 +36,16 @@ const ProfilePage = lazy(() => import('./pages/ProfilePage'));
 
 // Loading component
 const PageLoader = () => (
-  <div className="min-h-screen flex items-center justify-center bg-green-50">
+  <div className="min-h-screen flex items-center justify-center bg-surface">
     <div className="text-center">
-      <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-fresh-green mx-auto mb-4"></div>
-      <p className="text-fresh-green font-semibold text-lg">Loading FreshCart...</p>
+      <div className="animate-spin rounded-full h-14 w-14 border-2 border-primary/30 border-t-primary mx-auto mb-4" />
+      <p className="text-on-surface font-headline font-semibold text-base">Loading CityFreshKart...</p>
     </div>
   </div>
 );
 
 const MainLayout = ({ children }) => (
-  <div className="min-h-screen bg-white flex flex-col">
+  <div className="app-shopper min-h-screen flex flex-col bg-surface">
     <Header />
     <main className="flex-1 pb-24 md:pb-0">{children}</main>
     <Footer />
@@ -58,12 +58,13 @@ const FloatingOverlays = () => {
   const isAdminRoute = location.pathname.startsWith('/admin');
   const hideOnBottomCtaPages = location.pathname === '/cart'
     || location.pathname === '/checkout';
+  const isLoginPage = location.pathname === '/login';
 
   if (hideOnBottomCtaPages) return null;
 
   return (
     <>
-      {!isAdminRoute && <WhatsAppFloatingButton />}
+      {!isAdminRoute && isLoginPage && <WhatsAppFloatingButton />}
       <InstallPrompt />
     </>
   );

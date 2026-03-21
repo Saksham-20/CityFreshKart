@@ -63,14 +63,17 @@ const ProductCard = React.memo(({ product, className = '' }) => {
   if (!product) return null;
 
   return (
-    <div className={`group bg-white rounded-2xl border border-gray-100 hover:border-green-200 hover:shadow-xl hover:-translate-y-0.5 transition-all duration-200 overflow-hidden flex flex-col ${className}`}>
+    <div
+      id={productId ? `product-${productId}` : undefined}
+      className={`group bg-surface-container-lowest rounded-3xl outline outline-1 outline-outline-variant/10 hover:shadow-editorial hover:-translate-y-0.5 transition-all duration-200 overflow-visible flex flex-col shadow-[0_4px_24px_-8px_rgba(0,0,0,0.05)] ${className}`}
+    >
 
       {/* Image */}
-      <div className="relative bg-gray-50 overflow-hidden" style={{ aspectRatio: '1 / 1' }}>
+      <div className="relative bg-surface-container-low overflow-hidden rounded-t-3xl" style={{ aspectRatio: '1 / 1' }}>
         <img
           src={getImageUrl(product.image_url)}
           alt={product.name}
-          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+          className="w-full h-full object-cover product-image-offset group-hover:scale-105 transition-transform duration-300"
           loading="lazy"
           decoding="async"
           sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
@@ -80,20 +83,28 @@ const ProductCard = React.memo(({ product, className = '' }) => {
           }}
         />
         {discountPercent > 0 && (
-          <div className="absolute top-2 left-2 bg-gradient-to-r from-orange-500 to-red-500 text-white text-[10px] font-extrabold px-2 py-1 rounded-full shadow-md">
+          <div className="absolute top-2 left-2 bg-tertiary text-on-tertiary text-[10px] font-extrabold px-2 py-1 rounded-full shadow-md">
             {discountPercent}% OFF
           </div>
         )}
+        {!discountPercent && (
+          <div className="absolute top-2 right-2 z-10">
+            <span className="bg-primary-fixed text-on-primary-fixed-variant text-[10px] font-bold px-2 py-1 rounded-full inline-flex items-center gap-0.5">
+              <span className="material-symbols-outlined text-[12px]" style={{ fontVariationSettings: "'FILL' 1" }}>eco</span>
+              FRESH
+            </span>
+          </div>
+        )}
         {outOfStock && (
-          <div className="absolute inset-0 bg-white/75 backdrop-blur-[2px] flex items-center justify-center">
-            <span className="bg-gray-900 text-white text-[11px] font-bold px-3 py-1.5 rounded-full shadow-lg">Out of Stock</span>
+          <div className="absolute inset-0 bg-surface-container-lowest/80 backdrop-blur-[2px] flex items-center justify-center">
+            <span className="bg-inverse-surface text-inverse-on-surface text-[11px] font-bold px-3 py-1.5 rounded-full shadow-lg">Out of Stock</span>
           </div>
         )}
       </div>
 
       {/* Info */}
       <div className="flex flex-col flex-1 px-2.5 pt-2.5 pb-3 gap-2">
-        <h3 className="text-[13px] sm:text-sm font-bold text-gray-800 leading-snug line-clamp-2 min-h-[2.6em]">{product.name}</h3>
+        <h3 className="text-[13px] sm:text-sm font-headline font-bold text-on-surface leading-snug line-clamp-2 min-h-[2.6em]">{product.name}</h3>
 
         {/* Qty/Weight selector */}
         <div className="flex gap-1 flex-wrap">
@@ -101,10 +112,10 @@ const ProductCard = React.memo(({ product, className = '' }) => {
             <button
               key={w}
               onClick={() => setSelectedQty(w)}
-              className={`text-[10px] font-bold px-2 py-1 rounded-full border transition-all duration-150 ${
+              className={`text-[10px] font-bold px-2 py-1 rounded-full transition-all duration-150 outline outline-1 ${
                 selectedQty === w
-                  ? 'bg-gradient-to-r from-green-600 to-emerald-500 text-white border-transparent shadow-sm'
-                  : 'text-gray-500 border-gray-200 bg-white hover:border-green-400 hover:text-green-700'
+                  ? 'bg-surface-container-lowest text-primary outline-primary/40 shadow-sm'
+                  : 'text-on-surface-variant outline-outline-variant/20 bg-surface-container-low hover:outline-primary/25'
               }`}
             >
               {isPerPiece ? `${w} ${w === 1 ? 'pc' : 'pcs'}` : formatWeight(w)}
@@ -114,26 +125,27 @@ const ProductCard = React.memo(({ product, className = '' }) => {
 
         {/* Price row */}
         <div className="flex items-baseline gap-1.5">
-          <span className="text-sm sm:text-base font-black text-green-700">₹{effectivePrice.toFixed(0)}</span>
+          <span className="text-sm sm:text-base font-black text-primary">₹{effectivePrice.toFixed(0)}</span>
           {discountPercent > 0 && (
-            <span className="text-[11px] text-gray-400 line-through">₹{originalPrice.toFixed(0)}</span>
+            <span className="text-[11px] text-on-surface-variant line-through">₹{originalPrice.toFixed(0)}</span>
           )}
-          <span className="text-[10px] text-gray-400 ml-auto font-medium">{unitLabel}</span>
+          <span className="text-[10px] text-on-surface-variant ml-auto font-medium">{unitLabel}</span>
         </div>
 
         {/* Add to cart / quantity control */}
         {!outOfStock && (
           <div className="mt-auto">
             {!isInCart ? (
-              <button onClick={handleAddToCart}
-                className="w-full flex items-center justify-center gap-1.5 bg-gradient-to-r from-green-600 to-emerald-500 hover:from-green-700 hover:to-emerald-600 active:scale-[0.97] text-white text-xs font-bold py-2.5 rounded-xl transition-all duration-150 shadow-sm hover:shadow-md">
-                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
-                </svg>
+              <button
+                type="button"
+                onClick={handleAddToCart}
+                className="w-full flex items-center justify-center gap-1.5 bg-gradient-to-r from-primary to-primary-container hover:opacity-95 active:scale-[0.97] text-on-primary text-xs font-bold py-2.5 rounded-2xl transition-all duration-150 shadow-primary-glow"
+              >
+                <span className="material-symbols-outlined text-[18px]">add_shopping_cart</span>
                 Add to Cart
               </button>
             ) : (
-              <div className="flex items-center justify-between bg-gradient-to-r from-green-600 to-emerald-500 rounded-xl overflow-hidden shadow-sm">
+              <div className="flex items-center justify-between bg-gradient-to-r from-primary to-primary-container rounded-2xl overflow-hidden shadow-primary-glow">
                 <button onClick={handleDecrease}
                   className="w-10 h-9 flex items-center justify-center text-white hover:bg-black/10 active:bg-black/20 transition-colors text-lg font-bold">−</button>
                 <span className="text-white text-xs font-extrabold flex-1 text-center tracking-wide">{cartQtyLabel}</span>

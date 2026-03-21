@@ -23,16 +23,16 @@ const CartPage = () => {
 
   if (items.length === 0) {
     return (
-      <div className="min-h-screen bg-gray-50 pt-14 flex items-center justify-center px-4">
+      <div className="min-h-screen bg-surface pt-14 flex items-center justify-center px-4">
         <div className="text-center max-w-xs">
           <div className="text-6xl mb-5">🛒</div>
-          <h2 className="text-xl font-bold text-gray-900 mb-2">Your cart is empty</h2>
-          <p className="text-sm text-gray-500 mb-6 leading-relaxed">
+          <h2 className="text-xl font-headline font-bold text-on-surface mb-2">Your cart is empty</h2>
+          <p className="text-sm text-on-surface-variant mb-6 leading-relaxed">
             Start adding fresh vegetables, fruits and more!
           </p>
           <Link
-            to="/products"
-            className="inline-block bg-green-600 hover:bg-green-700 text-white font-bold px-8 py-3 rounded-xl text-sm transition-colors shadow-md"
+            to="/"
+            className="inline-block bg-gradient-to-r from-primary to-primary-container text-on-primary font-bold px-8 py-3 rounded-full text-sm transition-opacity shadow-primary-glow hover:opacity-95"
           >
             Shop Now
           </Link>
@@ -42,48 +42,48 @@ const CartPage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 pt-14 pb-[12rem] sm:pb-36">
+    <div className="min-h-screen bg-surface pt-14 pb-[12rem] sm:pb-36">
       <div className="max-w-lg mx-auto px-0 sm:px-4 py-3 sm:py-4">
 
         {/* Delivery info banner */}
-        <div className="mx-3 sm:mx-0 mb-3 bg-white rounded-xl border border-gray-100 overflow-hidden">
+        <div className="mx-3 sm:mx-0 mb-3 bg-surface-container-lowest rounded-2xl outline outline-1 outline-outline-variant/10 overflow-hidden shadow-editorial">
           {deliveryFee > 0 ? (
             <div className="px-4 py-3">
               <div className="flex items-center justify-between mb-2">
-                <p className="text-xs font-semibold text-gray-700">
-                  Add <span className="text-green-600 font-bold">₹{amountToFree.toFixed(0)}</span> more for free delivery
+                <p className="text-xs font-semibold text-on-surface">
+                  Add <span className="text-primary font-bold">₹{amountToFree.toFixed(0)}</span> more for free delivery
                 </p>
-                <span className="text-[10px] text-gray-400">{Math.round(deliveryProgress)}%</span>
+                <span className="text-[10px] text-on-surface-variant">{Math.round(deliveryProgress)}%</span>
               </div>
-              <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
+              <div className="w-full h-1.5 bg-surface-container-high rounded-full overflow-hidden">
                 <div
-                  className="h-full bg-green-500 rounded-full transition-all duration-500"
+                  className="h-full bg-primary-container rounded-full transition-all duration-500"
                   style={{ width: `${deliveryProgress}%` }}
                 />
               </div>
             </div>
           ) : (
-            <div className="px-4 py-3 flex items-center gap-2 bg-green-50">
-              <span className="text-green-600 font-bold text-sm">🎉</span>
-              <p className="text-xs font-bold text-green-700">You've unlocked FREE delivery!</p>
+            <div className="px-4 py-3 flex items-center gap-2 bg-secondary-container/20">
+              <span className="text-primary font-bold text-sm">🎉</span>
+              <p className="text-xs font-bold text-primary">You&apos;ve unlocked FREE delivery!</p>
             </div>
           )}
         </div>
 
         {/* Delivery time bar */}
-        <div className="mx-3 sm:mx-0 mb-3 bg-white rounded-xl border border-gray-100 px-4 py-3 flex items-center gap-3">
-          <span className="text-xl">⚡</span>
+        <div className="mx-3 sm:mx-0 mb-3 bg-surface-container-lowest rounded-2xl outline outline-1 outline-outline-variant/10 px-4 py-3 flex items-center gap-3 shadow-editorial">
+          <span className="material-symbols-outlined text-primary text-2xl">bolt</span>
           <div>
-            <p className="text-sm font-bold text-gray-800">Delivery in 30 minutes</p>
-            <p className="text-xs text-gray-400">Fresh to your doorstep</p>
+            <p className="text-sm font-bold text-on-surface">Delivery in 30 minutes</p>
+            <p className="text-xs text-on-surface-variant">Fresh to your doorstep</p>
           </div>
         </div>
 
         {/* Cart items */}
-        <div className="mx-3 sm:mx-0 bg-white rounded-xl border border-gray-100 divide-y divide-gray-50 overflow-hidden">
+        <div className="mx-3 sm:mx-0 bg-surface-container-lowest rounded-2xl outline outline-1 outline-outline-variant/10 divide-y divide-surface-container overflow-hidden shadow-editorial">
           <div className="px-4 py-3 flex items-center justify-between">
-            <h2 className="text-sm font-bold text-gray-900">Your Items</h2>
-            <span className="text-xs text-gray-400">{items.length} {items.length === 1 ? 'item' : 'items'}</span>
+            <h2 className="text-sm font-headline font-bold text-on-surface">Your Items</h2>
+            <span className="text-xs text-on-surface-variant">{items.length} {items.length === 1 ? 'item' : 'items'}</span>
           </div>
 
           {items.map((item) => {
@@ -94,7 +94,7 @@ const CartPage = () => {
             return (
               <div key={item.id} className="flex items-center gap-3 px-4 py-3">
                 {/* Image */}
-                <div className="flex-shrink-0 w-14 h-14 rounded-xl overflow-hidden bg-gray-50 border border-gray-100">
+                <div className="flex-shrink-0 w-14 h-14 rounded-xl overflow-hidden bg-surface-container-low outline outline-1 outline-outline-variant/10">
                   <img
                     src={getImageUrl(item.image_url)}
                     alt={item.name}
@@ -106,40 +106,43 @@ const CartPage = () => {
                 {/* Info */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-start justify-between gap-1">
-                    <h3 className="text-sm font-semibold text-gray-900 truncate pr-1">{item.name}</h3>
+                    <h3 className="text-sm font-semibold text-on-surface truncate pr-1">{item.name}</h3>
                     <button
+                      type="button"
                       onClick={() => removeFromCart(item.id)}
-                      className="flex-shrink-0 text-gray-300 hover:text-red-500 transition-colors p-0.5 -mt-0.5"
+                      className="flex-shrink-0 text-on-surface-variant hover:text-error transition-colors p-0.5 -mt-0.5"
                     >
                       <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                       </svg>
                     </button>
                   </div>
-                  <p className="text-xs text-gray-400 mt-0.5">
+                  <p className="text-xs text-on-surface-variant mt-0.5">
                     ₹{pricePerKg}/kg{item.discount > 0 ? ` · ${item.discount}% off` : ''}
                   </p>
 
                   <div className="flex items-center justify-between mt-1.5">
                     {/* Qty control */}
-                    <div className="flex items-center bg-green-600 rounded-lg overflow-hidden">
+                    <div className="flex items-center bg-gradient-to-r from-primary to-primary-container rounded-lg overflow-hidden shadow-primary-glow">
                       <button
+                        type="button"
                         onClick={() => handleDecrease(item)}
-                        className="w-7 h-6 flex items-center justify-center text-white text-sm font-bold hover:bg-green-700 transition-colors"
+                        className="w-7 h-6 flex items-center justify-center text-on-primary text-sm font-bold hover:opacity-90 transition-opacity"
                       >
                         −
                       </button>
-                      <span className="text-white text-[11px] font-bold px-2 min-w-[2.5rem] text-center">
+                      <span className="text-on-primary text-[11px] font-bold px-2 min-w-[2.5rem] text-center">
                         {item.quantity % 1 === 0 ? item.quantity : item.quantity.toFixed(1)} kg
                       </span>
                       <button
+                        type="button"
                         onClick={() => handleIncrease(item)}
-                        className="w-7 h-6 flex items-center justify-center text-white text-sm font-bold hover:bg-green-700 transition-colors"
+                        className="w-7 h-6 flex items-center justify-center text-on-primary text-sm font-bold hover:opacity-90 transition-opacity"
                       >
                         +
                       </button>
                     </div>
-                    <span className="text-sm font-bold text-gray-900">₹{lineTotal}</span>
+                    <span className="text-sm font-bold text-on-surface">₹{lineTotal}</span>
                   </div>
                 </div>
               </div>
@@ -149,7 +152,7 @@ const CartPage = () => {
 
         {/* Continue shopping */}
         <div className="mx-3 sm:mx-0 mt-3">
-          <Link to="/products" className="flex items-center gap-1.5 text-sm text-green-600 font-medium hover:text-green-700">
+          <Link to="/" className="flex items-center gap-1.5 text-sm text-primary font-medium hover:opacity-80">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
@@ -160,23 +163,24 @@ const CartPage = () => {
 
       {/* Sticky bottom checkout bar */}
       <div
-        className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 px-4 pt-3 pb-5 z-50 shadow-2xl"
+        className="fixed bottom-0 left-0 right-0 glass-header border-t border-outline-variant/10 px-4 pt-3 pb-5 z-50 shadow-editorial"
         style={{ paddingBottom: 'calc(1.25rem + env(safe-area-inset-bottom))' }}
       >
         {/* Price summary */}
         <div className="flex items-center justify-between mb-3 text-sm">
-          <div className="flex items-center gap-3 text-gray-500">
+          <div className="flex items-center gap-3 text-on-surface-variant">
             <span>{getCartItemCount().toFixed(1)} kg</span>
             <span>·</span>
-            <span>Delivery: <span className={deliveryFee === 0 ? 'text-green-600 font-bold' : 'font-medium text-gray-700'}>{deliveryFee === 0 ? 'FREE' : `₹${deliveryFee}`}</span></span>
+            <span>Delivery: <span className={deliveryFee === 0 ? 'text-primary font-bold' : 'font-medium text-on-surface'}>{deliveryFee === 0 ? 'FREE' : `₹${deliveryFee}`}</span></span>
           </div>
           <div className="text-right">
-            <span className="text-base font-extrabold text-gray-900">₹{total.toFixed(2)}</span>
+            <span className="text-base font-extrabold text-on-surface">₹{total.toFixed(2)}</span>
           </div>
         </div>
         <button
+          type="button"
           onClick={() => navigate('/checkout')}
-          className="w-full bg-green-600 hover:bg-green-700 active:bg-green-800 text-white font-bold py-3.5 rounded-xl text-base transition-colors shadow-md"
+          className="w-full bg-gradient-to-r from-primary to-primary-container hover:opacity-95 text-on-primary font-bold py-3.5 rounded-full text-base transition-opacity shadow-primary-glow"
         >
           Proceed to Checkout →
         </button>

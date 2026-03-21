@@ -106,24 +106,24 @@ const RegisterForm = ({ onSwitchToLogin }) => {
   return (
     <div>
       <div className="mb-7">
-        <h2 className="text-2xl font-extrabold text-gray-900">Create account</h2>
-        <p className="text-sm text-gray-500 mt-1">Join thousands of happy customers</p>
+        <h2 className="text-2xl font-headline font-extrabold text-on-surface">Create account</h2>
+        <p className="text-sm text-on-surface-variant mt-1">Join thousands of happy customers</p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
         {errors.general && (
-          <div className="flex items-start gap-2.5 bg-red-50 border-l-4 border-red-400 text-red-700 text-sm px-4 py-3 rounded-xl">
+          <div className="flex items-start gap-2.5 bg-error-container/50 border-l-4 border-error text-error text-sm px-4 py-3 rounded-xl">
             <FiAlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
             <span>{errors.general}</span>
           </div>
         )}
 
         <div>
-          <label htmlFor="name" className="text-xs font-semibold text-gray-600 uppercase tracking-wide block mb-1.5">
+          <label htmlFor="name" className="text-xs font-semibold text-on-surface-variant uppercase tracking-wide block mb-1.5">
             Full Name
           </label>
           <div className="relative">
-            <FiUser className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+            <FiUser className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-on-surface-variant pointer-events-none" />
             <input
               id="name"
               name="name"
@@ -131,20 +131,20 @@ const RegisterForm = ({ onSwitchToLogin }) => {
               value={formData.name}
               onChange={handleInputChange}
               placeholder="John Doe"
-              className={`w-full pl-10 pr-4 py-3 border rounded-xl text-sm bg-gray-50 focus:bg-white transition-all outline-none focus:ring-2 focus:ring-green-500/30 ${
-                errors.name ? 'border-red-400 focus:border-red-400 focus:ring-red-400/30' : 'border-gray-200 focus:border-green-500'
+              className={`w-full pl-10 pr-4 py-3 rounded-xl text-sm bg-surface-container-highest focus:bg-surface-container-lowest transition-all outline-none ghost-outline-primary focus:ring-2 focus:ring-primary/20 ${
+                errors.name ? 'ring-2 ring-error/40' : ''
               }`}
             />
           </div>
-          {errors.name && <p className="text-red-500 text-xs mt-1.5 flex items-center gap-1"><FiAlertCircle className="w-3 h-3" />{errors.name}</p>}
+          {errors.name && <p className="text-error text-xs mt-1.5 flex items-center gap-1"><FiAlertCircle className="w-3 h-3" />{errors.name}</p>}
         </div>
 
         <div>
-          <label htmlFor="phone" className="text-xs font-semibold text-gray-600 uppercase tracking-wide block mb-1.5">
+          <label htmlFor="phone" className="text-xs font-semibold text-on-surface-variant uppercase tracking-wide block mb-1.5">
             Phone Number
           </label>
           <div className="relative">
-            <FiPhone className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+            <FiPhone className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-on-surface-variant pointer-events-none" />
             <input
               id="phone"
               name="phone"
@@ -154,20 +154,20 @@ const RegisterForm = ({ onSwitchToLogin }) => {
               value={formData.phone}
               onChange={handleInputChange}
               placeholder="Enter your 10-digit number"
-              className={`w-full pl-10 pr-4 py-3 border rounded-xl text-sm bg-gray-50 focus:bg-white transition-all outline-none focus:ring-2 focus:ring-green-500/30 ${
-                errors.phone ? 'border-red-400 focus:border-red-400 focus:ring-red-400/30' : 'border-gray-200 focus:border-green-500'
+              className={`w-full pl-10 pr-4 py-3 rounded-xl text-sm bg-surface-container-highest focus:bg-surface-container-lowest transition-all outline-none ghost-outline-primary focus:ring-2 focus:ring-primary/20 ${
+                errors.phone ? 'ring-2 ring-error/40' : ''
               }`}
             />
           </div>
-          {errors.phone && <p className="text-red-500 text-xs mt-1.5 flex items-center gap-1"><FiAlertCircle className="w-3 h-3" />{errors.phone}</p>}
+          {errors.phone && <p className="text-error text-xs mt-1.5 flex items-center gap-1"><FiAlertCircle className="w-3 h-3" />{errors.phone}</p>}
         </div>
 
         <div>
-          <label htmlFor="password" className="text-xs font-semibold text-gray-600 uppercase tracking-wide block mb-1.5">
+          <label htmlFor="password" className="text-xs font-semibold text-on-surface-variant uppercase tracking-wide block mb-1.5">
             Password
           </label>
           <div className="relative">
-            <FiLock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+            <FiLock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-on-surface-variant pointer-events-none" />
             <input
               id="password"
               name="password"
@@ -175,19 +175,19 @@ const RegisterForm = ({ onSwitchToLogin }) => {
               value={formData.password}
               onChange={handleInputChange}
               placeholder="Min. 6 characters"
-              className={`w-full pl-10 pr-10 py-3 border rounded-xl text-sm bg-gray-50 focus:bg-white transition-all outline-none focus:ring-2 focus:ring-green-500/30 ${
-                errors.password ? 'border-red-400 focus:border-red-400 focus:ring-red-400/30' : 'border-gray-200 focus:border-green-500'
+              className={`w-full pl-10 pr-10 py-3 rounded-xl text-sm bg-surface-container-highest focus:bg-surface-container-lowest transition-all outline-none ghost-outline-primary focus:ring-2 focus:ring-primary/20 ${
+                errors.password ? 'ring-2 ring-error/40' : ''
               }`}
             />
-            <button type="button" onClick={() => setShowPassword(v => !v)} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors" tabIndex={-1}>
+            <button type="button" onClick={() => setShowPassword(v => !v)} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-on-surface transition-colors" tabIndex={-1}>
               {showPassword ? <FiEyeOff className="w-4 h-4" /> : <FiEye className="w-4 h-4" />}
             </button>
           </div>
-          {errors.password && <p className="text-red-500 text-xs mt-1.5 flex items-center gap-1"><FiAlertCircle className="w-3 h-3" />{errors.password}</p>}
+          {errors.password && <p className="text-error text-xs mt-1.5 flex items-center gap-1"><FiAlertCircle className="w-3 h-3" />{errors.password}</p>}
         </div>
 
         <div>
-          <label htmlFor="confirmPassword" className="text-xs font-semibold text-gray-600 uppercase tracking-wide block mb-1.5">
+          <label htmlFor="confirmPassword" className="text-xs font-semibold text-on-surface-variant uppercase tracking-wide block mb-1.5">
             Confirm Password
           </label>
           <div className="relative">
@@ -199,15 +199,15 @@ const RegisterForm = ({ onSwitchToLogin }) => {
               value={formData.confirmPassword}
               onChange={handleInputChange}
               placeholder="Re-enter your password"
-              className={`w-full pl-10 pr-10 py-3 border rounded-xl text-sm bg-gray-50 focus:bg-white transition-all outline-none focus:ring-2 focus:ring-green-500/30 ${
-                errors.confirmPassword ? 'border-red-400 focus:border-red-400 focus:ring-red-400/30' : 'border-gray-200 focus:border-green-500'
+              className={`w-full pl-10 pr-10 py-3 rounded-xl text-sm bg-surface-container-highest focus:bg-surface-container-lowest transition-all outline-none ghost-outline-primary focus:ring-2 focus:ring-primary/20 ${
+                errors.confirmPassword ? 'ring-2 ring-error/40' : ''
               }`}
             />
-            <button type="button" onClick={() => setShowConfirmPassword(v => !v)} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors" tabIndex={-1}>
+            <button type="button" onClick={() => setShowConfirmPassword(v => !v)} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-on-surface transition-colors" tabIndex={-1}>
               {showConfirmPassword ? <FiEyeOff className="w-4 h-4" /> : <FiEye className="w-4 h-4" />}
             </button>
           </div>
-          {errors.confirmPassword && <p className="text-red-500 text-xs mt-1.5 flex items-center gap-1"><FiAlertCircle className="w-3 h-3" />{errors.confirmPassword}</p>}
+          {errors.confirmPassword && <p className="text-error text-xs mt-1.5 flex items-center gap-1"><FiAlertCircle className="w-3 h-3" />{errors.confirmPassword}</p>}
         </div>
 
         <button
@@ -227,9 +227,9 @@ const RegisterForm = ({ onSwitchToLogin }) => {
         </button>
       </form>
 
-      <p className="mt-6 text-center text-sm text-gray-500">
+      <p className="mt-6 text-center text-sm text-on-surface-variant">
         Already have an account?{' '}
-        <button type="button" onClick={onSwitchToLogin} className="text-green-600 hover:text-green-700 font-semibold hover:underline">
+        <button type="button" onClick={onSwitchToLogin} className="text-primary font-semibold hover:underline">
           Sign in
         </button>
       </p>

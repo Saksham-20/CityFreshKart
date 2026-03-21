@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import ProductGrid from '../components/product/ProductGrid';
 import ProductCardSkeleton from '../components/product/ProductCardSkeleton';
+import PromoCarousel from '../components/product/PromoCarousel';
 import api from '../services/api';
 
 const DEFAULT_CATEGORY_NAMES = ['Vegetables', 'Fruits', 'Dairy', 'Bakery', 'Grains', 'Herbs & Spices', 'Other'];
@@ -46,7 +47,6 @@ const ProductsPage = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [products, sortBy, searchQuery, activeCategory]);
 
-  // Sync search query and category from URL params
   useEffect(() => {
     const q = searchParams.get('search') || '';
     const cat = searchParams.get('category') || '';
@@ -79,7 +79,6 @@ const ProductsPage = () => {
       const next = res.data?.data;
       if (Array.isArray(next) && next.length > 0) setCategoryNames(next);
     } catch (_) {
-      // Keep defaults on error
       setCategoryNames(DEFAULT_CATEGORY_NAMES);
     }
   };
@@ -118,40 +117,51 @@ const ProductsPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 pt-14">
+    <div className="min-h-screen bg-surface pt-14">
 
-      {/* Hero delivery strip */}
-      <div className="bg-gradient-to-r from-green-700 via-green-600 to-emerald-600 text-white">
+      {/* Top promo strip */}
+      <div className="bg-gradient-to-r from-primary via-primary to-primary-container text-on-primary">
         <div className="max-w-7xl mx-auto px-4 py-2.5 flex items-center justify-between text-sm">
           <div className="flex items-center gap-2 font-semibold">
-            <span className="text-base animate-pulse">⚡</span>
+            <span className="material-symbols-outlined text-[20px]">bolt</span>
             <span>Delivery in <strong>30 minutes</strong></span>
           </div>
-          <div className="text-green-100 text-xs hidden sm:flex items-center gap-3">
-            <span className="flex items-center gap-1">🌱 <span>Fresh produce</span></span>
-            <span className="text-green-300">·</span>
-            <span className="flex items-center gap-1">✅ <span>Quality guaranteed</span></span>
-            <span className="text-green-300">·</span>
-            <span className="flex items-center gap-1">🚚 <span>Free delivery over ₹300</span></span>
+          <div className="text-on-primary/90 text-xs hidden sm:flex items-center gap-3">
+            <span className="flex items-center gap-1"><span className="material-symbols-outlined text-[16px]">eco</span> Fresh</span>
+            <span className="opacity-50">·</span>
+            <span>Free delivery over ₹300</span>
           </div>
         </div>
       </div>
 
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-4">
+        <section className="mb-6">
+          <h1 className="font-headline text-3xl sm:text-4xl font-extrabold text-on-surface leading-[1.1] mb-2">
+            Freshly harvested
+            <br />
+            <span className="text-primary">just for you.</span>
+          </h1>
+          <p className="text-on-surface-variant text-sm font-medium max-w-md">
+            Direct from trusted sources to your doorstep — fast.
+          </p>
+        </section>
+
+        <PromoCarousel />
+      </div>
+
       {/* Sticky category + filter bar */}
-      <div className="bg-white border-b border-gray-100 sticky top-14 z-30 shadow-sm">
-        {/* Category chips */}
+      <div className="bg-surface-container-lowest/95 backdrop-blur-md sticky top-14 z-30 shadow-editorial outline outline-1 outline-outline-variant/10">
         <div
           ref={categoryRef}
-          className="flex items-center gap-2 overflow-x-auto no-scrollbar px-3 sm:px-4 pt-2.5 pb-0"
-          style={{ scrollbarWidth: 'none' }}
+          className="flex items-center gap-2 overflow-x-auto scrollbar-hide px-3 sm:px-4 lg:px-8 pt-3 pb-0 max-w-7xl mx-auto"
         >
           <button
             type="button"
             onClick={() => { setActiveCategory('All'); setSearchQuery(''); }}
-            className={`flex-shrink-0 flex items-center gap-1.5 text-xs font-semibold px-3.5 py-1.5 rounded-full border transition-all whitespace-nowrap ${
+            className={`flex-shrink-0 flex items-center gap-1.5 text-xs font-semibold px-4 py-2.5 rounded-full transition-all whitespace-nowrap ${
               activeCategory === 'All'
-                ? 'bg-gradient-to-r from-green-600 to-emerald-500 text-white border-transparent shadow-sm'
-                : 'text-gray-600 border-gray-200 bg-white hover:border-green-400 hover:text-green-700'
+                ? 'bg-gradient-to-r from-primary to-primary-container text-on-primary shadow-primary-glow'
+                : 'bg-secondary-container text-on-secondary-container hover:bg-secondary-fixed-dim/50'
             }`}
           >
             <span className="text-sm leading-none">🛒</span>
@@ -163,10 +173,10 @@ const ProductsPage = () => {
               key={catName}
               type="button"
               onClick={() => { setActiveCategory(catName); setSearchQuery(''); }}
-              className={`flex-shrink-0 flex items-center gap-1.5 text-xs font-semibold px-3.5 py-1.5 rounded-full border transition-all whitespace-nowrap ${
+              className={`flex-shrink-0 flex items-center gap-1.5 text-xs font-semibold px-4 py-2.5 rounded-full transition-all whitespace-nowrap ${
                 String(activeCategory).toLowerCase() === String(catName).toLowerCase()
-                  ? 'bg-gradient-to-r from-green-600 to-emerald-500 text-white border-transparent shadow-sm'
-                  : 'text-gray-600 border-gray-200 bg-white hover:border-green-400 hover:text-green-700'
+                  ? 'bg-gradient-to-r from-primary to-primary-container text-on-primary shadow-primary-glow'
+                  : 'bg-secondary-container text-on-secondary-container hover:bg-secondary-fixed-dim/50'
               }`}
             >
               <span className="text-sm leading-none">{getCategoryEmoji(catName)}</span>
@@ -175,20 +185,20 @@ const ProductsPage = () => {
           ))}
         </div>
 
-        {/* Sort + item count row */}
-        <div className="flex items-center justify-between px-3 sm:px-4 py-2">
-          <span className="text-xs text-gray-400 font-medium">
+        <div className="flex items-center justify-between px-3 sm:px-4 lg:px-8 py-2.5 max-w-7xl mx-auto">
+          <span className="text-xs text-on-surface-variant font-medium">
             {loading ? '' : `${filteredProducts.length} products`}
           </span>
           <div className="flex items-center gap-1.5">
             {SORT_OPTIONS.map(opt => (
               <button
                 key={opt.value}
+                type="button"
                 onClick={() => setSortBy(opt.value)}
-                className={`text-xs px-2.5 py-1 rounded-lg font-medium transition-colors ${
+                className={`text-xs px-2.5 py-1.5 rounded-lg font-medium transition-colors ${
                   sortBy === opt.value
-                    ? 'bg-gray-900 text-white'
-                    : 'text-gray-500 bg-gray-100 hover:bg-gray-200'
+                    ? 'bg-inverse-surface text-inverse-on-surface'
+                    : 'text-on-surface-variant bg-surface-container-low hover:bg-surface-container'
                 }`}
               >
                 {opt.label}
@@ -198,8 +208,7 @@ const ProductsPage = () => {
         </div>
       </div>
 
-      {/* Products Grid */}
-      <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6 py-4">
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-8 py-4">
         {loading ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4">
             <ProductCardSkeleton count={12} />
@@ -207,10 +216,11 @@ const ProductsPage = () => {
         ) : error ? (
           <div className="text-center py-20">
             <div className="text-4xl mb-3">😕</div>
-            <p className="text-gray-500 mb-4 text-sm">{error}</p>
+            <p className="text-on-surface-variant mb-4 text-sm">{error}</p>
             <button
+              type="button"
               onClick={fetchProducts}
-              className="text-sm text-white bg-green-600 hover:bg-green-700 font-medium px-5 py-2 rounded-lg"
+              className="text-sm text-on-primary bg-primary hover:opacity-95 font-medium px-5 py-2 rounded-full"
             >
               Try again
             </button>
@@ -218,14 +228,15 @@ const ProductsPage = () => {
         ) : filteredProducts.length === 0 ? (
           <div className="text-center py-20">
             <div className="text-5xl mb-3">🥦</div>
-            <p className="text-gray-600 font-semibold">No products found</p>
-            <p className="text-gray-400 text-sm mt-1">
+            <p className="text-on-surface font-headline font-semibold">No products found</p>
+            <p className="text-on-surface-variant text-sm mt-1">
               {searchQuery ? `No results for "${searchQuery}"` : `Nothing in "${activeCategory}" yet — check back soon!`}
             </p>
             {(searchQuery || activeCategory !== 'All') && (
               <button
+                type="button"
                 onClick={() => { setSearchQuery(''); setActiveCategory('All'); }}
-                className="mt-4 text-sm text-green-600 font-semibold hover:underline"
+                className="mt-4 text-sm text-primary font-semibold hover:underline"
               >
                 Show all products
               </button>
@@ -234,7 +245,7 @@ const ProductsPage = () => {
         ) : (
           <>
             {activeCategory !== 'All' && (
-              <h2 className="text-base font-bold text-gray-800 mb-3">
+              <h2 className="text-base font-headline font-bold text-on-surface mb-3">
                 {getCategoryEmoji(activeCategory)} {activeCategory}
               </h2>
             )}
@@ -242,12 +253,6 @@ const ProductsPage = () => {
           </>
         )}
       </div>
-
-      {/* Global style for hiding scrollbar */}
-      <style>{`
-        .no-scrollbar::-webkit-scrollbar { display: none; }
-        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-      `}</style>
     </div>
   );
 };
