@@ -47,12 +47,17 @@ router.get('/categories', async (req, res) => {
 // @access  Public
 router.get('/carousel', async (req, res) => {
   try {
-    const limit = Math.min(24, Math.max(1, parseInt(req.query.limit || '12', 10) || 12));
+    const wantsAll = ['1', 'true', 'yes'].includes(String(req.query.all || '').toLowerCase());
+    const maxCap = wantsAll ? 500 : 24;
+    const requested = parseInt(req.query.limit || (wantsAll ? '500' : '12'), 10) || (wantsAll ? 500 : 12);
+    const limit = Math.min(maxCap, Math.max(1, requested));
 
     const runFeatured = async () => (await query(`
       SELECT
         id,
         name,
+        category,
+        description,
         COALESCE(NULLIF(TRIM(image_url), ''), NULLIF(TRIM(image), '')) AS image_url,
         price_per_kg,
         discount,
@@ -78,6 +83,8 @@ router.get('/carousel', async (req, res) => {
       SELECT
         id,
         name,
+        category,
+        description,
         COALESCE(NULLIF(TRIM(image_url), ''), NULLIF(TRIM(image), '')) AS image_url,
         price_per_kg,
         discount,

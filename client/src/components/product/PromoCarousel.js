@@ -46,7 +46,7 @@ const PromoCarousel = () => {
       <div className="flex items-center justify-between mb-3 px-1">
         <h2 className="font-headline text-lg md:text-xl font-bold text-on-surface">Daily Highlights</h2>
         <Link
-          to="/"
+          to="/?highlights=1"
           className="text-primary text-xs font-bold uppercase tracking-widest hover:opacity-80"
         >
           See all
@@ -108,7 +108,7 @@ const PromoCarousel = () => {
                     <span className="text-on-surface-variant text-[10px] font-medium">/ kg</span>
                   </div>
                   <Link
-                    to={`#product-${product.id}`}
+                    to={`/?highlight=${encodeURIComponent(product.id)}`}
                     className="inline-flex bg-primary text-on-primary text-[10px] font-bold px-4 py-2 rounded-full active:scale-95 transition-transform shadow-primary-glow"
                   >
                     View

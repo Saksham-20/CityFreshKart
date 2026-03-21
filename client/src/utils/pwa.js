@@ -3,7 +3,7 @@
  * Handles service worker registration and app installation
  */
 
-import { getPublicApiOrigin } from './publicOrigin';
+import api from '../services/api';
 
 let deferredPrompt;
 const installPromptListeners = new Set();
@@ -184,6 +184,10 @@ const urlBase64ToUint8Array = (base64String) => {
  * Subscribe current browser for server Web Push notifications
  */
 export const subscribeToWebPush = async () => {
+  if (typeof window !== 'undefined' && !window.isSecureContext) {
+    throw new Error('Push notifications require a secure connection (https://).');
+  }
+
   const hasPermission = await requestNotificationPermission();
   if (!hasPermission) {
     throw new Error('Notification permission not granted');
@@ -199,6 +203,7 @@ export const subscribeToWebPush = async () => {
   }
 
   const registration = await navigator.serviceWorker.register('/sw.js', { scope: '/' });
+  await registration.update();
   let subscription = await registration.pushManager.getSubscription();
 
   if (!subscription) {
@@ -208,22 +213,20 @@ export const subscribeToWebPush = async () => {
     });
   }
 
-  const response = await fetch(
-    `${getPublicApiOrigin()}/api/notifications/subscribe`,
-    {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${localStorage.getItem('token') || ''}`,
-      },
-      credentials: 'include',
-      body: JSON.stringify({ subscription }),
-    },
-  );
+  const serializable = typeof subscription.toJSON === 'function'
+    ? subscription.toJSON()
+    : subscription;
 
-  if (!response.ok) {
-    const err = await response.json().catch(() => ({}));
-    throw new Error(err.message || 'Failed to save push subscription');
+  try {
+    await api.post('/notifications/subscribe', { subscription: serializable });
+  } catch (err) {
+    const data = err.response?.data;
+    const msg =
+      (typeof data?.message === 'string' && data.message) ||
+      data?.errors?.[0]?.msg ||
+      err.message ||
+      'Failed to save push subscription';
+    throw new Error(msg);
   }
 
   return subscription;

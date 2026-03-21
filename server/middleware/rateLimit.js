@@ -1,5 +1,16 @@
 const rateLimit = require('express-rate-limit');
 
+const defaultAuthWindowMs = 15 * 60 * 1000;
+const parsedAuthWindow = parseInt(process.env.AUTH_RATE_LIMIT_WINDOW_MS, 10);
+const authWindowMs = Number.isFinite(parsedAuthWindow) && parsedAuthWindow > 0
+  ? parsedAuthWindow
+  : defaultAuthWindowMs;
+
+const parsedAuthMax = parseInt(process.env.AUTH_RATE_LIMIT_MAX, 10);
+const authMax = Number.isFinite(parsedAuthMax) && parsedAuthMax > 0
+  ? parsedAuthMax
+  : (process.env.NODE_ENV === 'production' ? 30 : 1000);
+
 // General API rate limiting (relaxed in development/test for automated testing)
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
@@ -11,10 +22,11 @@ const apiLimiter = rateLimit({
   legacyHeaders: false, // Disable the `X-RateLimit-*` headers
 });
 
-// Stricter rate limiting for auth endpoints (relaxed in development/test)
+// Stricter rate limiting for auth endpoints (failed attempts only in production)
 const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: process.env.NODE_ENV === 'production' ? 5 : 1000,
+  windowMs: authWindowMs,
+  max: authMax,
+  skipSuccessfulRequests: true,
   message: {
     message: 'Too many authentication attempts, please try again later.',
   },

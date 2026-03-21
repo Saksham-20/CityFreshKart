@@ -25,6 +25,12 @@ const { collectCspConnectOrigins } = require('./utils/cspOrigins');
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+// Behind Nginx / Cloudflare / ALB — required for correct client IP in rate limiting
+if (process.env.NODE_ENV === 'production') {
+  const hops = parseInt(process.env.TRUST_PROXY_HOPS, 10);
+  app.set('trust proxy', Number.isFinite(hops) && hops >= 0 ? hops : 1);
+}
+
 // Security middleware - enabled for production
 if (process.env.NODE_ENV === 'production') {
   const connectSrc = collectCspConnectOrigins();

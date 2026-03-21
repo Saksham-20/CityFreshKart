@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useSearchParams, Link } from 'react-router-dom';
 import ProductGrid from '../components/product/ProductGrid';
 import ProductCardSkeleton from '../components/product/ProductCardSkeleton';
 import PromoCarousel from '../components/product/PromoCarousel';
@@ -25,7 +25,7 @@ const SORT_OPTIONS = [
 ];
 
 const ProductsPage = () => {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [products, setProducts] = useState([]);
   const [filteredProducts, setFilteredProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -34,31 +34,12 @@ const ProductsPage = () => {
   const [sortBy, setSortBy] = useState('newest');
   const [activeCategory, setActiveCategory] = useState('All');
   const [categoryNames, setCategoryNames] = useState(DEFAULT_CATEGORY_NAMES);
+  const [flashProductId, setFlashProductId] = useState(null);
   const categoryRef = useRef(null);
+  const highlightId = searchParams.get('highlight');
+  const highlightsMode = searchParams.get('highlights') === '1';
 
-  useEffect(() => {
-    fetchProducts();
-    fetchCategories();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useEffect(() => {
-    applyFilters();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [products, sortBy, searchQuery, activeCategory]);
-
-  useEffect(() => {
-    const q = searchParams.get('search') || '';
-    const cat = searchParams.get('category') || '';
-    setSearchQuery(q);
-    if (cat && categoryNames.some(c => c.toLowerCase() === cat.toLowerCase())) {
-      setActiveCategory(cat);
-    } else if (q) {
-      setActiveCategory('All');
-    }
-  }, [searchParams, categoryNames]);
-
-  const fetchProducts = async () => {
+  const fetchProducts = useCallback(async () => {
     try {
       setLoading(true);
       const response = await api.get('/products?page=1&limit=100');
@@ -71,7 +52,100 @@ const ProductsPage = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  const fetchHighlights = useCallback(async () => {
+    try {
+      setLoading(true);
+      const response = await api.get('/products/carousel?all=1&limit=500');
+      const items = response.data?.data?.items || response.data?.data?.products || [];
+      setProducts(Array.isArray(items) ? items : []);
+      setError(null);
+    } catch (err) {
+      setError('Failed to load deals and new arrivals. Please try again.');
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchCategories();
+  }, []);
+
+  useEffect(() => {
+    if (highlightsMode) fetchHighlights();
+    else fetchProducts();
+  }, [highlightsMode, fetchHighlights, fetchProducts]);
+
+  useEffect(() => {
+    applyFilters();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [products, sortBy, searchQuery, activeCategory]);
+
+  useEffect(() => {
+    const q = searchParams.get('search') || '';
+    const cat = searchParams.get('category') || '';
+    if (searchParams.get('highlight')) {
+      return;
+    }
+    setSearchQuery(q);
+    if (cat && categoryNames.some(c => c.toLowerCase() === cat.toLowerCase())) {
+      setActiveCategory(cat);
+    } else if (q) {
+      setActiveCategory('All');
+    }
+  }, [searchParams, categoryNames]);
+
+  useEffect(() => {
+    if (!highlightId) return;
+    setActiveCategory('All');
+    setSearchQuery('');
+  }, [highlightId]);
+
+  useEffect(() => {
+    if (!highlightId || loading) return;
+    if (filteredProducts.length === 0) {
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete('highlight');
+        return next;
+      }, { replace: true });
+      return;
+    }
+
+    const inList = filteredProducts.some(
+      (p) =>
+        String(p.id) === String(highlightId) ||
+        String(p.product_id) === String(highlightId),
+    );
+    if (!inList) {
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete('highlight');
+        return next;
+      }, { replace: true });
+      return;
+    }
+
+    let clearFlashTimer;
+    const scrollTimer = setTimeout(() => {
+      const el = document.getElementById(`product-${highlightId}`);
+      el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      setFlashProductId(highlightId);
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete('highlight');
+        return next;
+      }, { replace: true });
+      clearFlashTimer = window.setTimeout(() => setFlashProductId(null), 3500);
+    }, 100);
+
+    return () => {
+      window.clearTimeout(scrollTimer);
+      if (clearFlashTimer) window.clearTimeout(clearFlashTimer);
+    };
+  }, [highlightId, loading, filteredProducts, setSearchParams]);
 
   const fetchCategories = async () => {
     try {
@@ -96,7 +170,7 @@ const ProductsPage = () => {
       const q = searchQuery.toLowerCase();
       filtered = filtered.filter(p =>
         p.name?.toLowerCase().includes(q) ||
-        p.description?.toLowerCase().includes(q)
+        (p.description && p.description.toLowerCase().includes(q))
       );
     }
 
@@ -136,17 +210,36 @@ const ProductsPage = () => {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-4">
         <section className="mb-6">
-          <h1 className="font-headline text-3xl sm:text-4xl font-extrabold text-on-surface leading-[1.1] mb-2">
-            Freshly harvested
-            <br />
-            <span className="text-primary">just for you.</span>
-          </h1>
-          <p className="text-on-surface-variant text-sm font-medium max-w-md">
-            Direct from trusted sources to your doorstep — fast.
-          </p>
+          {highlightsMode ? (
+            <>
+              <h1 className="font-headline text-3xl sm:text-4xl font-extrabold text-on-surface leading-[1.1] mb-2">
+                Deals &amp; new arrivals
+              </h1>
+              <p className="text-on-surface-variant text-sm font-medium max-w-md mb-3">
+                Discounted picks and products added in the last 14 days — same pool as Daily Highlights.
+              </p>
+              <Link
+                to="/"
+                className="text-sm font-semibold text-primary hover:underline"
+              >
+                Back to all products
+              </Link>
+            </>
+          ) : (
+            <>
+              <h1 className="font-headline text-3xl sm:text-4xl font-extrabold text-on-surface leading-[1.1] mb-2">
+                Freshly harvested
+                <br />
+                <span className="text-primary">just for you.</span>
+              </h1>
+              <p className="text-on-surface-variant text-sm font-medium max-w-md">
+                Direct from trusted sources to your doorstep — fast.
+              </p>
+            </>
+          )}
         </section>
 
-        <PromoCarousel />
+        {!highlightsMode && <PromoCarousel />}
       </div>
 
       {/* Sticky category + filter bar */}
@@ -219,7 +312,7 @@ const ProductsPage = () => {
             <p className="text-on-surface-variant mb-4 text-sm">{error}</p>
             <button
               type="button"
-              onClick={fetchProducts}
+              onClick={() => (highlightsMode ? fetchHighlights() : fetchProducts())}
               className="text-sm text-on-primary bg-primary hover:opacity-95 font-medium px-5 py-2 rounded-full"
             >
               Try again
@@ -232,7 +325,7 @@ const ProductsPage = () => {
             <p className="text-on-surface-variant text-sm mt-1">
               {searchQuery ? `No results for "${searchQuery}"` : `Nothing in "${activeCategory}" yet — check back soon!`}
             </p>
-            {(searchQuery || activeCategory !== 'All') && (
+            {(searchQuery || activeCategory !== 'All') && !highlightsMode && (
               <button
                 type="button"
                 onClick={() => { setSearchQuery(''); setActiveCategory('All'); }}
@@ -240,6 +333,23 @@ const ProductsPage = () => {
               >
                 Show all products
               </button>
+            )}
+            {(searchQuery || activeCategory !== 'All') && highlightsMode && (
+              <button
+                type="button"
+                onClick={() => { setSearchQuery(''); setActiveCategory('All'); }}
+                className="mt-4 text-sm text-primary font-semibold hover:underline"
+              >
+                Clear filters
+              </button>
+            )}
+            {!searchQuery && activeCategory === 'All' && highlightsMode && (
+              <Link
+                to="/"
+                className="mt-4 inline-block text-sm text-primary font-semibold hover:underline"
+              >
+                Browse full catalog
+              </Link>
             )}
           </div>
         ) : (
@@ -249,7 +359,7 @@ const ProductsPage = () => {
                 {getCategoryEmoji(activeCategory)} {activeCategory}
               </h2>
             )}
-            <ProductGrid products={filteredProducts} loading={false} error={null} />
+            <ProductGrid products={filteredProducts} loading={false} error={null} flashProductId={flashProductId} />
           </>
         )}
       </div>

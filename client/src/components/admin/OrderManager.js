@@ -27,11 +27,24 @@ const STATUS_FLOW = {
 
 const ALL_STATUSES = ['pending', 'confirmed', 'delivered', 'cancelled'];
 
+const POLL_INTERVAL_MS = 10000;
+
 const statusLabel = (s) => STATUS_LABELS[s] || (s ? s.charAt(0).toUpperCase() + s.slice(1) : '');
+
+const formatLastUpdated = (d) => {
+  if (!d) return '';
+  try {
+    return d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  } catch {
+    return '';
+  }
+};
 
 const OrderManager = () => {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [lastUpdatedAt, setLastUpdatedAt] = useState(null);
+  const [silentRefreshing, setSilentRefreshing] = useState(false);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [showStatusModal, setShowStatusModal] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState(null);
@@ -41,30 +54,34 @@ const OrderManager = () => {
   const [adminNote, setAdminNote] = useState('');
   const [updatingStatus, setUpdatingStatus] = useState(false);
 
-  const fetchOrders = useCallback(async () => {
+  const fetchOrders = useCallback(async (opts = {}) => {
+    const silent = !!opts.silent;
     try {
-      setLoading(true);
+      if (silent) setSilentRefreshing(true);
+      else setLoading(true);
       const params = { limit: 100 };
       if (statusFilter !== 'all') params.status = statusFilter;
       const response = await api.get('/admin/orders', { params });
       setOrders(response.data.orders || []);
+      setLastUpdatedAt(new Date());
     } catch (error) {
       console.error('Failed to fetch orders:', error);
     } finally {
-      setLoading(false);
+      if (silent) setSilentRefreshing(false);
+      else setLoading(false);
     }
   }, [statusFilter]);
 
   useEffect(() => {
-    fetchOrders();
+    fetchOrders({ silent: false });
   }, [fetchOrders]);
 
   useEffect(() => {
     const interval = setInterval(() => {
       if (document.visibilityState !== 'visible') return;
       if (updatingStatus || showDetailsModal || showStatusModal) return;
-      fetchOrders();
-    }, 15000);
+      fetchOrders({ silent: true });
+    }, POLL_INTERVAL_MS);
 
     return () => clearInterval(interval);
   }, [fetchOrders, updatingStatus, showDetailsModal, showStatusModal]);
@@ -80,7 +97,7 @@ const OrderManager = () => {
       setShowStatusModal(false);
       setSelectedOrder(null);
       setAdminNote('');
-      fetchOrders();
+      fetchOrders({ silent: true });
     } catch (error) {
       console.error('Failed to update order status:', error.response?.data?.message || error.message);
     } finally {
@@ -117,9 +134,25 @@ const OrderManager = () => {
     <div>
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-6">
         <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Order Management</h1>
-        <button onClick={fetchOrders} className="text-sm text-blue-600 hover:underline font-medium">
-          Refresh
-        </button>
+        <div className="flex flex-wrap items-center gap-3 text-sm text-gray-600">
+          {silentRefreshing && (
+            <span className="text-blue-600 font-medium" aria-live="polite">
+              Syncing…
+            </span>
+          )}
+          {lastUpdatedAt && (
+            <span className="text-gray-500">
+              Last updated {formatLastUpdated(lastUpdatedAt)}
+            </span>
+          )}
+          <button
+            type="button"
+            onClick={() => fetchOrders({ silent: false })}
+            className="text-blue-600 hover:underline font-medium"
+          >
+            Refresh
+          </button>
+        </div>
       </div>
 
       {/* Filters */}

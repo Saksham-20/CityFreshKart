@@ -1,7 +1,7 @@
 import React from 'react';
 import ProductCard from './ProductCard';
 
-const ProductGrid = ({ products, loading, error }) => {
+const ProductGrid = ({ products, loading, error, flashProductId = null }) => {
   if (loading) {
     return (
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4 sm:gap-6">
@@ -56,9 +56,13 @@ const ProductGrid = ({ products, loading, error }) => {
 
   return (
     <div className="asymmetric-grid gap-2.5 sm:gap-4">
-      {products.map((product) => (
-        <ProductCard key={product.id} product={product} />
-      ))}
+      {products.map((product) => {
+        const pid = product.id || product.product_id;
+        const flash = flashProductId != null && String(pid) === String(flashProductId);
+        return (
+          <ProductCard key={product.id || product.product_id} product={product} highlightFlash={flash} />
+        );
+      })}
     </div>
   );
 };

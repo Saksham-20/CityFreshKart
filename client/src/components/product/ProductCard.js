@@ -7,7 +7,7 @@ const PIECE_OPTIONS = [1, 2, 3, 4];
 
 const formatWeight = (w) => w < 1 ? `${w * 1000}g` : `${w}kg`;
 
-const ProductCard = React.memo(({ product, className = '' }) => {
+const ProductCard = React.memo(({ product, className = '', highlightFlash = false }) => {
   const { addToCart, removeFromCart, items: cartItems, updateItemQuantity } = useCart();
 
   const isPerPiece = product.pricing_type === 'per_piece';
@@ -65,7 +65,7 @@ const ProductCard = React.memo(({ product, className = '' }) => {
   return (
     <div
       id={productId ? `product-${productId}` : undefined}
-      className={`group bg-surface-container-lowest rounded-3xl outline outline-1 outline-outline-variant/10 hover:shadow-editorial hover:-translate-y-0.5 transition-all duration-200 overflow-visible flex flex-col shadow-[0_4px_24px_-8px_rgba(0,0,0,0.05)] ${className}`}
+      className={`group bg-surface-container-lowest rounded-3xl outline outline-1 outline-outline-variant/10 hover:shadow-editorial hover:-translate-y-0.5 transition-all duration-200 overflow-visible flex flex-col shadow-[0_4px_24px_-8px_rgba(0,0,0,0.05)] ${highlightFlash ? 'ring-2 ring-primary ring-offset-2 ring-offset-surface z-[1]' : ''} ${className}`}
     >
 
       {/* Image */}

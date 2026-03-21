@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import useAuth from '../hooks/useAuth';
 import Button from '../components/ui/Button';
+import Modal from '../components/ui/Modal';
 import Loading from '../components/ui/Loading';
 import Breadcrumb from '../components/common/Breadcrumb';
 import api from '../services/api';
@@ -44,6 +45,9 @@ const ProfilePage = () => {
   const [recentOrders, setRecentOrders] = useState([]);
   const [ordersLoading, setOrdersLoading] = useState(false);
   const [notificationLoading, setNotificationLoading] = useState(false);
+  const [showPushModal, setShowPushModal] = useState(false);
+
+  const vapidConfigured = !!process.env.REACT_APP_VAPID_PUBLIC_KEY;
 
   const ORDER_STATUS_LABELS = {
     pending: 'Pending', confirmed: 'Accepted', delivered: 'Delivered', cancelled: 'Rejected',
@@ -69,6 +73,16 @@ const ProfilePage = () => {
       fetchRecentOrders();
     }
   }, [user, activeSection]);
+
+  useEffect(() => {
+    if (activeSection !== 'security') return;
+    if (!vapidConfigured) return;
+    if (typeof window === 'undefined' || !('Notification' in window)) return;
+    if (Notification.permission !== 'default') return;
+    if (sessionStorage.getItem('cfk_push_intro_auto')) return;
+    sessionStorage.setItem('cfk_push_intro_auto', '1');
+    setShowPushModal(true);
+  }, [activeSection, vapidConfigured]);
 
   const fetchRecentOrders = async () => {
     try {
@@ -248,9 +262,29 @@ const ProfilePage = () => {
     toast.success('Logged out successfully');
   };
 
-  const handleEnableNotifications = async () => {
+  const handleOpenPushModal = () => {
+    if (!('Notification' in window)) {
+      toast.error('This browser does not support notifications.');
+      return;
+    }
+    if (Notification.permission === 'denied') {
+      toast.error(
+        'Notifications are blocked for this site. Use the lock or site icon in the address bar → Site settings → Notifications → Allow, then try again.',
+        { duration: 6500 },
+      );
+      return;
+    }
+    setShowPushModal(true);
+  };
+
+  const handleConfirmPushSubscribe = async () => {
+    if (!vapidConfigured) {
+      setShowPushModal(false);
+      return;
+    }
     try {
       setNotificationLoading(true);
+      setShowPushModal(false);
       await subscribeToWebPush();
       toast.success('Push notifications enabled successfully');
     } catch (error) {
@@ -266,6 +300,43 @@ const ProfilePage = () => {
 
   return (
     <>
+      <Modal
+        isOpen={showPushModal}
+        onClose={() => setShowPushModal(false)}
+        title="Enable push notifications?"
+        size="sm"
+      >
+        <div className="space-y-4">
+          {!vapidConfigured ? (
+            <p className="text-sm text-on-surface-variant">
+              Push notifications are not configured for this build. Set
+              {' '}
+              <code className="text-xs bg-surface-container-low px-1 rounded">REACT_APP_VAPID_PUBLIC_KEY</code>
+              {' '}
+              at build time to match the server&apos;s VAPID public key.
+            </p>
+          ) : (
+            <p className="text-sm text-on-surface-variant">
+              Get order updates and alerts on this device. Your browser will ask for permission next — you can change it later in site settings.
+            </p>
+          )}
+          <div className="flex flex-wrap justify-end gap-2 pt-2">
+            <button
+              type="button"
+              onClick={() => setShowPushModal(false)}
+              className="px-4 py-2 rounded-lg bg-surface-container-highest text-on-surface font-medium hover:bg-gray-50 transition-colors"
+            >
+              {vapidConfigured ? 'Cancel' : 'Close'}
+            </button>
+            {vapidConfigured && (
+              <Button type="button" onClick={handleConfirmPushSubscribe} loading={notificationLoading}>
+                Continue
+              </Button>
+            )}
+          </div>
+        </div>
+      </Modal>
+
       <div className="min-h-screen bg-surface pt-14 pb-24 md:pb-8">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
           <Breadcrumb />
@@ -560,7 +631,8 @@ const ProfilePage = () => {
                         Change Password
                       </button>
                       <button
-                        onClick={handleEnableNotifications}
+                        type="button"
+                        onClick={handleOpenPushModal}
                         disabled={notificationLoading}
                         className="px-4 py-2 outline outline-2 outline-primary/40 rounded-lg text-primary font-medium hover:bg-secondary-container/30 transition-colors disabled:opacity-60"
                       >
