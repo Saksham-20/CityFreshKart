@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { IMAGE_DIMS } from '../../utils/imageUtils';
 
 /**
  * LazyImage — lazy-loads images using IntersectionObserver.
@@ -50,7 +51,10 @@ const LazyImage = ({
                 <img
                     src={src}
                     alt={alt}
+                    width={width}
+                    height={height}
                     loading="lazy"
+                    decoding="async"
                     onLoad={() => setIsLoaded(true)}
                     className={`w-full h-full object-cover transition-opacity duration-500 ${isLoaded ? 'opacity-100' : 'opacity-0'
                         }`}

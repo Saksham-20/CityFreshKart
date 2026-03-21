@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import api from '../../services/api';
-import { getImageUrl, getPlaceholderImage } from '../../utils/imageUtils';
+import { getImageUrl, getPlaceholderImage, IMAGE_DIMS } from '../../utils/imageUtils';
 
 const ProductSlide = ({ product }) => {
   if (!product) return null;
@@ -14,7 +14,11 @@ const ProductSlide = ({ product }) => {
         <img
           src={getImageUrl(product.image_url) || getPlaceholderImage()}
           alt={product.name}
+          width={IMAGE_DIMS.product4x3.width}
+          height={IMAGE_DIMS.product4x3.height}
           className="w-full h-full object-cover"
+          loading="lazy"
+          decoding="async"
           onError={(e) => {
             e.target.onerror = null;
             e.target.src = getPlaceholderImage();

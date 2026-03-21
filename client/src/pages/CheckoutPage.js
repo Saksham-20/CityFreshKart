@@ -19,6 +19,8 @@ const CheckoutPage = () => {
     houseNumber: '',
     floor: '',
     addressLine: '',
+    society: '',
+    sector: '',
   });
   const [saveNewAddress, setSaveNewAddress] = useState(false);
   const [deliveryNotes, setDeliveryNotes] = useState('');
@@ -81,6 +83,8 @@ const CheckoutPage = () => {
         house_number: newAddressForm.houseNumber,
         floor: newAddressForm.floor,
         address_line: newAddressForm.addressLine,
+        society: newAddressForm.society,
+        sector: newAddressForm.sector,
       });
     }
     const addr = savedAddresses.find(a => a.id === selectedAddressId);
@@ -294,10 +298,7 @@ const CheckoutPage = () => {
                           )}
                         </div>
                         <p className="text-on-surface-variant mt-0.5">
-                          {[addr.house_number,
-                            addr.floor ? `Floor ${addr.floor}` : '',
-                            addr.address_line,
-                          ].filter(Boolean).join(', ')}
+                          {addressService.formatAddressText(addr)}
                         </p>
                       </div>
                       {!useNewAddress && selectedAddressId === addr.id && (
@@ -366,6 +367,35 @@ const CheckoutPage = () => {
                               placeholder="House no., Street, Area"
                               className="w-full px-3 py-2 rounded-lg text-sm bg-surface-container-highest focus:bg-surface-container-lowest focus:outline-none focus:ring-2 focus:ring-primary/25 ghost-outline-primary"
                             />
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <label className="block text-xs font-medium text-on-surface-variant mb-1">Society</label>
+                              <input
+                                type="text"
+                                value={newAddressForm.society}
+                                onChange={(e) => {
+                                  setNewAddressForm(p => ({ ...p, society: e.target.value }));
+                                  if (error) setError('');
+                                }}
+                                placeholder="Society / building"
+                                className="w-full px-3 py-2 rounded-lg text-sm bg-surface-container-highest focus:bg-surface-container-lowest focus:outline-none focus:ring-2 focus:ring-primary/25 ghost-outline-primary"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-medium text-on-surface-variant mb-1">Sector</label>
+                              <input
+                                type="text"
+                                value={newAddressForm.sector}
+                                onChange={(e) => {
+                                  setNewAddressForm(p => ({ ...p, sector: e.target.value }));
+                                  if (error) setError('');
+                                }}
+                                placeholder="Sector"
+                                className="w-full px-3 py-2 rounded-lg text-sm bg-surface-container-highest focus:bg-surface-container-lowest focus:outline-none focus:ring-2 focus:ring-primary/25 ghost-outline-primary"
+                              />
+                            </div>
                           </div>
 
                           <label className="flex items-center gap-2 cursor-pointer select-none">

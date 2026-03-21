@@ -20,6 +20,7 @@ const razorpayRoutes = require('./routes/razorpay');
 const cartRoutes = require('./routes/cart');
 const addressRoutes = require('./routes/addresses');
 const notificationRoutes = require('./routes/notifications');
+const marketingRoutes = require('./routes/marketing');
 const { collectCspConnectOrigins } = require('./utils/cspOrigins');
 
 const app = express();
@@ -120,6 +121,7 @@ console.log('✅ Razorpay routes registered at /api/razorpay');
 app.use('/api/cart', cartRoutes);
 app.use('/api/addresses', addressRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/marketing', marketingRoutes);
 
 // Explicit deprecation for removed wishlist feature
 app.use('/api/wishlist', (req, res) => {

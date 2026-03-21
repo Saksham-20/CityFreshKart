@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../../services/api';
-import { getImageUrl } from '../../utils/imageUtils';
+import { getImageUrl, IMAGE_DIMS } from '../../utils/imageUtils';
 
 const PromoCarousel = () => {
   const [items, setItems] = useState([]);
@@ -30,7 +30,7 @@ const PromoCarousel = () => {
           <div className="h-6 w-40 bg-surface-container-low rounded-lg animate-pulse" />
           <div className="h-4 w-14 bg-surface-container-low rounded animate-pulse" />
         </div>
-        <div className="flex gap-4 overflow-hidden pb-2 -mx-4 px-4">
+        <div className="flex gap-4 overflow-hidden pb-2 -mx-4 px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
           {[1, 2].map((k) => (
             <div key={k} className="flex-none w-[280px] h-[168px] rounded-3xl bg-surface-container-low animate-pulse" />
           ))}
@@ -52,7 +52,7 @@ const PromoCarousel = () => {
           See all
         </Link>
       </div>
-      <div className="flex gap-4 overflow-x-auto pb-3 -mx-4 px-4 scrollbar-hide snap-x snap-mandatory scroll-pl-4">
+      <div className="flex gap-4 overflow-x-auto pb-3 -mx-4 px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8 scrollbar-hide snap-x snap-mandatory scroll-pl-4">
         {items.map((product) => {
           const price = Number(product.price_per_kg) || 0;
           const d = Number(product.discount) || 0;
@@ -118,8 +118,11 @@ const PromoCarousel = () => {
                   <img
                     alt=""
                     src={getImageUrl(product.image_url)}
+                    width={IMAGE_DIMS.promoThumb.width}
+                    height={IMAGE_DIMS.promoThumb.height}
                     className="w-full h-full object-contain drop-shadow-xl product-image-offset"
                     loading="lazy"
+                    decoding="async"
                     onError={(e) => {
                       e.target.onerror = null;
                       e.target.src = 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22120%22 height=%22120%22%3E%3Crect fill=%22%23f3f4f6%22 width=%22120%22 height=%22120%22 rx=%2212%22/%3E%3Ctext x=%2250%25%22 y=%2252%25%22 font-size=%2240%22 text-anchor=%22middle%22%3E%F0%9F%A5%AC%3C/text%3E%3C/svg%3E';

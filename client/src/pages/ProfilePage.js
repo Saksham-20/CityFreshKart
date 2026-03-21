@@ -37,6 +37,8 @@ const ProfilePage = () => {
     addressLine: '',
     houseNumber: '',
     floor: '',
+    society: '',
+    sector: '',
     isDefault: false,
   });
   const [activeSection, setActiveSection] = useState('profile');
@@ -44,7 +46,7 @@ const ProfilePage = () => {
   // Recent orders state
   const [recentOrders, setRecentOrders] = useState([]);
   const [ordersLoading, setOrdersLoading] = useState(false);
-  const [notificationLoading, setNotificationLoading] = useState(false);
+  const [pushSubscribing, setPushSubscribing] = useState(false);
   const [showPushModal, setShowPushModal] = useState(false);
 
   const vapidConfigured = !!process.env.REACT_APP_VAPID_PUBLIC_KEY;
@@ -79,10 +81,14 @@ const ProfilePage = () => {
     if (!vapidConfigured) return;
     if (typeof window === 'undefined' || !('Notification' in window)) return;
     if (Notification.permission !== 'default') return;
-    if (sessionStorage.getItem('cfk_push_intro_auto')) return;
-    sessionStorage.setItem('cfk_push_intro_auto', '1');
+    if (sessionStorage.getItem('cfk_push_intro_v2')) return;
+    sessionStorage.setItem('cfk_push_intro_v2', '1');
     setShowPushModal(true);
   }, [activeSection, vapidConfigured]);
+
+  useEffect(() => () => {
+    setPushSubscribing(false);
+  }, []);
 
   const fetchRecentOrders = async () => {
     try {
@@ -116,6 +122,8 @@ const ProfilePage = () => {
         addressLine: address.address_line || '',
         houseNumber: address.house_number || '',
         floor: address.floor || '',
+        society: address.society || '',
+        sector: address.sector || '',
         isDefault: address.is_default || false,
       });
     } else {
@@ -124,6 +132,8 @@ const ProfilePage = () => {
         addressLine: '',
         houseNumber: '',
         floor: '',
+        society: '',
+        sector: '',
         isDefault: false,
       });
     }
@@ -283,14 +293,14 @@ const ProfilePage = () => {
       return;
     }
     try {
-      setNotificationLoading(true);
-      setShowPushModal(false);
+      setPushSubscribing(true);
       await subscribeToWebPush();
       toast.success('Push notifications enabled successfully');
+      setShowPushModal(false);
     } catch (error) {
       toast.error(error.message || 'Failed to enable notifications');
     } finally {
-      setNotificationLoading(false);
+      setPushSubscribing(false);
     }
   };
 
@@ -302,9 +312,14 @@ const ProfilePage = () => {
     <>
       <Modal
         isOpen={showPushModal}
-        onClose={() => setShowPushModal(false)}
+        onClose={() => {
+          setPushSubscribing(false);
+          setShowPushModal(false);
+        }}
         title="Enable push notifications?"
         size="sm"
+        closeOnOverlayClick={!pushSubscribing}
+        closeOnEscape={!pushSubscribing}
       >
         <div className="space-y-4">
           {!vapidConfigured ? (
@@ -323,13 +338,17 @@ const ProfilePage = () => {
           <div className="flex flex-wrap justify-end gap-2 pt-2">
             <button
               type="button"
-              onClick={() => setShowPushModal(false)}
-              className="px-4 py-2 rounded-lg bg-surface-container-highest text-on-surface font-medium hover:bg-gray-50 transition-colors"
+              disabled={pushSubscribing}
+              onClick={() => {
+                setPushSubscribing(false);
+                setShowPushModal(false);
+              }}
+              className="px-4 py-2 rounded-lg bg-surface-container-highest text-on-surface font-medium hover:bg-gray-50 transition-colors disabled:opacity-50"
             >
               {vapidConfigured ? 'Cancel' : 'Close'}
             </button>
             {vapidConfigured && (
-              <Button type="button" onClick={handleConfirmPushSubscribe} loading={notificationLoading}>
+              <Button type="button" onClick={handleConfirmPushSubscribe} loading={pushSubscribing}>
                 Continue
               </Button>
             )}
@@ -505,6 +524,28 @@ const ProfilePage = () => {
                           placeholder="e.g. 2"
                         />
                       </div>
+                      <div>
+                        <label className="block text-xs font-medium text-on-surface-variant mb-1">Society</label>
+                        <input
+                          type="text"
+                          name="society"
+                          value={addressForm.society}
+                          onChange={handleAddressFormChange}
+                          className="w-full px-3 py-2 rounded-lg bg-surface-container-highest text-sm focus:ring-2 focus:ring-2 focus:ring-primary/25 ghost-outline-primary outline-none"
+                          placeholder="Building / society name"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-on-surface-variant mb-1">Sector</label>
+                      <input
+                        type="text"
+                        name="sector"
+                        value={addressForm.sector}
+                        onChange={handleAddressFormChange}
+                        className="w-full px-3 py-2 rounded-lg bg-surface-container-highest text-sm focus:ring-2 focus:ring-2 focus:ring-primary/25 ghost-outline-primary outline-none"
+                        placeholder="e.g. Sector 62"
+                      />
                     </div>
                     <label className="flex items-center gap-2 cursor-pointer">
                       <input type="checkbox" name="isDefault" checked={addressForm.isDefault} onChange={handleAddressFormChange} className="w-4 h-4 accent-green-600" />
@@ -547,9 +588,7 @@ const ProfilePage = () => {
                               )}
                             </div>
                             <p className="text-sm text-on-surface-variant">
-                              {[addr.house_number, addr.floor ? `Floor ${addr.floor}` : '', addr.address_line]
-                                .filter(Boolean)
-                                .join(', ')}
+                              {addressService.formatAddressText(addr)}
                             </p>
                           </div>
                           <div className="flex flex-col gap-1">
@@ -622,6 +661,18 @@ const ProfilePage = () => {
             {activeSection === 'security' && (
               <div className="bg-surface-container-lowest rounded-2xl outline outline-1 outline-outline-variant/15 shadow-editorial p-6">
                 <h3 className="text-lg font-semibold text-on-surface mb-6">Security</h3>
+                {!vapidConfigured && (
+                  <div
+                    role="status"
+                    className="mb-4 p-3 rounded-xl bg-amber-50 outline outline-1 outline-amber-200/80 text-sm text-amber-950"
+                  >
+                    <strong className="font-semibold">Push notifications are not configured on this deployment.</strong>
+                    {' '}
+                    The app build must include <code className="text-xs bg-white/80 px-1 rounded">REACT_APP_VAPID_PUBLIC_KEY</code>
+                    {' '}
+                    (same value as the server&apos;s VAPID public key). Contact support if alerts do not work after updating the app.
+                  </div>
+                )}
                 {!showPasswordForm ? (
                   <div>
                     <p className="text-sm text-on-surface-variant mb-4">Manage your account security by changing your password regularly.</p>
@@ -633,10 +684,10 @@ const ProfilePage = () => {
                       <button
                         type="button"
                         onClick={handleOpenPushModal}
-                        disabled={notificationLoading}
+                        disabled={pushSubscribing}
                         className="px-4 py-2 outline outline-2 outline-primary/40 rounded-lg text-primary font-medium hover:bg-secondary-container/30 transition-colors disabled:opacity-60"
                       >
-                        {notificationLoading ? 'Enabling...' : 'Enable Push Notifications'}
+                        {pushSubscribing ? 'Enabling...' : 'Enable Push Notifications'}
                       </button>
                     </div>
                   </div>

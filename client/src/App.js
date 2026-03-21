@@ -30,6 +30,7 @@ const AdminOrdersPage = lazy(() => import('./pages/AdminOrdersPage'));
 const AdminUsersPage = lazy(() => import('./pages/AdminUsersPage'));
 const AdminAnalyticsPage = lazy(() => import('./pages/AdminAnalyticsPage'));
 const AdminSettingsPage = lazy(() => import('./pages/AdminSettingsPage'));
+const AdminMarketingBannersPage = lazy(() => import('./pages/AdminMarketingBannersPage'));
 const OrdersPage = lazy(() => import('./pages/OrdersPage'));
 const OrderDetailPage = lazy(() => import('./pages/OrderDetailPage'));
 const ProfilePage = lazy(() => import('./pages/ProfilePage'));
@@ -143,6 +144,14 @@ function App() {
             element={(
               <AdminRoute>
                 <AdminLayout><AdminSettingsPage /></AdminLayout>
+              </AdminRoute>
+            )}
+          />
+          <Route
+            path="/admin/marketing-banners"
+            element={(
+              <AdminRoute>
+                <AdminLayout><AdminMarketingBannersPage /></AdminLayout>
               </AdminRoute>
             )}
           />

@@ -200,6 +200,7 @@ CREATE TABLE IF NOT EXISTS user_addresses (
     house_number VARCHAR(100) NOT NULL DEFAULT '',
     floor VARCHAR(100) DEFAULT '',
     society VARCHAR(150) DEFAULT '',
+    sector VARCHAR(150) DEFAULT '',
     city VARCHAR(100) NOT NULL,
     state VARCHAR(100) NOT NULL,
     postal_code VARCHAR(20) NOT NULL,
@@ -213,6 +214,7 @@ CREATE TABLE IF NOT EXISTS user_addresses (
 ALTER TABLE user_addresses ADD COLUMN IF NOT EXISTS house_number VARCHAR(100) NOT NULL DEFAULT '';
 ALTER TABLE user_addresses ADD COLUMN IF NOT EXISTS floor VARCHAR(100) DEFAULT '';
 ALTER TABLE user_addresses ADD COLUMN IF NOT EXISTS society VARCHAR(150) DEFAULT '';
+ALTER TABLE user_addresses ADD COLUMN IF NOT EXISTS sector VARCHAR(150) DEFAULT '';
 
 -- Create indexes for better performance
 CREATE INDEX IF NOT EXISTS idx_products_is_active ON products(is_active);
@@ -296,6 +298,23 @@ CREATE TABLE IF NOT EXISTS push_subscriptions (
 DROP TRIGGER IF EXISTS update_push_subscriptions_updated_at ON push_subscriptions;
 CREATE TRIGGER update_push_subscriptions_updated_at BEFORE UPDATE ON push_subscriptions FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE INDEX IF NOT EXISTS idx_push_subscriptions_user_id ON push_subscriptions(user_id);
+
+-- Marketing carousel (admin-managed storefront banners)
+CREATE TABLE IF NOT EXISTS marketing_banners (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    title VARCHAR(200) DEFAULT '',
+    subtitle VARCHAR(500) DEFAULT '',
+    image_url TEXT NOT NULL,
+    link_url TEXT DEFAULT '',
+    sort_order INT DEFAULT 0,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+DROP TRIGGER IF EXISTS update_marketing_banners_updated_at ON marketing_banners;
+CREATE TRIGGER update_marketing_banners_updated_at BEFORE UPDATE ON marketing_banners FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE INDEX IF NOT EXISTS idx_marketing_banners_active_sort ON marketing_banners (is_active, sort_order, created_at DESC);
 
 -- Wishlist tables removed (feature fully disabled)
 DROP TABLE IF EXISTS wishlist CASCADE;

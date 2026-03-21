@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import Loading from '../ui/Loading';
 import useAuth from '../../hooks/useAuth';
 import api from '../../services/api';
-import { getImageUrl } from '../../utils/imageUtils';
+import { getImageUrl, IMAGE_DIMS } from '../../utils/imageUtils';
 
 const Dashboard = () => {
   const { user } = useAuth();
@@ -308,7 +308,11 @@ const Dashboard = () => {
                       <img
                         src={product.image_url ? getImageUrl(product.image_url) : '/placeholder-product.jpg'}
                         alt={product.name}
+                        width={IMAGE_DIMS.adminRow.width}
+                        height={IMAGE_DIMS.adminRow.height}
                         className="w-12 h-12 rounded object-cover ml-3"
+                        loading="lazy"
+                        decoding="async"
                       />
                       <div className="ml-3">
                         <p className="text-sm font-medium text-gray-900">{product.name}</p>

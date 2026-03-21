@@ -1,7 +1,7 @@
 import React from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import useCart from '../hooks/useCart';
-import { getImageUrl, getPlaceholderImage } from '../utils/imageUtils';
+import { getImageUrl, getPlaceholderImage, IMAGE_DIMS } from '../utils/imageUtils';
 
 const WEIGHT_STEP = 0.5;
 const FREE_DELIVERY_THRESHOLD = 300;
@@ -98,7 +98,11 @@ const CartPage = () => {
                   <img
                     src={getImageUrl(item.image_url)}
                     alt={item.name}
+                    width={IMAGE_DIMS.cartLineSm.width}
+                    height={IMAGE_DIMS.cartLineSm.height}
                     className="w-full h-full object-cover"
+                    loading="lazy"
+                    decoding="async"
                     onError={(e) => { e.target.src = getPlaceholderImage(); }}
                   />
                 </div>

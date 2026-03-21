@@ -1,16 +1,21 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FiUser, FiShoppingBag, FiX, FiSettings, FiLogOut, FiMapPin, FiChevronDown, FiClock, FiPackage } from 'react-icons/fi';
+import { FiUser, FiShoppingBag, FiX, FiSettings, FiLogOut, FiMapPin, FiChevronDown, FiClock, FiPackage, FiDownload } from 'react-icons/fi';
 import useAuth from '../../hooks/useAuth';
 import useCart from '../../hooks/useCart';
+import InstallAppModal from '../pwa/InstallAppModal';
+import { isAppInstalled, isStandaloneDisplayMode } from '../../utils/pwa';
 
 const Header = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [isScrolled, setIsScrolled] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [showInstallModal, setShowInstallModal] = useState(false);
   const searchRef = useRef(null);
   const userMenuRef = useRef(null);
+
+  const canShowInstallApp = !isAppInstalled() && !isStandaloneDisplayMode();
 
   const { user, logout } = useAuth();
   const { items: cartItems } = useCart();
@@ -119,6 +124,18 @@ const Header = () => {
           {/* Right Actions */}
           <div className="flex items-center gap-1 flex-shrink-0">
 
+            {user && canShowInstallApp && (
+              <button
+                type="button"
+                onClick={() => setShowInstallModal(true)}
+                className="flex p-2 text-on-surface-variant hover:text-primary hover:bg-secondary-container/30 rounded-xl transition-colors"
+                title="Install app"
+                aria-label="Install app"
+              >
+                <FiDownload className="w-5 h-5" />
+              </button>
+            )}
+
             {/* Admin Panel button */}
             {user?.is_admin && (
               <Link
@@ -214,6 +231,8 @@ const Header = () => {
 
         </div>
       </div>
+
+      <InstallAppModal isOpen={showInstallModal} onClose={() => setShowInstallModal(false)} />
     </header>
   );
 };

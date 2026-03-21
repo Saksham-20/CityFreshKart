@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import Button from '../ui/Button';
 import Loading from '../ui/Loading';
 import api from '../../services/api';
-import { getImageUrl } from '../../utils/imageUtils';
+import { getImageUrl, IMAGE_DIMS } from '../../utils/imageUtils';
 
 const Analytics = () => {
   const [loading, setLoading] = useState(true);
@@ -248,7 +248,11 @@ const Analytics = () => {
                       <img
                         src={product.image_url ? getImageUrl(product.image_url) : '/placeholder-product.jpg'}
                         alt={product.name}
+                        width={IMAGE_DIMS.adminRowSm.width}
+                        height={IMAGE_DIMS.adminRowSm.height}
                         className="w-10 h-10 rounded object-cover ml-3"
+                        loading="lazy"
+                        decoding="async"
                       />
                       <div className="ml-3">
                         <p className="text-sm font-medium text-gray-900">{product.name}</p>

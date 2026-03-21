@@ -1,6 +1,6 @@
 import React, { useMemo, useCallback, useState } from 'react';
 import useCart from '../../hooks/useCart';
-import { getImageUrl } from '../../utils/imageUtils';
+import { getImageUrl, IMAGE_DIMS } from '../../utils/imageUtils';
 
 const KG_OPTIONS = [0.5, 1, 1.5, 2];
 const PIECE_OPTIONS = [1, 2, 3, 4];
@@ -73,6 +73,8 @@ const ProductCard = React.memo(({ product, className = '', highlightFlash = fals
         <img
           src={getImageUrl(product.image_url)}
           alt={product.name}
+          width={IMAGE_DIMS.productSquare.width}
+          height={IMAGE_DIMS.productSquare.height}
           className="w-full h-full object-cover product-image-offset group-hover:scale-105 transition-transform duration-300"
           loading="lazy"
           decoding="async"

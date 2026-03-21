@@ -4,7 +4,7 @@ import Button from '../ui/Button';
 import Input from '../ui/Input';
 import Modal from '../ui/Modal';
 import Loading from '../ui/Loading';
-import { getImageUrl, getPlaceholderImage } from '../../utils/imageUtils';
+import { getImageUrl, getPlaceholderImage, IMAGE_DIMS } from '../../utils/imageUtils';
 import toast from 'react-hot-toast';
 
 const emptyForm = () => ({
@@ -54,9 +54,16 @@ const ImageSection = ({
     <label className="block text-sm font-medium text-gray-700 mb-2">Product Image</label>
     {isEdit && existingImages.length > 0 && (
       <div className="mb-3 flex items-center gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
-        <img src={getImageUrl(existingImages[0].url)} alt="Current"
+        <img
+          src={getImageUrl(existingImages[0].url)}
+          alt="Current"
+          width={IMAGE_DIMS.formPreviewLg.width}
+          height={IMAGE_DIMS.formPreviewLg.height}
           className="h-16 w-16 object-cover rounded-lg border border-gray-200"
-          onError={(e) => { e.target.src = getPlaceholderImage(); }} />
+          loading="lazy"
+          decoding="async"
+          onError={(e) => { e.target.src = getPlaceholderImage(); }}
+        />
         <div className="flex-1">
           <p className="text-xs text-gray-500 mb-1">Current image</p>
           <button type="button" onClick={() => { setExistingImages([]); }}
@@ -70,9 +77,16 @@ const ImageSection = ({
           value={formData.image_url} onChange={handleInputChange} className="w-full mb-2"
           placeholder="https://images.pexels.com/photos/..." />
         {formData.image_url && (
-          <img src={formData.image_url} alt="Preview"
+          <img
+            src={formData.image_url}
+            alt="Preview"
+            width={IMAGE_DIMS.formPreview.width}
+            height={IMAGE_DIMS.formPreview.height}
             className="mb-2 h-20 w-20 object-cover rounded-lg border border-gray-200"
-            onError={(e) => { e.target.style.display = 'none'; }} />
+            loading="lazy"
+            decoding="async"
+            onError={(e) => { e.target.style.display = 'none'; }}
+          />
         )}
         <p className="text-xs text-gray-400 mb-2 text-center">- or upload a file -</p>
         {selectedImages.length === 0 ? (
@@ -92,7 +106,15 @@ const ImageSection = ({
           </div>
         ) : (
           <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
-            <img src={imagePreview[0]} alt="New" className="h-14 w-14 object-cover rounded-lg border border-gray-200" />
+            <img
+              src={imagePreview[0]}
+              alt="New"
+              width={IMAGE_DIMS.formThumb.width}
+              height={IMAGE_DIMS.formThumb.height}
+              className="h-14 w-14 object-cover rounded-lg border border-gray-200"
+              loading="lazy"
+              decoding="async"
+            />
             <div className="flex-1">
               <p className="text-xs text-gray-700 truncate">{selectedImages[0]?.name}</p>
               <button type="button" onClick={() => { setSelectedImages([]); setImagePreview([]); }}
@@ -398,9 +420,16 @@ const ProductManager = () => {
                 <tr key={product.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">
-                      <img className="h-12 w-12 rounded-lg object-cover border border-gray-200 flex-shrink-0"
-                        src={getImageUrl(product.image_url)} alt={product.name}
-                        onError={(e) => { e.target.src = getPlaceholderImage(); }} />
+                      <img
+                        className="h-12 w-12 rounded-lg object-cover border border-gray-200 flex-shrink-0"
+                        src={getImageUrl(product.image_url)}
+                        alt={product.name}
+                        width={IMAGE_DIMS.adminRow.width}
+                        height={IMAGE_DIMS.adminRow.height}
+                        loading="lazy"
+                        decoding="async"
+                        onError={(e) => { e.target.src = getPlaceholderImage(); }}
+                      />
                       <div className="ml-3">
                         <p className="text-sm font-medium text-gray-900">{product.name}</p>
                         {product.discount > 0 && (

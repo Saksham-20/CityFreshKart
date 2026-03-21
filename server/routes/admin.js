@@ -25,6 +25,15 @@ const toPublicUploadPath = (file) => {
   return '';
 };
 
+/** Skip multer when client sends JSON (e.g. text-only banner update). */
+const optionalSingleImageUpload = (req, res, next) => {
+  const ct = req.headers['content-type'] || '';
+  if (ct.includes('multipart/form-data')) {
+    return upload.single('image')(req, res, next);
+  }
+  return next();
+};
+
 // Apply admin auth to all routes
 router.use(authenticateToken, requireAdmin);
 
@@ -1107,6 +1116,169 @@ router.delete('/categories/:name', async (req, res) => {
   } catch (error) {
     console.error('Delete category error:', error);
     res.status(500).json({ success: false, message: 'Failed to delete category' });
+  }
+});
+
+// --- Marketing banners (storefront carousel) ---
+
+// @route   GET /api/admin/marketing-banners
+router.get('/marketing-banners', async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT id, title, subtitle, image_url, link_url, sort_order, is_active, created_at, updated_at
+       FROM marketing_banners
+       ORDER BY sort_order ASC, created_at DESC`,
+    );
+    res.json({ success: true, data: { banners: result.rows } });
+  } catch (error) {
+    console.error('Admin list marketing banners:', error);
+    res.status(500).json({ success: false, message: 'Failed to load banners' });
+  }
+});
+
+// @route   PUT /api/admin/marketing-banners/reorder
+router.put(
+  '/marketing-banners/reorder',
+  [body('items').isArray({ min: 1 }).withMessage('items array required')],
+  async (req, res) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) return res.status(400).json({ success: false, errors: errors.array() });
+
+      const { items } = req.body;
+      const client = await pool.pool.connect();
+      try {
+        await client.query('BEGIN');
+        for (let i = 0; i < items.length; i += 1) {
+          const row = items[i];
+          const id = row?.id;
+          const sortOrder = parseInt(row?.sort_order, 10);
+          if (!id || !Number.isFinite(sortOrder)) {
+            await client.query('ROLLBACK');
+            return res.status(400).json({ success: false, message: 'Each item needs id and sort_order' });
+          }
+          await client.query(
+            'UPDATE marketing_banners SET sort_order = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+            [sortOrder, id],
+          );
+        }
+        await client.query('COMMIT');
+      } catch (e) {
+        await client.query('ROLLBACK');
+        throw e;
+      } finally {
+        client.release();
+      }
+      const result = await pool.query(
+        `SELECT id, title, subtitle, image_url, link_url, sort_order, is_active, created_at, updated_at
+         FROM marketing_banners ORDER BY sort_order ASC, created_at DESC`,
+      );
+      res.json({ success: true, data: { banners: result.rows } });
+    } catch (error) {
+      console.error('Reorder marketing banners:', error);
+      res.status(500).json({ success: false, message: 'Failed to reorder banners' });
+    }
+  },
+);
+
+// @route   POST /api/admin/marketing-banners
+router.post('/marketing-banners', optionalSingleImageUpload, handleUploadError, async (req, res) => {
+  try {
+    const { title, subtitle, link_url, sort_order, is_active, image_url } = req.body;
+    let finalImage = String(image_url || '').trim();
+    if (req.file) finalImage = toPublicUploadPath(req.file) || finalImage;
+    if (!finalImage) {
+      return res.status(400).json({ success: false, message: 'Provide an image file or image URL' });
+    }
+    const sort = parseInt(sort_order, 10);
+    const sortVal = Number.isFinite(sort) ? sort : 0;
+    const active = !['false', '0', ''].includes(String(is_active ?? 'true').toLowerCase());
+
+    const result = await pool.query(
+      `INSERT INTO marketing_banners (title, subtitle, image_url, link_url, sort_order, is_active)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       RETURNING *`,
+      [
+        String(title || '').trim().slice(0, 200),
+        String(subtitle || '').trim().slice(0, 500),
+        finalImage,
+        String(link_url || '').trim().slice(0, 2000),
+        sortVal,
+        active,
+      ],
+    );
+    res.status(201).json({ success: true, data: { banner: result.rows[0] } });
+  } catch (error) {
+    console.error('Create marketing banner:', error);
+    res.status(500).json({ success: false, message: 'Failed to create banner' });
+  }
+});
+
+// @route   PUT /api/admin/marketing-banners/:id
+router.put(
+  '/marketing-banners/:id',
+  optionalSingleImageUpload,
+  handleUploadError,
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+      const existing = await pool.query('SELECT * FROM marketing_banners WHERE id = $1', [id]);
+      if (existing.rows.length === 0) {
+        return res.status(404).json({ success: false, message: 'Banner not found' });
+      }
+      const prev = existing.rows[0];
+
+      const { title, subtitle, link_url, sort_order, is_active, image_url } = req.body;
+      let nextImage = prev.image_url;
+      if (req.file) {
+        nextImage = toPublicUploadPath(req.file) || nextImage;
+      } else if (image_url !== undefined && image_url !== null) {
+        const trimmed = String(image_url).trim();
+        if (trimmed) nextImage = trimmed.slice(0, 2000);
+      }
+
+      const sort = parseInt(sort_order, 10);
+      const sortVal = Number.isFinite(sort) ? sort : prev.sort_order;
+      const active = is_active !== undefined
+        ? !['false', '0'].includes(String(is_active).toLowerCase())
+        : prev.is_active;
+
+      const result = await pool.query(
+        `UPDATE marketing_banners
+         SET title = $1, subtitle = $2, image_url = $3, link_url = $4, sort_order = $5, is_active = $6,
+             updated_at = CURRENT_TIMESTAMP
+         WHERE id = $7
+         RETURNING *`,
+        [
+          title !== undefined ? String(title).trim().slice(0, 200) : prev.title,
+          subtitle !== undefined ? String(subtitle).trim().slice(0, 500) : prev.subtitle,
+          nextImage,
+          link_url !== undefined ? String(link_url).trim().slice(0, 2000) : prev.link_url,
+          sortVal,
+          active,
+          id,
+        ],
+      );
+      res.json({ success: true, data: { banner: result.rows[0] } });
+    } catch (error) {
+      console.error('Update marketing banner:', error);
+      res.status(500).json({ success: false, message: 'Failed to update banner' });
+    }
+  },
+);
+
+// @route   DELETE /api/admin/marketing-banners/:id
+router.delete('/marketing-banners/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const del = await pool.query('DELETE FROM marketing_banners WHERE id = $1 RETURNING id', [id]);
+    if (del.rowCount === 0) {
+      return res.status(404).json({ success: false, message: 'Banner not found' });
+    }
+    res.json({ success: true, data: { id } });
+  } catch (error) {
+    console.error('Delete marketing banner:', error);
+    res.status(500).json({ success: false, message: 'Failed to delete banner' });
   }
 });
 

@@ -29,7 +29,7 @@ router.post('/', authenticateToken, async (req, res) => {
       firstName, first_name, lastName, last_name,
       addressLine, address_line,
       houseNumber, house_number,
-      floor, society,
+      floor, society, sector,
       city, state, postalCode, postal_code, phone, isDefault, is_default,
     } = req.body;
 
@@ -40,6 +40,7 @@ router.post('/', authenticateToken, async (req, res) => {
     const zip = postalCode || postal_code;
     const floorValue = floor || '';
     const societyValue = society || '';
+    const sectorValue = sector || '';
     const deflt = isDefault !== undefined ? isDefault : (is_default || false);
 
     if (!line1 || !houseNo) {
@@ -60,11 +61,11 @@ router.post('/', authenticateToken, async (req, res) => {
     const result = await query(`
       INSERT INTO user_addresses (
         user_id, first_name, last_name, address_line,
-        house_number, floor, society,
+        house_number, floor, society, sector,
         city, state, postal_code,
         phone, is_default
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
       RETURNING *
     `, [
       req.user.id,
@@ -74,6 +75,7 @@ router.post('/', authenticateToken, async (req, res) => {
       houseNo,
       floorValue,
       societyValue,
+      sectorValue,
       city || 'N/A',
       state || 'N/A',
       zip || '000000',
@@ -98,7 +100,7 @@ router.put('/:id', authenticateToken, async (req, res) => {
       firstName, first_name, lastName, last_name,
       addressLine, address_line,
       houseNumber, house_number,
-      floor, society,
+      floor, society, sector,
       city, state, postalCode, postal_code,
       phone, isDefault, is_default,
     } = req.body;
@@ -109,6 +111,7 @@ router.put('/:id', authenticateToken, async (req, res) => {
     const houseNo = houseNumber !== undefined ? houseNumber : house_number;
     const floorValue = floor !== undefined ? floor : undefined;
     const societyValue = society !== undefined ? society : undefined;
+    const sectorValue = sector !== undefined ? sector : undefined;
     const zip = postalCode || postal_code;
     const deflt = isDefault !== undefined ? isDefault : is_default;
 
@@ -133,15 +136,16 @@ router.put('/:id', authenticateToken, async (req, res) => {
           house_number = COALESCE($4, house_number),
           floor = COALESCE($5, floor),
           society = COALESCE($6, society),
-          city = COALESCE($7, city),
-          state = COALESCE($8, state),
-          postal_code = COALESCE($9, postal_code),
-          phone = COALESCE($10, phone),
-          is_default = COALESCE($11, is_default),
+          sector = COALESCE($7, sector),
+          city = COALESCE($8, city),
+          state = COALESCE($9, state),
+          postal_code = COALESCE($10, postal_code),
+          phone = COALESCE($11, phone),
+          is_default = COALESCE($12, is_default),
           updated_at = CURRENT_TIMESTAMP
-      WHERE id = $12 AND user_id = $13
+      WHERE id = $13 AND user_id = $14
       RETURNING *
-    `, [fname, lname, line1, houseNo, floorValue, societyValue, city, state, zip, phone, deflt, id, req.user.id]);
+    `, [fname, lname, line1, houseNo, floorValue, societyValue, sectorValue, city, state, zip, phone, deflt, id, req.user.id]);
 
     res.json({ success: true, data: { address: result.rows[0] } });
   } catch (error) {

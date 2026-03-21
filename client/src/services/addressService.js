@@ -30,11 +30,20 @@ export const addressService = {
     const addressLine = address.address_line ?? address.addressLine ?? '';
     const houseNumber = address.house_number ?? address.houseNumber ?? '';
     const floor = address.floor ?? '';
+    const society = address.society ?? '';
+    const sector = address.sector ?? '';
+    const city = address.city ?? '';
+    const state = address.state ?? '';
+    const postal = address.postal_code ?? address.postalCode ?? '';
 
     return [
       houseNumber || null,
       floor ? `Floor ${floor}` : null,
+      society ? `Society: ${society}` : null,
+      sector ? `Sector: ${sector}` : null,
       addressLine || null,
+      [city, state].filter(Boolean).join(', ') || null,
+      postal && postal !== '000000' ? postal : null,
     ].filter(Boolean).join(', ');
   },
 };

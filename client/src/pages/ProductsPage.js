@@ -3,6 +3,7 @@ import { useSearchParams, Link } from 'react-router-dom';
 import ProductGrid from '../components/product/ProductGrid';
 import ProductCardSkeleton from '../components/product/ProductCardSkeleton';
 import PromoCarousel from '../components/product/PromoCarousel';
+import OffersCarousel from '../components/product/OffersCarousel';
 import api from '../services/api';
 
 const DEFAULT_CATEGORY_NAMES = ['Vegetables', 'Fruits', 'Dairy', 'Bakery', 'Grains', 'Herbs & Spices', 'Other'];
@@ -239,7 +240,12 @@ const ProductsPage = () => {
           )}
         </section>
 
-        {!highlightsMode && <PromoCarousel />}
+        {!highlightsMode && (
+          <>
+            <OffersCarousel />
+            <PromoCarousel />
+          </>
+        )}
       </div>
 
       {/* Sticky category + filter bar */}

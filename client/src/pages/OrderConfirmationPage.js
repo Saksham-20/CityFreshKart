@@ -5,6 +5,7 @@ import { orderService } from '../services/orderService';
 import Button from '../components/ui/Button';
 import Loading from '../components/ui/Loading';
 import Breadcrumb from '../components/common/Breadcrumb';
+import { IMAGE_DIMS } from '../utils/imageUtils';
 
 const OrderConfirmationPage = () => {
   const { orderId } = useParams();
@@ -148,7 +149,11 @@ const OrderConfirmationPage = () => {
                     <img
                       src={item.product_image || '/default-product.png'}
                       alt={item.product_name}
+                      width={IMAGE_DIMS.orderItem.width}
+                      height={IMAGE_DIMS.orderItem.height}
                       className="w-16 h-16 rounded object-cover"
+                      loading="lazy"
+                      decoding="async"
                       onError={(e) => { e.target.src = '/default-product.png'; }}
                     />
                     <div className="flex-1">

@@ -6,6 +6,7 @@ import { calculatePrice } from '@/utils/weightSystem';
 import WeightSelector from '../ui/WeightSelector';
 import Button from '../ui/Button';
 import { useCartStore } from '../../store/useCartStore';
+import { IMAGE_DIMS } from '../../utils/imageUtils';
 
 /**
  * ProductCard Component
@@ -81,12 +82,15 @@ const ProductCard = ({
         <img
           src={imageSrc}
           alt={product.name}
+          width={IMAGE_DIMS.productSquare.width}
+          height={IMAGE_DIMS.productSquare.height}
           className={cn(
             'w-full h-full object-cover',
             'transition-transform duration-500',
             'group-hover:scale-110'
           )}
           loading="lazy"
+          decoding="async"
         />
 
         {/* Discount Badge */}

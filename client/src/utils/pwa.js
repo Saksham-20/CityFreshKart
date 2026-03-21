@@ -204,22 +204,45 @@ export const subscribeToWebPush = async () => {
 
   const registration = await navigator.serviceWorker.register('/sw.js', { scope: '/' });
   await registration.update();
-  let subscription = await registration.pushManager.getSubscription();
 
-  if (!subscription) {
-    subscription = await registration.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
-    });
-  }
+  const pushSubscribeTimeoutMs = 60000;
+  let subscription = await Promise.race([
+    (async () => {
+      let sub = await registration.pushManager.getSubscription();
+      if (!sub) {
+        sub = await registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
+        });
+      }
+      return sub;
+    })(),
+    new Promise((_, reject) => {
+      setTimeout(
+        () => reject(new Error('Browser push setup timed out. Try again or check your connection.')),
+        pushSubscribeTimeoutMs,
+      );
+    }),
+  ]);
 
   const serializable = typeof subscription.toJSON === 'function'
     ? subscription.toJSON()
     : subscription;
 
+  const subscribePostTimeoutMs = 45000;
+  const controller = new AbortController();
+  const abortTimer = setTimeout(() => controller.abort(), subscribePostTimeoutMs);
+
   try {
-    await api.post('/notifications/subscribe', { subscription: serializable });
+    await api.post(
+      '/notifications/subscribe',
+      { subscription: serializable },
+      { signal: controller.signal },
+    );
   } catch (err) {
+    if (err.code === 'ERR_CANCELED' || err.name === 'CanceledError' || err.message === 'canceled') {
+      throw new Error('Saving your notification settings timed out. Check your connection and try again.');
+    }
     const data = err.response?.data;
     const msg =
       (typeof data?.message === 'string' && data.message) ||
@@ -227,6 +250,8 @@ export const subscribeToWebPush = async () => {
       err.message ||
       'Failed to save push subscription';
     throw new Error(msg);
+  } finally {
+    clearTimeout(abortTimer);
   }
 
   return subscription;

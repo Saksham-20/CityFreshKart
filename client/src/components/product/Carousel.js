@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { IMAGE_DIMS } from '../../utils/imageUtils';
 
 const Carousel = ({ images = [] }) => {
   const [currentSlide, setCurrentSlide] = useState(0);
@@ -69,7 +70,11 @@ const Carousel = ({ images = [] }) => {
             <img
               src={slide.image}
               alt={slide.title}
+              width={IMAGE_DIMS.carouselHero.width}
+              height={IMAGE_DIMS.carouselHero.height}
               className="w-full h-full object-cover"
+              loading="lazy"
+              decoding="async"
             />
           )}
         </div>

@@ -5,6 +5,7 @@ import { orderService } from '../services/orderService';
 import { useCartStore } from '../store/useCartStore';
 import Loading from '../components/ui/Loading';
 import toast from 'react-hot-toast';
+import { IMAGE_DIMS } from '../utils/imageUtils';
 
 // Simplified 3-step flow: pending → confirmed (Accepted) → delivered
 // Rejected is a separate branch off pending
@@ -249,9 +250,16 @@ const OrderDetailPage = () => {
             {(order.items || []).map((item, idx) => (
               <div key={idx} className="flex items-center gap-3 px-4 py-3">
                 {item.product_image && (
-                  <img src={item.product_image} alt={item.product_name}
+                  <img
+                    src={item.product_image}
+                    alt={item.product_name}
+                    width={IMAGE_DIMS.orderLine.width}
+                    height={IMAGE_DIMS.orderLine.height}
                     className="w-12 h-12 rounded-lg object-cover outline outline-1 outline-outline-variant/15 print:hidden"
-                    onError={(e) => { e.target.style.display = 'none'; }} />
+                    loading="lazy"
+                    decoding="async"
+                    onError={(e) => { e.target.style.display = 'none'; }}
+                  />
                 )}
                 <div className="flex-1 min-w-0">
                   <p className="font-medium text-on-surface text-sm truncate">{item.product_name}</p>

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { getImageUrl } from '../../utils/imageUtils';
+import { getImageUrl, IMAGE_DIMS } from '../../utils/imageUtils';
 
 const ProductImages = ({ images = [] }) => {
   const [selectedImage, setSelectedImage] = useState(0);
@@ -40,7 +40,11 @@ const ProductImages = ({ images = [] }) => {
         <img
           src={imageUrls[selectedImage]}
           alt="Product"
+          width={IMAGE_DIMS.productDetailMain.width}
+          height={IMAGE_DIMS.productDetailMain.height}
           className="w-full h-96 object-contain object-center rounded-lg"
+          loading="lazy"
+          decoding="async"
         />
         
         {/* Navigation Arrows - Only show if more than 1 image */}
@@ -87,7 +91,11 @@ const ProductImages = ({ images = [] }) => {
               <img
                 src={imageUrl}
                 alt={`Product ${index + 1}`}
+                width={IMAGE_DIMS.productDetailThumb.width}
+                height={IMAGE_DIMS.productDetailThumb.height}
                 className="w-full h-20 object-contain object-center hover:opacity-75 transition-opacity"
+                loading="lazy"
+                decoding="async"
               />
             </button>
           ))}

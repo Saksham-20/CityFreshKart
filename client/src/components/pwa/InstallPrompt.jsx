@@ -10,6 +10,8 @@ import {
 import { cn } from '../../utils/cn';
 
 const SESSION_DISMISS_KEY = 'cfk-install-banner-dismissed';
+const BANNER_VERSION_KEY = 'cfk-install-banner-version';
+const CURRENT_BANNER_VERSION = '2';
 
 /**
  * Install prompt: Android/Chrome uses beforeinstallprompt; iOS shows Add to Home Screen steps.
@@ -22,6 +24,15 @@ const InstallPrompt = () => {
   const [iosModalOpen, setIosModalOpen] = useState(false);
 
   useEffect(() => {
+    try {
+      if (localStorage.getItem(BANNER_VERSION_KEY) !== CURRENT_BANNER_VERSION) {
+        localStorage.setItem(BANNER_VERSION_KEY, CURRENT_BANNER_VERSION);
+        sessionStorage.removeItem(SESSION_DISMISS_KEY);
+      }
+    } catch (_) {
+      /* ignore */
+    }
+
     const installed = isAppInstalled();
     setIsInstalled(installed);
     if (installed || sessionStorage.getItem(SESSION_DISMISS_KEY) === '1') {

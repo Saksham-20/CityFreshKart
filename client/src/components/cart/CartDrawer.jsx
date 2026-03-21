@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, ShoppingCart, Trash2 } from 'lucide-react';
 import { cn } from '@/utils/cn';
+import { IMAGE_DIMS } from '../../utils/imageUtils';
 import { calculateDelivery, FREE_DELIVERY_THRESHOLD } from '@/utils/weightSystem';
 import Button from '../ui/Button';
 
@@ -122,7 +123,11 @@ const CartDrawer = ({
                         <img
                           src={item.image}
                           alt={item.name}
+                          width={IMAGE_DIMS.cartDrawer.width}
+                          height={IMAGE_DIMS.cartDrawer.height}
                           className="w-16 h-16 rounded-lg object-cover flex-shrink-0"
+                          loading="lazy"
+                          decoding="async"
                         />
                       )}
 

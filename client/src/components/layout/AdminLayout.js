@@ -15,6 +15,7 @@ const AdminLayout = ({ children }) => {
     { name: 'Orders', href: '/admin/orders', icon: '📦' },
     { name: 'Users', href: '/admin/users', icon: '👥' },
     // { name: 'Analytics', href: '/admin/analytics', icon: '📈' }, // hidden temporarily
+    { name: 'Banners', href: '/admin/marketing-banners', icon: '🖼️' },
     { name: 'Settings', href: '/admin/settings', icon: '⚙️' },
   ];
 

@@ -1,6 +1,6 @@
 import React from 'react';
 import useCart from '../../hooks/useCart';
-import { getImageUrl, getPlaceholderImage } from '../../utils/imageUtils';
+import { getImageUrl, getPlaceholderImage, IMAGE_DIMS } from '../../utils/imageUtils';
 import QuantitySelector from '../ui/QuantitySelector';
 
 const WEIGHT_STEP = 0.5;
@@ -35,7 +35,11 @@ const CartItem = ({ item }) => {
         <img
           src={getImageUrl(item.image_url)}
           alt={item.name}
+          width={IMAGE_DIMS.cartLine.width}
+          height={IMAGE_DIMS.cartLine.height}
           className="w-16 h-16 sm:w-20 sm:h-20 object-cover rounded-xl border border-gray-100"
+          loading="lazy"
+          decoding="async"
           onError={(e) => { e.target.src = getPlaceholderImage(); }}
         />
       </div>
