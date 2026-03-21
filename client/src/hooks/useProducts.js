@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { getPublicApiOrigin } from '../utils/publicOrigin';
 
 const useProducts = (initialFilters = {}) => {
   const [products, setProducts] = useState([]);
@@ -24,7 +25,7 @@ const useProducts = (initialFilters = {}) => {
         ...newFilters
       });
 
-      const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5001';
+      const apiUrl = getPublicApiOrigin();
       const url = `${apiUrl}/api/products?${queryParams}`;
       console.log('📦 useProducts: Fetching from URL:', url);
       

@@ -15,6 +15,21 @@
 
 ---
 
+## Environment (generated secrets)
+
+From the repo root, after `npm install` (and `cd server && npm install` if you want VAPID keys generated):
+
+```bash
+npm run setup:env:dry       # preview only
+npm run setup:env           # writes .env and client/.env.production (fails if they exist)
+npm run setup:env:force     # overwrite existing
+npm run setup:env:testing   # weak fixed secrets for smoke tests; overwrites .env files
+```
+
+Then edit **`.env`**: set `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, and your public URLs. Delete **`scripts/.setup-env-report.txt`** after saving secrets elsewhere.
+
+---
+
 ## 🏗️ Architecture
 
 ```

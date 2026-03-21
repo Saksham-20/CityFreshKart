@@ -196,6 +196,19 @@ router.post('/verify-payment', authenticateToken, [
     const payment = await razorpay.payments.fetch(paymentId);
 
     if (payment.status === 'captured') {
+      try {
+        await pool.query(
+          `UPDATE orders
+           SET razorpay_payment_id = $1,
+               updated_at = CURRENT_TIMESTAMP,
+               status = CASE WHEN status = 'pending' THEN 'confirmed' ELSE status END
+           WHERE razorpay_order_id = $2 AND user_id = $3`,
+          [paymentId, orderId, req.user.id],
+        );
+      } catch (dbErr) {
+        console.error('verify-payment: order update skipped', dbErr.message);
+      }
+
       res.json({
         success: true,
         message: 'Payment verified successfully (captured)',

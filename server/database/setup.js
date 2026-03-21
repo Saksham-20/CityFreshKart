@@ -15,14 +15,7 @@ function slugify(value = '') {
 async function setupDatabase() {
   console.log('🚀 Starting database setup...');
 
-  // Debug environment variables
-  console.log('🔍 Environment variables:');
-  console.log('DB_USER:', process.env.DB_USER);
-  console.log('DB_HOST:', process.env.DB_HOST);
-  console.log('DB_NAME:', process.env.DB_NAME);
-  console.log('DB_PORT:', process.env.DB_PORT);
-  console.log('DB_PASSWORD:', process.env.DB_PASSWORD ? '***SET***' : 'NOT SET');
-  console.log('DATABASE_URL:', process.env.DATABASE_URL ? '***SET***' : 'NOT SET');
+  console.log('🔍 DB config:', process.env.DATABASE_URL ? 'DATABASE_URL=***' : `host=${process.env.DB_HOST || 'localhost'} db=${process.env.DB_NAME || 'default'}`);
   console.log('NODE_ENV:', process.env.NODE_ENV);
 
   // Use the shared pool from config.js
@@ -146,7 +139,7 @@ async function setupDatabase() {
         [adminPhone, adminHashedPassword, 'Admin User', true],
       );
       if (adminInsert.rowCount > 0) {
-        console.log('✅ Admin user created (Phone: ' + adminPhone + ' / Password: admin123)');
+        console.log('✅ Admin user created (phone ending …' + String(adminPhone).slice(-4) + '). Set ADMIN_PASSWORD in env for production.');
       } else {
         console.log('ℹ️  Admin user already exists, skipping');
       }
@@ -159,7 +152,7 @@ async function setupDatabase() {
         [testPhone, testHashedPassword, 'Test User', false],
       );
       if (testInsert.rowCount > 0) {
-        console.log('✅ Test user created (Phone: ' + testPhone + ' / Password: password123)');
+        console.log('✅ Test user created for Playwright (phone …' + String(testPhone).slice(-4) + '). Use TEST_PASSWORD from env in CI if set.');
       } else {
         console.log('ℹ️  Test user already exists, skipping');
       }
@@ -230,13 +223,7 @@ async function setupDatabase() {
     console.log('');
     console.log('🎉 Database setup completed successfully!');
     console.log('');
-    console.log('📋 Admin Login Credentials:');
-    console.log(`Phone: ${adminPhone}`);
-    console.log(`Password: ${adminPassword}`);
-    console.log('');
-    console.log('📋 Test User Credentials (for Playwright):');
-    console.log(`Phone: ${testPhone}`);
-    console.log(`Password: ${testPassword}`);
+    console.log('📋 Configure ADMIN_PHONE / ADMIN_PASSWORD (and test user) via environment — credentials are not printed.');
     console.log('');
     console.log('🛍️ Sample Data Available:');
     console.log('- 16 Fresh Vegetables & Fruits');

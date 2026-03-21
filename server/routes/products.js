@@ -153,9 +153,13 @@ router.get('/', async (req, res) => {
       search = '',
     } = req.query;
 
-    console.log('🔍 Processed params:', { page, limit, search });
+    if (process.env.NODE_ENV === 'development') {
+      console.log('🔍 Processed params:', { page, limit, search });
+    }
 
-    const offset = (page - 1) * limit;
+    const pageNum = Math.max(1, parseInt(page, 10) || 1);
+    const limitNum = Math.min(100, Math.max(1, parseInt(limit, 10) || 12));
+    const offset = (pageNum - 1) * limitNum;
     const queryParams = [];
     let paramCount = 0;
 
@@ -191,26 +195,28 @@ router.get('/', async (req, res) => {
       LIMIT $${paramCount + 1} OFFSET $${paramCount + 2}
     `;
 
-    const productsResult = await query(productsQuery, [...queryParams, limit, offset]);
-    console.log('🔍 Products result count:', productsResult.rows.length);
-    if (productsResult.rows.length > 0) {
-      console.log('🔍 First product sample:', productsResult.rows[0]);
+    const productsResult = await query(productsQuery, [...queryParams, limitNum, offset]);
+    if (process.env.NODE_ENV === 'development') {
+      console.log('🔍 Products result count:', productsResult.rows.length);
+      if (productsResult.rows.length > 0) {
+        console.log('🔍 First product sample:', productsResult.rows[0]);
+      }
     }
 
     // Calculate pagination info
-    const totalPages = Math.ceil(total / limit);
-    const hasNextPage = page < totalPages;
-    const hasPrevPage = page > 1;
+    const totalPages = Math.ceil(total / limitNum);
+    const hasNextPage = pageNum < totalPages;
+    const hasPrevPage = pageNum > 1;
 
     res.json({
       success: true,
       data: {
         products: productsResult.rows,
         pagination: {
-          current_page: parseInt(page),
+          current_page: pageNum,
           total_pages: totalPages,
           total_items: total,
-          items_per_page: parseInt(limit),
+          items_per_page: limitNum,
           has_next_page: hasNextPage,
           has_prev_page: hasPrevPage,
         },

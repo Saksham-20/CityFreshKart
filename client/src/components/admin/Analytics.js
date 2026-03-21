@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import Button from '../ui/Button';
 import Loading from '../ui/Loading';
 import api from '../../services/api';
+import { getImageUrl } from '../../utils/imageUtils';
 
 const Analytics = () => {
   const [loading, setLoading] = useState(true);
@@ -245,7 +246,7 @@ const Analytics = () => {
                     <div className="flex items-center">
                       <span className="text-sm font-medium text-gray-500 w-6">{index + 1}</span>
                       <img
-                        src={product.image_url ? `${process.env.REACT_APP_API_URL || 'http://localhost:5000'}${product.image_url}` : '/placeholder-product.jpg'}
+                        src={product.image_url ? getImageUrl(product.image_url) : '/placeholder-product.jpg'}
                         alt={product.name}
                         className="w-10 h-10 rounded object-cover ml-3"
                       />

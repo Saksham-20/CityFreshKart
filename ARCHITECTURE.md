@@ -62,8 +62,8 @@
 │                                                                   │
 │  ┌──────────────────────────────────────────────────────────┐   │
 │  │  External Services                                       │   │
-│  │  ├─ Stripe (Payments)                                    │   │
-│  │  ├─ Cloudinary (Images)                                  │   │
+│  │  ├─ Razorpay (Payments)                                  │   │
+│  │  ├─ Local disk /uploads (product images)                  │   │
 │  │  └─ SendGrid/Nodemailer (Email)                          │   │
 │  └──────────────────────────────────────────────────────────┘   │
 └──────────────────────────────────────────────────────────────────┘

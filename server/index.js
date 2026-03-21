@@ -8,6 +8,9 @@ const path = require('path');
 const fs = require('fs');
 require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 
+const { assertJwtSecretForProduction } = require('./config/jwt');
+assertJwtSecretForProduction();
+
 const authRoutes = require('./routes/auth');
 const productRoutes = require('./routes/products');
 const orderRoutes = require('./routes/orders');
@@ -129,6 +132,7 @@ app.get('/api/settings', async (req, res) => {
     result.rows.forEach(row => { settings[row.key] = row.value; });
     res.json({ success: true, data: settings });
   } catch (error) {
+    console.error('GET /api/settings: database error, returning defaults', error.message);
     res.json({ success: true, data: { free_delivery_threshold: '300', delivery_fee: '50', min_order_amount: '0' } });
   }
 });

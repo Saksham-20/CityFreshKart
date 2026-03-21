@@ -4,6 +4,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { authenticateToken } = require('../middleware/auth');
 const { authLimiter } = require('../middleware/rateLimit');
+const { getJwtSecret } = require('../config/jwt');
 
 // Safe db query accessor
 const dbQuery = async (text, params) => {
@@ -22,7 +23,7 @@ const setAuthCookie = (res, token) => {
   });
 };
 
-router.post('/register', async (req, res) => {
+router.post('/register', authLimiter, async (req, res) => {
   try {
     const { phone, password, name } = req.body;
     if (!phone || !password || !name) {
@@ -47,7 +48,7 @@ router.post('/register', async (req, res) => {
 
     const token = jwt.sign(
       { id: user.id, is_admin: user.is_admin },
-      process.env.JWT_SECRET || 'your-super-secret-jwt-key-here-change-in-production',
+      getJwtSecret(),
       { expiresIn: '7d' }
     );
 
@@ -59,7 +60,7 @@ router.post('/register', async (req, res) => {
   }
 });
 
-router.post('/login', async (req, res) => {
+router.post('/login', authLimiter, async (req, res) => {
   try {
     const { phone, password } = req.body;
     if (!phone || !password) {
@@ -79,7 +80,7 @@ router.post('/login', async (req, res) => {
 
     const token = jwt.sign(
       { id: user.id, is_admin: user.is_admin },
-      process.env.JWT_SECRET || 'your-super-secret-jwt-key-here-change-in-production',
+      getJwtSecret(),
       { expiresIn: '7d' }
     );
 

@@ -7,6 +7,8 @@ const getImageUrl = (imagePath) => {
     return getPlaceholderImage();
   }
 
+  imagePath = String(imagePath).replace(/\\/g, '/');
+
   // If it's already a full URL (http/https), return as is
   if (imagePath.startsWith('http')) {
     return imagePath;

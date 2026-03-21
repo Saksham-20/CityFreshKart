@@ -33,50 +33,47 @@ router.use(authenticateToken, requireAdmin);
 // @access  Admin
 router.get('/dashboard', async (req, res) => {
   try {
-    // Get total products
-    const totalProducts = await pool.query('SELECT COUNT(*) as count FROM products WHERE is_active = true');
-
-    // Get total orders
-    const totalOrders = await pool.query('SELECT COUNT(*) as count FROM orders');
-
-    // Get total users
-    const totalUsers = await pool.query('SELECT COUNT(*) as count FROM users WHERE is_admin = false');
-
-    // Get total revenue
-    const totalRevenue = await pool.query(`
+    const [
+      totalProducts,
+      totalOrders,
+      totalUsers,
+      totalRevenue,
+      categoryStats,
+      recentOrders,
+      lowStockProducts,
+      configuredCategories,
+    ] = await Promise.all([
+      pool.query('SELECT COUNT(*) as count FROM products WHERE is_active = true'),
+      pool.query('SELECT COUNT(*) as count FROM orders'),
+      pool.query('SELECT COUNT(*) as count FROM users WHERE is_admin = false'),
+      pool.query(`
       SELECT COALESCE(SUM(total_price), 0) as revenue 
       FROM orders 
       WHERE status IN ('delivered', 'confirmed', 'pending')
-    `);
-
-    // Get category breakdown
-    const categoryStats = await pool.query(`
+    `),
+      pool.query(`
       SELECT category, COUNT(*) as count 
       FROM products 
       WHERE is_active = true 
       GROUP BY category 
       ORDER BY count DESC
-    `);
-
-    // Get recent orders
-    const recentOrders = await pool.query(`
+    `),
+      pool.query(`
       SELECT o.*, u.name, u.phone
       FROM orders o
       JOIN users u ON o.user_id = u.id
       ORDER BY o.created_at DESC
       LIMIT 5
-    `);
-
-    // Get low stock products
-    const lowStockProducts = await pool.query(`
+    `),
+      pool.query(`
       SELECT * FROM products 
       WHERE quantity_available <= 5 
       AND is_active = true
       ORDER BY quantity_available ASC
       LIMIT 5
-    `);
-
-    const configuredCategories = await getProductCategories();
+    `),
+      getProductCategories(),
+    ]);
 
     const response = {
       stats: {
@@ -108,8 +105,10 @@ router.get('/dashboard', async (req, res) => {
 // @access  Admin
 router.get('/products', async (req, res) => {
   try {
-    const { page = 1, limit = 20, search, category, status } = req.query;
-    const offset = (page - 1) * limit;
+    const { search, category, status } = req.query;
+    const pageNum = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const limitNum = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 20));
+    const offset = (pageNum - 1) * limitNum;
 
     let query = `SELECT * FROM products WHERE 1=1`;
 
@@ -129,7 +128,7 @@ router.get('/products', async (req, res) => {
     }
 
     query += ` ORDER BY created_at DESC LIMIT $${paramCount + 1} OFFSET $${paramCount + 2}`;
-    queryParams.push(parseInt(limit), offset);
+    queryParams.push(limitNum, offset);
 
     const products = await pool.query(query, queryParams);
 
@@ -153,13 +152,14 @@ router.get('/products', async (req, res) => {
 
     const totalCount = await pool.query(countQuery, countParams);
 
+    const total = parseInt(totalCount.rows[0].total, 10);
     res.json({
       products: products.rows,
       pagination: {
-        currentPage: parseInt(page),
-        totalPages: Math.ceil(totalCount.rows[0].total / limit),
-        totalItems: parseInt(totalCount.rows[0].total),
-        itemsPerPage: parseInt(limit),
+        currentPage: pageNum,
+        totalPages: Math.ceil(total / limitNum) || 0,
+        totalItems: total,
+        itemsPerPage: limitNum,
       },
     });
 
@@ -369,8 +369,10 @@ router.delete('/products/:id', async (req, res) => {
 // @access  Admin
 router.get('/orders', async (req, res) => {
   try {
-    const { page = 1, limit = 20, status, search } = req.query;
-    const offset = (page - 1) * limit;
+    const { status, search } = req.query;
+    const pageNum = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const limitNum = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 20));
+    const offset = (pageNum - 1) * limitNum;
 
     let query = `
       SELECT 
@@ -411,7 +413,7 @@ router.get('/orders', async (req, res) => {
     }
 
     query += ` GROUP BY o.id, u.name, u.phone ORDER BY o.created_at DESC LIMIT $${paramCount + 1} OFFSET $${paramCount + 2}`;
-    queryParams.push(parseInt(limit), offset);
+    queryParams.push(limitNum, offset);
 
     const orders = await pool.query(query, queryParams);
 
@@ -440,13 +442,14 @@ router.get('/orders', async (req, res) => {
 
     const totalCount = await pool.query(countQuery, countParams);
 
+    const total = parseInt(totalCount.rows[0].total, 10);
     res.json({
       orders: orders.rows,
       pagination: {
-        currentPage: parseInt(page),
-        totalPages: Math.ceil(totalCount.rows[0].total / limit),
-        totalItems: parseInt(totalCount.rows[0].total),
-        itemsPerPage: parseInt(limit),
+        currentPage: pageNum,
+        totalPages: Math.ceil(total / limitNum) || 0,
+        totalItems: total,
+        itemsPerPage: limitNum,
       },
     });
 
@@ -576,8 +579,10 @@ router.post('/users', [
 // @access  Admin
 router.get('/users', async (req, res) => {
   try {
-    const { page = 1, limit = 20, search, role, sortOrder = 'DESC' } = req.query;
-    const offset = (page - 1) * limit;
+    const { search, role, sortOrder = 'DESC' } = req.query;
+    const pageNum = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const limitNum = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 20));
+    const offset = (pageNum - 1) * limitNum;
     const normalizedSortOrder = String(sortOrder).toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
 
     let query = `
@@ -603,7 +608,7 @@ router.get('/users', async (req, res) => {
     }
 
     query += ` ORDER BY created_at ${normalizedSortOrder} LIMIT $${paramCount + 1} OFFSET $${paramCount + 2}`;
-    queryParams.push(parseInt(limit), offset);
+    queryParams.push(limitNum, offset);
 
     const users = await pool.query(query, queryParams);
 
@@ -631,13 +636,14 @@ router.get('/users', async (req, res) => {
 
     const totalCount = await pool.query(countQuery, countParams);
 
+    const total = parseInt(totalCount.rows[0].total, 10);
     res.json({
       users: users.rows,
       pagination: {
-        currentPage: parseInt(page),
-        totalPages: Math.ceil(totalCount.rows[0].total / limit),
-        totalItems: parseInt(totalCount.rows[0].total),
-        itemsPerPage: parseInt(limit),
+        currentPage: pageNum,
+        totalPages: Math.ceil(total / limitNum) || 0,
+        totalItems: total,
+        itemsPerPage: limitNum,
       },
     });
 

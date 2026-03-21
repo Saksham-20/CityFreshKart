@@ -43,16 +43,121 @@ ALTER TABLE products ADD COLUMN IF NOT EXISTS created_at TIMESTAMP WITH TIME ZON
 ALTER TABLE products ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;
 
 
--- Cart table
+-- Categories (normalized; optional FK on products.category_id for joins in cart/API)
+CREATE TABLE IF NOT EXISTS categories (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name VARCHAR(100) NOT NULL,
+    slug VARCHAR(255) NOT NULL UNIQUE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+INSERT INTO categories (name, slug) VALUES
+    ('Vegetables', 'vegetables'),
+    ('Fruits', 'fruits'),
+    ('Dairy', 'dairy'),
+    ('Bakery', 'bakery'),
+    ('Grains', 'grains'),
+    ('Herbs & Spices', 'herbs-spices'),
+    ('Other', 'other')
+ON CONFLICT (slug) DO NOTHING;
+
+ALTER TABLE products ADD COLUMN IF NOT EXISTS category_id UUID REFERENCES categories(id) ON DELETE SET NULL;
+
+-- Optional FK for stock reporting (mirrors quantity_available for code paths that read stock_quantity)
+ALTER TABLE products ADD COLUMN IF NOT EXISTS stock_quantity DECIMAL(10,2) DEFAULT 0;
+
+-- Legacy cart was line-items-in-one-table; migrate to header + cart_items when present
+DO $$
+BEGIN
+    IF to_regclass('public.cart') IS NOT NULL
+       AND EXISTS (
+           SELECT 1 FROM information_schema.columns
+           WHERE table_schema = 'public' AND table_name = 'cart' AND column_name = 'product_id'
+       )
+    THEN
+        ALTER TABLE cart RENAME TO cart_legacy;
+    END IF;
+END $$;
+
+-- Cart header: one row per user (matches server routes)
 CREATE TABLE IF NOT EXISTS cart (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
-    product_id UUID REFERENCES products(id) ON DELETE CASCADE,
-    quantity_kg DECIMAL(10,2) NOT NULL,
+    user_id UUID NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS cart_items (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    cart_id UUID NOT NULL REFERENCES cart(id) ON DELETE CASCADE,
+    product_id UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+    quantity INT NOT NULL DEFAULT 1,
+    weight DECIMAL(10,2),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(user_id, product_id)
+    UNIQUE(cart_id, product_id)
 );
+
+DO $$
+BEGIN
+    IF to_regclass('public.cart_legacy') IS NOT NULL THEN
+        INSERT INTO cart (id, user_id, created_at, updated_at)
+        SELECT uuid_generate_v4(), u.user_id, u.created_min, u.updated_max
+        FROM (
+            SELECT user_id,
+                   MIN(created_at) AS created_min,
+                   MAX(updated_at) AS updated_max
+            FROM cart_legacy
+            GROUP BY user_id
+        ) u
+        WHERE NOT EXISTS (SELECT 1 FROM cart c WHERE c.user_id = u.user_id::uuid);
+
+        INSERT INTO cart_items (id, cart_id, product_id, quantity, weight, created_at, updated_at)
+        SELECT
+            uuid_generate_v4(),
+            c.id,
+            cl.product_id::uuid,
+            1,
+            cl.quantity_kg,
+            cl.created_at,
+            cl.updated_at
+        FROM cart_legacy cl
+        INNER JOIN cart c ON c.user_id = cl.user_id::uuid
+        -- Legacy cart_items may use text FK columns; compare via text to avoid text = uuid errors
+        WHERE NOT EXISTS (
+            SELECT 1 FROM cart_items ci
+            WHERE ci.cart_id::text = c.id::text AND ci.product_id::text = cl.product_id::text
+        );
+
+        DROP TABLE cart_legacy CASCADE;
+    END IF;
+END $$;
+
+-- Keep stock_quantity aligned with quantity_available (single source of truth for weight-based stock)
+CREATE OR REPLACE FUNCTION sync_product_stock_quantity()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.stock_quantity := COALESCE(NEW.quantity_available, 0);
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_products_sync_stock ON products;
+CREATE TRIGGER trg_products_sync_stock
+    BEFORE INSERT OR UPDATE OF quantity_available ON products
+    FOR EACH ROW
+    EXECUTE FUNCTION sync_product_stock_quantity();
+
+UPDATE products SET stock_quantity = COALESCE(quantity_available, 0);
+
+-- Backfill category_id from legacy string column when possible
+UPDATE products p
+SET category_id = c.id
+FROM categories c
+WHERE p.category_id IS NULL
+  AND p.category IS NOT NULL
+  AND LOWER(TRIM(p.category)) = LOWER(TRIM(c.name));
 
 -- Orders table (Simplified for weight-based pricing)
 CREATE TABLE IF NOT EXISTS orders (
@@ -117,6 +222,10 @@ CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
 
 CREATE INDEX IF NOT EXISTS idx_order_items_order_id ON order_items(order_id);
 CREATE INDEX IF NOT EXISTS idx_cart_user_id ON cart(user_id);
+CREATE INDEX IF NOT EXISTS idx_cart_items_cart_id ON cart_items(cart_id);
+CREATE INDEX IF NOT EXISTS idx_cart_items_product_id ON cart_items(product_id);
+CREATE INDEX IF NOT EXISTS idx_products_category_id ON products(category_id);
+CREATE INDEX IF NOT EXISTS idx_orders_created_at ON orders(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_users_phone ON users(phone);
 
 -- Create trigger function for updated_at timestamps
@@ -140,6 +249,12 @@ CREATE TRIGGER update_orders_updated_at BEFORE UPDATE ON orders FOR EACH ROW EXE
 
 DROP TRIGGER IF EXISTS update_cart_updated_at ON cart;
 CREATE TRIGGER update_cart_updated_at BEFORE UPDATE ON cart FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+DROP TRIGGER IF EXISTS update_cart_items_updated_at ON cart_items;
+CREATE TRIGGER update_cart_items_updated_at BEFORE UPDATE ON cart_items FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+DROP TRIGGER IF EXISTS update_categories_updated_at ON categories;
+CREATE TRIGGER update_categories_updated_at BEFORE UPDATE ON categories FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 DROP TRIGGER IF EXISTS update_user_addresses_updated_at ON user_addresses;
 CREATE TRIGGER update_user_addresses_updated_at BEFORE UPDATE ON user_addresses FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();

@@ -74,10 +74,12 @@ async function sendToUser(userId, payload) {
     [userId],
   );
 
+  const results = await Promise.allSettled(
+    result.rows.map((row) => sendToSubscription(row.subscription, payload)),
+  );
   let sent = 0;
-  for (const row of result.rows) {
-    const status = await sendToSubscription(row.subscription, payload);
-    if (status.sent) sent += 1;
+  for (const r of results) {
+    if (r.status === 'fulfilled' && r.value?.sent) sent += 1;
   }
   return { sent };
 }

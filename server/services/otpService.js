@@ -141,9 +141,10 @@ class OTPService {
       const user = userResult.rows[0];
 
       // Generate JWT token
+      const { getJwtSecret } = require('../config/jwt');
       const token = require('jsonwebtoken').sign(
         { userId: user.id },
-        process.env.JWT_SECRET,
+        getJwtSecret(),
         { expiresIn: '7d' }
       );
 

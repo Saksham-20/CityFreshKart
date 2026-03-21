@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
 const { query } = require('../database/config');
+const { getJwtSecret } = require('../config/jwt');
 
 // Middleware to verify JWT token
 const authenticateToken = async (req, res, next) => {
@@ -20,7 +21,7 @@ const authenticateToken = async (req, res, next) => {
     }
 
     // Verify token
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const decoded = jwt.verify(token, getJwtSecret());
 
     // Get user from database using userId from token
     const result = await query(
@@ -86,7 +87,7 @@ const optionalAuth = async (req, res, next) => {
     }
 
     if (token) {
-      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      const decoded = jwt.verify(token, getJwtSecret());
       const result = await query(
         'SELECT id, phone, name, is_admin FROM users WHERE id = $1',
         [decoded.id],

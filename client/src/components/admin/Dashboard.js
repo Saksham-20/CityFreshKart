@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import Loading from '../ui/Loading';
 import useAuth from '../../hooks/useAuth';
 import api from '../../services/api';
+import { getImageUrl } from '../../utils/imageUtils';
 
 const Dashboard = () => {
   const { user } = useAuth();
@@ -305,7 +306,7 @@ const Dashboard = () => {
                     <div className="flex items-center">
                       <span className="text-sm font-medium text-gray-500 w-6">{index + 1}</span>
                       <img
-                        src={product.image_url ? `${process.env.REACT_APP_API_URL || 'http://localhost:5000'}${product.image_url}` : '/placeholder-product.jpg'}
+                        src={product.image_url ? getImageUrl(product.image_url) : '/placeholder-product.jpg'}
                         alt={product.name}
                         className="w-12 h-12 rounded object-cover ml-3"
                       />

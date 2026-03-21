@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
 const { PrismaClient } = require('@prisma/client');
+const { getJwtSecret } = require('../config/jwt');
 
 const prisma = new PrismaClient();
 
@@ -37,7 +38,7 @@ const syncUserByPhone = async ({ phone, name }) => {
 
 const createAppSessionToken = (userId) => jwt.sign(
   { userId },
-  process.env.JWT_SECRET,
+  getJwtSecret(),
   { expiresIn: '7d' },
 );
 

@@ -10,7 +10,8 @@ const router = express.Router();
 // @access  Private
 router.get('/', authenticateToken, async (req, res) => {
   try {
-    const { page = 1, limit = 10 } = req.query;
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 10));
     const offset = (page - 1) * limit;
 
     const orders = await query(`
@@ -23,7 +24,7 @@ router.get('/', authenticateToken, async (req, res) => {
       GROUP BY o.id
       ORDER BY o.created_at DESC
       LIMIT $2 OFFSET $3
-    `, [req.user.id, parseInt(limit), offset]);
+    `, [req.user.id, limit, offset]);
 
     // Get total count
     const totalCount = await query(
@@ -39,10 +40,10 @@ router.get('/', authenticateToken, async (req, res) => {
         orders: orders.rows,
       },
       pagination: {
-        page: parseInt(page),
-        limit: parseInt(limit),
+        page,
+        limit,
         total,
-        totalPages: Math.ceil(total / limit),
+        totalPages: Math.ceil(total / limit) || 0,
       },
     });
 
@@ -95,13 +96,27 @@ router.get('/:id', authenticateToken, async (req, res) => {
   }
 });
 
-// Helper: fetch a single store setting value (falls back to default if table not ready)
-async function getSetting(key, defaultValue) {
+// Batch load order-related store settings (single round-trip)
+async function getStoreOrderSettings() {
+  const out = {
+    free_delivery_threshold: 300,
+    delivery_fee: 50,
+    min_order_amount: 0,
+  };
   try {
-    const result = await query('SELECT value FROM store_settings WHERE key = $1', [key]);
-    if (result.rows.length > 0) return parseFloat(result.rows[0].value) || defaultValue;
+    const result = await query(
+      `SELECT key, value FROM store_settings WHERE key = ANY($1::text[])`,
+      [['free_delivery_threshold', 'delivery_fee', 'min_order_amount']],
+    );
+    for (const row of result.rows) {
+      const v = parseFloat(row.value);
+      if (!Number.isFinite(v)) continue;
+      if (row.key === 'free_delivery_threshold') out.free_delivery_threshold = v;
+      else if (row.key === 'delivery_fee') out.delivery_fee = v;
+      else if (row.key === 'min_order_amount') out.min_order_amount = v;
+    }
   } catch (_) { /* table may not exist yet on first run */ }
-  return defaultValue;
+  return out;
 }
 
 // @route   POST /api/orders
@@ -123,10 +138,11 @@ router.post('/', authenticateToken, async (req, res) => {
       return res.status(400).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Delivery address is required' } });
     }
 
-    // Load dynamic settings from DB
-    const freeDeliveryThreshold = await getSetting('free_delivery_threshold', 300);
-    const deliveryFeeAmount = await getSetting('delivery_fee', 50);
-    const minOrderAmount = await getSetting('min_order_amount', 0);
+    const {
+      free_delivery_threshold: freeDeliveryThreshold,
+      delivery_fee: deliveryFeeAmount,
+      min_order_amount: minOrderAmount,
+    } = await getStoreOrderSettings();
 
     const uniqueProductIds = [...new Set(items.map(item => item.product_id).filter(Boolean))];
     if (uniqueProductIds.length !== items.length) {

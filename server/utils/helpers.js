@@ -1,5 +1,6 @@
 const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
+const { getJwtSecret } = require('../config/jwt');
 
 // Generate random string
 const generateRandomString = (length = 32) => {
@@ -25,14 +26,14 @@ const comparePassword = async (password, hash) => {
 };
 
 // Generate JWT token
-const generateToken = (payload, secret = process.env.JWT_SECRET, expiresIn = '24h') => {
-  return jwt.sign(payload, secret, { expiresIn });
+const generateToken = (payload, secret, expiresIn = '24h') => {
+  return jwt.sign(payload, secret ?? getJwtSecret(), { expiresIn });
 };
 
 // Verify JWT token
-const verifyToken = (token, secret = process.env.JWT_SECRET) => {
+const verifyToken = (token, secret) => {
   try {
-    return jwt.verify(token, secret);
+    return jwt.verify(token, secret ?? getJwtSecret());
   } catch (error) {
     throw new Error('Invalid token');
   }

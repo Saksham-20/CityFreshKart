@@ -2,6 +2,7 @@ import React, { createContext, useContext, useReducer, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
 import { useAuth } from './AuthContext';
 import api from '../services/api';
+import { getPublicApiOrigin } from '../utils/publicOrigin';
 
 const CartContext = createContext();
 
@@ -379,7 +380,7 @@ export const CartProvider = ({ children }) => {
         }
         
         // Remove via API
-        const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+        const apiUrl = getPublicApiOrigin();
         const url = `${apiUrl}/api/cart/${cartItemId}`;
         
         const response = await fetch(url, {
@@ -474,7 +475,7 @@ export const CartProvider = ({ children }) => {
         variant_details: item.variant_details
       }));
 
-      const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+      const apiUrl = getPublicApiOrigin();
       const response = await fetch(`${apiUrl}/api/cart/merge`, {
         method: 'POST',
         headers: {
