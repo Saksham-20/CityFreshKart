@@ -38,11 +38,12 @@ const InstallPrompt = () => {
     <div
       id="install-banner"
       className={cn(
-        'fixed bottom-24 sm:bottom-6 left-4 right-4 sm:left-auto sm:right-6 sm:w-80',
+        'fixed left-4 right-4 sm:left-auto sm:right-6 sm:w-80',
         'bg-green-600 text-white rounded-2xl shadow-lg',
         'p-4 flex flex-col gap-3 z-30',
         'border border-green-700'
       )}
+      style={{ bottom: 'calc(env(safe-area-inset-bottom) + 5.5rem)' }}
     >
       <div className="flex items-start gap-3">
         <Download className="w-5 h-5 flex-shrink-0 mt-0.5" />

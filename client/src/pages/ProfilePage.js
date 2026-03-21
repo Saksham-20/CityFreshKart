@@ -34,9 +34,10 @@ const ProfilePage = () => {
   const [showAddressForm, setShowAddressForm] = useState(false);
   const [editingAddress, setEditingAddress] = useState(null);
   const [addressForm, setAddressForm] = useState({
-    firstName: '', lastName: '', addressLine: '',
-    houseNumber: '', floor: '', society: '',
-    city: '', state: '', postalCode: '', phone: '', isDefault: false,
+    addressLine: '',
+    houseNumber: '',
+    floor: '',
+    isDefault: false,
   });
   const [activeSection, setActiveSection] = useState('profile');
 
@@ -99,24 +100,18 @@ const ProfilePage = () => {
     if (address) {
       setEditingAddress(address);
       setAddressForm({
-        firstName: address.first_name || '',
-        lastName: address.last_name || '',
         addressLine: address.address_line || '',
         houseNumber: address.house_number || '',
         floor: address.floor || '',
-        society: address.society || '',
-        city: address.city || '',
-        state: address.state || '',
-        postalCode: address.postal_code || '',
-        phone: address.phone || '',
         isDefault: address.is_default || false,
       });
     } else {
       setEditingAddress(null);
       setAddressForm({
-        firstName: '', lastName: '', addressLine: '',
-        houseNumber: '', floor: '', society: '',
-        city: '', state: '', postalCode: '', phone: '', isDefault: false,
+        addressLine: '',
+        houseNumber: '',
+        floor: '',
+        isDefault: false,
       });
     }
     setShowAddressForm(true);
@@ -128,7 +123,7 @@ const ProfilePage = () => {
   };
 
   const handleSaveAddress = async () => {
-    if (!addressForm.firstName || !addressForm.addressLine || !addressForm.houseNumber || !addressForm.city || !addressForm.state || !addressForm.postalCode) {
+    if (!addressForm.addressLine || !addressForm.houseNumber) {
       toast.error('Please fill all required address fields');
       return;
     }
@@ -322,12 +317,6 @@ const ProfilePage = () => {
                 ))}
                 <div className="border-t border-gray-100 pt-1 mt-1">
                   <button
-                    onClick={() => navigate('/orders')}
-                    className="w-full text-left px-4 py-2 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
-                  >
-                    📦 My Orders
-                  </button>
-                  <button
                     onClick={handleLogout}
                     className="w-full text-left px-4 py-2 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50 transition-colors"
                   >
@@ -416,20 +405,6 @@ const ProfilePage = () => {
                 {showAddressForm && (
                   <div className="mb-6 p-4 bg-gray-50 rounded-xl border border-gray-200 space-y-3">
                     <h4 className="font-semibold text-gray-800 text-sm">{editingAddress ? 'Edit Address' : 'Add New Address'}</h4>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-xs font-medium text-gray-600 mb-1">First Name *</label>
-                        <input type="text" name="firstName" value={addressForm.firstName} onChange={handleAddressFormChange}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-fresh-green focus:border-transparent outline-none"
-                          placeholder="First name" />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-medium text-gray-600 mb-1">Last Name</label>
-                        <input type="text" name="lastName" value={addressForm.lastName} onChange={handleAddressFormChange}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-fresh-green focus:border-transparent outline-none"
-                          placeholder="Last name" />
-                      </div>
-                    </div>
                     <div>
                       <label className="block text-xs font-medium text-gray-600 mb-1">Address Line *</label>
                       <input type="text" name="addressLine" value={addressForm.addressLine} onChange={handleAddressFormChange}
@@ -458,45 +433,6 @@ const ProfilePage = () => {
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-fresh-green focus:border-transparent outline-none"
                           placeholder="e.g. 2"
                         />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-medium text-gray-600 mb-1">Society</label>
-                        <input
-                          type="text"
-                          name="society"
-                          value={addressForm.society}
-                          onChange={handleAddressFormChange}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-fresh-green focus:border-transparent outline-none"
-                          placeholder="e.g. Shanti Nagar"
-                        />
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-xs font-medium text-gray-600 mb-1">City *</label>
-                        <input type="text" name="city" value={addressForm.city} onChange={handleAddressFormChange}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-fresh-green focus:border-transparent outline-none"
-                          placeholder="City" />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-medium text-gray-600 mb-1">State *</label>
-                        <input type="text" name="state" value={addressForm.state} onChange={handleAddressFormChange}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-fresh-green focus:border-transparent outline-none"
-                          placeholder="State" />
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-xs font-medium text-gray-600 mb-1">Pincode *</label>
-                        <input type="text" name="postalCode" value={addressForm.postalCode} onChange={handleAddressFormChange}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-fresh-green focus:border-transparent outline-none"
-                          placeholder="Pincode" />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-medium text-gray-600 mb-1">Phone</label>
-                        <input type="tel" name="phone" value={addressForm.phone} onChange={handleAddressFormChange}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-fresh-green focus:border-transparent outline-none"
-                          placeholder="Phone number" />
                       </div>
                     </div>
                     <label className="flex items-center gap-2 cursor-pointer">
@@ -534,20 +470,16 @@ const ProfilePage = () => {
                         <div className="flex items-start justify-between gap-3">
                           <div className="flex-1">
                             <div className="flex items-center gap-2 mb-1">
-                              <p className="font-semibold text-gray-900 text-sm">
-                                {addr.first_name} {addr.last_name}
-                              </p>
+                              <p className="font-semibold text-gray-900 text-sm">Saved Address</p>
                               {addr.is_default && (
                                 <span className="text-[10px] bg-fresh-green text-white px-2 py-0.5 rounded-full font-semibold">Default</span>
                               )}
                             </div>
                             <p className="text-sm text-gray-600">
-                              {[addr.house_number, addr.floor ? `Floor ${addr.floor}` : '', addr.society ? `Society ${addr.society}` : '', addr.address_line]
+                              {[addr.house_number, addr.floor ? `Floor ${addr.floor}` : '', addr.address_line]
                                 .filter(Boolean)
                                 .join(', ')}
                             </p>
-                            <p className="text-sm text-gray-600">{addr.city}, {addr.state} – {addr.postal_code}</p>
-                            {addr.phone && <p className="text-xs text-gray-500 mt-1">Ph: {addr.phone}</p>}
                           </div>
                           <div className="flex flex-col gap-1">
                             <button onClick={() => openAddressForm(addr)}

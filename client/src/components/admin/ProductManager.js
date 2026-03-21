@@ -18,6 +18,171 @@ const emptyForm = () => ({
   pricing_type: 'per_kg',
 });
 
+const PricingTypeToggle = ({ value, onChange }) => (
+  <div className="flex items-center gap-2">
+    <span className="text-sm font-medium text-gray-700">Pricing Type:</span>
+    <div className="flex rounded-lg border border-gray-300 overflow-hidden">
+      {[{ v: 'per_kg', label: 'Per Kg' }, { v: 'per_piece', label: 'Per Piece' }].map(({ v, label }) => (
+        <button
+          key={v}
+          type="button"
+          onClick={() => onChange(v)}
+          className={`px-4 py-1.5 text-sm font-medium transition-colors ${
+            value === v ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'
+          }`}
+        >
+          {label}
+        </button>
+      ))}
+    </div>
+  </div>
+);
+
+const ImageSection = ({
+  formData,
+  handleInputChange,
+  selectedImages,
+  setSelectedImages,
+  imagePreview,
+  setImagePreview,
+  existingImages,
+  setExistingImages,
+  handleImageChange,
+  isEdit = false,
+}) => (
+  <div>
+    <label className="block text-sm font-medium text-gray-700 mb-2">Product Image</label>
+    {isEdit && existingImages.length > 0 && (
+      <div className="mb-3 flex items-center gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
+        <img src={getImageUrl(existingImages[0].url)} alt="Current"
+          className="h-16 w-16 object-cover rounded-lg border border-gray-200"
+          onError={(e) => { e.target.src = getPlaceholderImage(); }} />
+        <div className="flex-1">
+          <p className="text-xs text-gray-500 mb-1">Current image</p>
+          <button type="button" onClick={() => { setExistingImages([]); }}
+            className="text-xs text-red-600 hover:text-red-700 font-medium">Remove image</button>
+        </div>
+      </div>
+    )}
+    {(!isEdit || existingImages.length === 0) && (
+      <>
+        <Input label="Image URL (Pexels or any direct link)" name="image_url" type="url"
+          value={formData.image_url} onChange={handleInputChange} className="w-full mb-2"
+          placeholder="https://images.pexels.com/photos/..." />
+        {formData.image_url && (
+          <img src={formData.image_url} alt="Preview"
+            className="mb-2 h-20 w-20 object-cover rounded-lg border border-gray-200"
+            onError={(e) => { e.target.style.display = 'none'; }} />
+        )}
+        <p className="text-xs text-gray-400 mb-2 text-center">- or upload a file -</p>
+        {selectedImages.length === 0 ? (
+          <div className="border-2 border-dashed border-gray-300 rounded-lg p-5 text-center hover:border-gray-400 transition-colors">
+            <input type="file" accept="image/*" multiple={!isEdit}
+              id={isEdit ? 'img-edit' : 'img-add'}
+              onChange={isEdit ? (e) => {
+                const f = e.target.files[0];
+                if (!f) return;
+                setSelectedImages([f]);
+                setImagePreview([URL.createObjectURL(f)]);
+              } : handleImageChange}
+              className="hidden" />
+            <label htmlFor={isEdit ? 'img-edit' : 'img-add'} className="cursor-pointer block text-sm text-gray-600">
+              Click to upload · PNG, JPG up to 5MB
+            </label>
+          </div>
+        ) : (
+          <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
+            <img src={imagePreview[0]} alt="New" className="h-14 w-14 object-cover rounded-lg border border-gray-200" />
+            <div className="flex-1">
+              <p className="text-xs text-gray-700 truncate">{selectedImages[0]?.name}</p>
+              <button type="button" onClick={() => { setSelectedImages([]); setImagePreview([]); }}
+                className="text-xs text-red-600 font-medium">Remove</button>
+            </div>
+          </div>
+        )}
+      </>
+    )}
+  </div>
+);
+
+const ProductForm = ({
+  formData,
+  handleInputChange,
+  categories,
+  categoriesLoading,
+  loading,
+  onSubmit,
+  onCancel,
+  submitLabel,
+  selectedImages,
+  setSelectedImages,
+  imagePreview,
+  setImagePreview,
+  existingImages,
+  setExistingImages,
+  handleImageChange,
+}) => {
+  const priceLabel = formData.pricing_type === 'per_piece' ? 'Price per piece (Rs)' : 'Price per kg (Rs)';
+  const stockLabel = formData.pricing_type === 'per_piece' ? 'Stock (pieces)' : 'Stock (kg)';
+
+  return (
+    <form onSubmit={onSubmit} className="space-y-4 max-w-2xl mx-auto">
+      <PricingTypeToggle value={formData.pricing_type}
+        onChange={(v) => handleInputChange({ target: { name: 'pricing_type', value: v, type: 'text' } })} />
+
+      <Input label="Product Name *" name="name" value={formData.name}
+        onChange={handleInputChange} required className="w-full" />
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Input label={`${priceLabel} *`} name="price_per_kg" type="number"
+          step="0.01" min="0" value={formData.price_per_kg} onChange={handleInputChange}
+          required className="w-full" placeholder="0.00" />
+        <Input label="Discount (%)" name="discount" type="number" step="0.01" min="0" max="100"
+          value={formData.discount} onChange={handleInputChange} className="w-full" placeholder="0" />
+        <Input label={`${stockLabel} *`} name="stock_quantity" type="number"
+          value={formData.stock_quantity} onChange={handleInputChange} required className="w-full" placeholder="0" />
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">Category *</label>
+        <select name="category" value={formData.category} onChange={handleInputChange} required
+          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+          <option value="">Select Category</option>
+          {categoriesLoading ? (
+            <option value="" disabled>Loading...</option>
+          ) : (
+            categories.map(cat => <option key={cat} value={cat}>{cat}</option>)
+          )}
+        </select>
+      </div>
+
+      <label className="flex items-center gap-2 cursor-pointer">
+        <input type="checkbox" name="is_active" checked={formData.is_active} onChange={handleInputChange}
+          className="h-4 w-4 text-blue-600 border-gray-300 rounded" />
+        <span className="text-sm font-medium text-gray-900">Active (visible in store)</span>
+      </label>
+
+      <ImageSection
+        formData={formData}
+        handleInputChange={handleInputChange}
+        selectedImages={selectedImages}
+        setSelectedImages={setSelectedImages}
+        imagePreview={imagePreview}
+        setImagePreview={setImagePreview}
+        existingImages={existingImages}
+        setExistingImages={setExistingImages}
+        handleImageChange={handleImageChange}
+        isEdit={submitLabel.includes('Update')}
+      />
+
+      <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
+        <Button type="button" variant="outline" onClick={onCancel}>Cancel</Button>
+        <Button type="submit" disabled={loading}>{loading ? 'Saving...' : submitLabel}</Button>
+      </div>
+    </form>
+  );
+};
+
 const ProductManager = () => {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -187,136 +352,9 @@ const ProductManager = () => {
     setShowEditModal(true);
   };
 
-  const priceLabel = (pType) => pType === 'per_piece' ? 'Price per piece (₹)' : 'Price per kg (₹)';
-  const stockLabel = (pType) => pType === 'per_piece' ? 'Stock (pieces)' : 'Stock (kg)';
   const priceDisplay = (p) => `₹${p.price_per_kg}/${p.pricing_type === 'per_piece' ? 'pc' : 'kg'}`;
 
   if (loading && products.length === 0) return <Loading />;
-
-  const PricingTypeToggle = ({ value, onChange }) => (
-    <div className="flex items-center gap-2">
-      <span className="text-sm font-medium text-gray-700">Pricing Type:</span>
-      <div className="flex rounded-lg border border-gray-300 overflow-hidden">
-        {[{ v: 'per_kg', label: 'Per Kg' }, { v: 'per_piece', label: 'Per Piece' }].map(({ v, label }) => (
-          <button
-            key={v}
-            type="button"
-            onClick={() => onChange(v)}
-            className={`px-4 py-1.5 text-sm font-medium transition-colors ${
-              value === v ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'
-            }`}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-
-  const ImageSection = ({ isEdit = false }) => (
-    <div>
-      <label className="block text-sm font-medium text-gray-700 mb-2">Product Image</label>
-      {isEdit && existingImages.length > 0 && (
-        <div className="mb-3 flex items-center gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
-          <img src={getImageUrl(existingImages[0].url)} alt="Current"
-            className="h-16 w-16 object-cover rounded-lg border border-gray-200"
-            onError={(e) => { e.target.src = getPlaceholderImage(); }} />
-          <div className="flex-1">
-            <p className="text-xs text-gray-500 mb-1">Current image</p>
-            <button type="button" onClick={() => { setExistingImages([]); setFormData(p => ({ ...p, image_url: '' })); }}
-              className="text-xs text-red-600 hover:text-red-700 font-medium">Remove image</button>
-          </div>
-        </div>
-      )}
-      {(!isEdit || existingImages.length === 0) && (
-        <>
-          <Input label="Image URL (Pexels or any direct link)" name="image_url" type="url"
-            value={formData.image_url} onChange={handleInputChange} className="w-full mb-2"
-            placeholder="https://images.pexels.com/photos/..." />
-          {formData.image_url && (
-            <img src={formData.image_url} alt="Preview"
-              className="mb-2 h-20 w-20 object-cover rounded-lg border border-gray-200"
-              onError={(e) => { e.target.style.display = 'none'; }} />
-          )}
-          <p className="text-xs text-gray-400 mb-2 text-center">— or upload a file —</p>
-          {selectedImages.length === 0 ? (
-            <div className="border-2 border-dashed border-gray-300 rounded-lg p-5 text-center hover:border-gray-400 transition-colors">
-              <input type="file" accept="image/*" multiple={!isEdit}
-                id={isEdit ? 'img-edit' : 'img-add'}
-                onChange={isEdit ? (e) => {
-                  const f = e.target.files[0];
-                  if (!f) return;
-                  setSelectedImages([f]);
-                  setImagePreview([URL.createObjectURL(f)]);
-                } : handleImageChange}
-                className="hidden" />
-              <label htmlFor={isEdit ? 'img-edit' : 'img-add'} className="cursor-pointer block text-sm text-gray-600">
-                Click to upload · PNG, JPG up to 5MB
-              </label>
-            </div>
-          ) : (
-            <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
-              <img src={imagePreview[0]} alt="New" className="h-14 w-14 object-cover rounded-lg border border-gray-200" />
-              <div className="flex-1">
-                <p className="text-xs text-gray-700 truncate">{selectedImages[0]?.name}</p>
-                <button type="button" onClick={() => { setSelectedImages([]); setImagePreview([]); }}
-                  className="text-xs text-red-600 font-medium">Remove</button>
-              </div>
-            </div>
-          )}
-        </>
-      )}
-    </div>
-  );
-
-  const ProductForm = ({ onSubmit, submitLabel }) => (
-    <form onSubmit={onSubmit} className="space-y-4 max-w-2xl mx-auto">
-      <PricingTypeToggle value={formData.pricing_type}
-        onChange={(v) => setFormData(p => ({ ...p, pricing_type: v }))} />
-
-      <Input label="Product Name *" name="name" value={formData.name}
-        onChange={handleInputChange} required className="w-full" />
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Input label={`${priceLabel(formData.pricing_type)} *`} name="price_per_kg" type="number"
-          step="0.01" min="0" value={formData.price_per_kg} onChange={handleInputChange}
-          required className="w-full" placeholder="0.00" />
-        <Input label="Discount (%)" name="discount" type="number" step="0.01" min="0" max="100"
-          value={formData.discount} onChange={handleInputChange} className="w-full" placeholder="0" />
-        <Input label={`${stockLabel(formData.pricing_type)} *`} name="stock_quantity" type="number"
-          value={formData.stock_quantity} onChange={handleInputChange} required className="w-full" placeholder="0" />
-      </div>
-
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">Category *</label>
-        <select name="category" value={formData.category} onChange={handleInputChange} required
-          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-          <option value="">Select Category</option>
-          {categoriesLoading ? (
-            <option value="" disabled>Loading...</option>
-          ) : (
-            categories.map(cat => <option key={cat} value={cat}>{cat}</option>)
-          )}
-        </select>
-      </div>
-
-      <label className="flex items-center gap-2 cursor-pointer">
-        <input type="checkbox" name="is_active" checked={formData.is_active} onChange={handleInputChange}
-          className="h-4 w-4 text-blue-600 border-gray-300 rounded" />
-        <span className="text-sm font-medium text-gray-900">Active (visible in store)</span>
-      </label>
-
-      <ImageSection isEdit={submitLabel.includes('Update')} />
-
-      <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
-        <Button type="button" variant="outline"
-          onClick={() => submitLabel.includes('Update') ? setShowEditModal(false) : setShowAddModal(false)}>
-          Cancel
-        </Button>
-        <Button type="submit" disabled={loading}>{loading ? 'Saving...' : submitLabel}</Button>
-      </div>
-    </form>
-  );
 
   return (
     <div>
@@ -404,12 +442,44 @@ const ProductManager = () => {
 
       {/* Add Modal */}
       <Modal isOpen={showAddModal} onClose={() => setShowAddModal(false)} title="Add New Product">
-        <ProductForm onSubmit={handleAddProduct} submitLabel="Add Product" />
+        <ProductForm
+          formData={formData}
+          handleInputChange={handleInputChange}
+          categories={categories}
+          categoriesLoading={categoriesLoading}
+          loading={loading}
+          onSubmit={handleAddProduct}
+          onCancel={() => setShowAddModal(false)}
+          submitLabel="Add Product"
+          selectedImages={selectedImages}
+          setSelectedImages={setSelectedImages}
+          imagePreview={imagePreview}
+          setImagePreview={setImagePreview}
+          existingImages={existingImages}
+          setExistingImages={setExistingImages}
+          handleImageChange={handleImageChange}
+        />
       </Modal>
 
       {/* Edit Modal */}
       <Modal isOpen={showEditModal} onClose={() => setShowEditModal(false)} title="Edit Product">
-        <ProductForm onSubmit={handleEditProduct} submitLabel="Update Product" />
+        <ProductForm
+          formData={formData}
+          handleInputChange={handleInputChange}
+          categories={categories}
+          categoriesLoading={categoriesLoading}
+          loading={loading}
+          onSubmit={handleEditProduct}
+          onCancel={() => setShowEditModal(false)}
+          submitLabel="Update Product"
+          selectedImages={selectedImages}
+          setSelectedImages={setSelectedImages}
+          imagePreview={imagePreview}
+          setImagePreview={setImagePreview}
+          existingImages={existingImages}
+          setExistingImages={setExistingImages}
+          handleImageChange={handleImageChange}
+        />
       </Modal>
 
       {/* Delete Confirmation Modal */}

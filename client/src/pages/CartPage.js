@@ -42,7 +42,7 @@ const CartPage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 pt-14 pb-[11.5rem] sm:pb-36">
+    <div className="min-h-screen bg-gray-50 pt-14 pb-[12rem] sm:pb-36">
       <div className="max-w-lg mx-auto px-0 sm:px-4 py-3 sm:py-4">
 
         {/* Delivery info banner */}

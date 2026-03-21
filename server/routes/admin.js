@@ -76,13 +76,15 @@ router.get('/dashboard', async (req, res) => {
       LIMIT 5
     `);
 
+    const configuredCategories = await getProductCategories();
+
     const response = {
       stats: {
         totalProducts: parseInt(totalProducts.rows[0].count),
         totalOrders: parseInt(totalOrders.rows[0].count),
         totalUsers: parseInt(totalUsers.rows[0].count),
         totalRevenue: parseFloat(totalRevenue.rows[0].revenue),
-        totalCategories: categoryStats.rows.length,
+        totalCategories: configuredCategories.length,
       },
       categoryStats: categoryStats.rows,
       recentOrders: recentOrders.rows,

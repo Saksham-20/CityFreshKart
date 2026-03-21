@@ -18,11 +18,7 @@ const CheckoutPage = () => {
   const [newAddressForm, setNewAddressForm] = useState({
     houseNumber: '',
     floor: '',
-    society: '',
     addressLine: '',
-    city: '',
-    state: '',
-    postalCode: '',
   });
   const [saveNewAddress, setSaveNewAddress] = useState(false);
   const [deliveryNotes, setDeliveryNotes] = useState('');
@@ -70,32 +66,21 @@ const CheckoutPage = () => {
 
   const validateNewAddress = () => {
     if (!useNewAddress) return '';
-    const postalCode = String(newAddressForm.postalCode || '').trim();
-    if (!/^\d{6}$/.test(postalCode)) return 'Please enter a valid 6-digit pincode';
     if (String(newAddressForm.houseNumber || '').trim().length > 100) return 'House number is too long';
     if (String(newAddressForm.addressLine || '').trim().length < 5) return 'Address line is too short';
-    if (String(newAddressForm.city || '').trim().length < 2) return 'Please enter a valid city';
-    if (String(newAddressForm.state || '').trim().length < 2) return 'Please enter a valid state';
     return '';
   };
 
   const getDeliveryAddress = () => {
     if (useNewAddress) {
-      const { houseNumber, addressLine, city, state, postalCode } = newAddressForm;
-      const ready = houseNumber && addressLine && city && state && postalCode;
+      const { houseNumber, addressLine } = newAddressForm;
+      const ready = houseNumber && addressLine;
       if (!ready) return '';
 
       return addressService.formatAddressText({
-        first_name: user?.name || 'User',
-        last_name: '',
         house_number: newAddressForm.houseNumber,
         floor: newAddressForm.floor,
-        society: newAddressForm.society,
         address_line: newAddressForm.addressLine,
-        city: newAddressForm.city,
-        state: newAddressForm.state,
-        postal_code: newAddressForm.postalCode,
-        phone: user?.phone || '',
       });
     }
     const addr = savedAddresses.find(a => a.id === selectedAddressId);
@@ -147,23 +132,21 @@ const CheckoutPage = () => {
     if (useNewAddress && saveNewAddress && address) {
       try {
         await addressService.addAddress({
-          firstName: user.name || 'User',
-          lastName: '',
           houseNumber: newAddressForm.houseNumber,
           floor: newAddressForm.floor,
-          society: newAddressForm.society,
           addressLine: newAddressForm.addressLine,
-          city: newAddressForm.city,
-          state: newAddressForm.state,
-          postalCode: newAddressForm.postalCode,
-          phone: user.phone || '',
           isDefault: savedAddresses.length === 0,
         });
         toast.success('Address saved to your profile!');
         // Refresh addresses silently so future visits are pre-filled
         loadAddresses();
-      } catch {
-        // Don't block order if address save fails
+      } catch (saveErr) {
+        // Don't block order placement, but clearly inform the user.
+        toast.error(
+          saveErr?.response?.data?.error?.message
+          || saveErr?.response?.data?.message
+          || 'Could not save this address to profile. Order will still be placed.',
+        );
       }
     }
 
@@ -217,7 +200,7 @@ const CheckoutPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-[10rem]">
+    <div className="min-h-screen bg-gray-50 pt-14 pb-[10.5rem]">
       {/* Header */}
       <div className="bg-white border-b border-gray-200 px-4 py-3 flex items-center gap-3 sticky top-14 z-10">
         <button onClick={() => navigate('/cart')} className="text-gray-600 p-1 -ml-1 rounded-lg hover:bg-gray-100">
@@ -305,7 +288,7 @@ const CheckoutPage = () => {
                       />
                       <div className="flex-1 text-sm">
                         <div className="flex items-center gap-2">
-                          <span className="font-semibold text-gray-900">{addr.first_name} {addr.last_name}</span>
+                          <span className="font-semibold text-gray-900">Saved Address</span>
                           {addr.is_default && (
                             <span className="text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded font-semibold">Default</span>
                           )}
@@ -313,12 +296,9 @@ const CheckoutPage = () => {
                         <p className="text-gray-600 mt-0.5">
                           {[addr.house_number,
                             addr.floor ? `Floor ${addr.floor}` : '',
-                            addr.society ? `Society ${addr.society}` : '',
                             addr.address_line,
                           ].filter(Boolean).join(', ')}
                         </p>
-                        <p className="text-gray-600">{addr.city}, {addr.state} – {addr.postal_code}</p>
-                        {addr.phone && <p className="text-gray-500 text-xs mt-0.5">Ph: {addr.phone}</p>}
                       </div>
                       {!useNewAddress && selectedAddressId === addr.id && (
                         <span className="text-green-600 text-xs font-bold mt-0.5">✓</span>
@@ -375,20 +355,6 @@ const CheckoutPage = () => {
                           </div>
 
                           <div>
-                            <label className="block text-xs font-medium text-gray-600 mb-1">Society</label>
-                            <input
-                              type="text"
-                              value={newAddressForm.society}
-                              onChange={(e) => {
-                                setNewAddressForm(p => ({ ...p, society: e.target.value }));
-                                if (error) setError('');
-                              }}
-                              placeholder="e.g. Shanti Nagar"
-                              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-                            />
-                          </div>
-
-                          <div>
                             <label className="block text-xs font-medium text-gray-600 mb-1">Address Line *</label>
                             <input
                               type="text"
@@ -402,48 +368,6 @@ const CheckoutPage = () => {
                             />
                           </div>
 
-                          <div className="grid grid-cols-2 gap-3">
-                            <div>
-                              <label className="block text-xs font-medium text-gray-600 mb-1">City *</label>
-                              <input
-                                type="text"
-                                value={newAddressForm.city}
-                                onChange={(e) => {
-                                  setNewAddressForm(p => ({ ...p, city: e.target.value }));
-                                  if (error) setError('');
-                                }}
-                                placeholder="City"
-                                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-xs font-medium text-gray-600 mb-1">State *</label>
-                              <input
-                                type="text"
-                                value={newAddressForm.state}
-                                onChange={(e) => {
-                                  setNewAddressForm(p => ({ ...p, state: e.target.value }));
-                                  if (error) setError('');
-                                }}
-                                placeholder="State"
-                                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-                              />
-                            </div>
-                          </div>
-
-                          <div>
-                            <label className="block text-xs font-medium text-gray-600 mb-1">Pincode *</label>
-                            <input
-                              type="text"
-                              value={newAddressForm.postalCode}
-                              onChange={(e) => {
-                                setNewAddressForm(p => ({ ...p, postalCode: e.target.value }));
-                                if (error) setError('');
-                              }}
-                              placeholder="Pincode"
-                              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-                            />
-                          </div>
                           <label className="flex items-center gap-2 cursor-pointer select-none">
                             <input
                               type="checkbox"
@@ -528,7 +452,7 @@ const CheckoutPage = () => {
 
       {/* Sticky Place Order Button */}
       <div
-        className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 z-20"
+        className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 z-40"
         style={{ paddingBottom: 'calc(1rem + env(safe-area-inset-bottom))' }}
       >
         <button

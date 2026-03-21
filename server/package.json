@@ -8,10 +8,10 @@
     "dev": "nodemon index.js",
     "test": "jest",
     "build": "echo 'Build completed'",
-    "db:setup": "npx prisma migrate dev --name init",
+    "db:setup": "node database/setup.js",
     "db:seed": "node database/seed.js",
-    "db:migrate": "npx prisma migrate dev",
-    "db:studio": "npx prisma studio"
+    "db:migrate": "node database/setup.js",
+    "db:studio": "echo 'Prisma studio disabled: using raw SQL schema source of truth'"
   },
   "dependencies": {
     "@prisma/client": "^6.19.2",

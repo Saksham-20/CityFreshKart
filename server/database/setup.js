@@ -3,6 +3,15 @@ const path = require('path');
 const { pool } = require('./config');
 require('dotenv').config();
 
+function slugify(value = '') {
+  return String(value)
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9\s-]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-');
+}
+
 async function setupDatabase() {
   console.log('🚀 Starting database setup...');
 
@@ -23,6 +32,80 @@ async function setupDatabase() {
     // Test the pool connection
     const testResult = await pool.query('SELECT NOW()');
     console.log('✅ Connected to PostgreSQL via shared pool');
+    await pool.query('CREATE EXTENSION IF NOT EXISTS "uuid-ossp"');
+
+    // Compatibility fix: migrate legacy Prisma-era TEXT ids -> UUID
+    // so raw SQL schema FKs (UUID) can be applied safely.
+    try {
+      const idTypes = await pool.query(`
+        SELECT table_name, data_type
+        FROM information_schema.columns
+        WHERE column_name = 'id'
+          AND table_name IN ('users', 'products')
+      `);
+
+      const usersIdType = idTypes.rows.find(r => r.table_name === 'users')?.data_type;
+      const productsIdType = idTypes.rows.find(r => r.table_name === 'products')?.data_type;
+
+      if ((usersIdType && usersIdType !== 'uuid') || (productsIdType && productsIdType !== 'uuid')) {
+        console.log('🔄 Normalizing legacy id column types to UUID...');
+
+        // Drop dependent tables so FK/type conversion can complete in one pass.
+        // These tables are recreated by schema.sql immediately after.
+        await pool.query(`
+          DROP TABLE IF EXISTS cart CASCADE;
+          DROP TABLE IF EXISTS cart_items CASCADE;
+          DROP TABLE IF EXISTS order_items CASCADE;
+          DROP TABLE IF EXISTS orders CASCADE;
+          DROP TABLE IF EXISTS user_addresses CASCADE;
+          DROP TABLE IF EXISTS push_subscriptions CASCADE;
+          DROP TABLE IF EXISTS otp_sessions CASCADE;
+          DROP TABLE IF EXISTS carts CASCADE;
+          DROP TABLE IF EXISTS wishlist CASCADE;
+          DROP TABLE IF EXISTS wishlists CASCADE;
+          DROP TABLE IF EXISTS wishlist_items CASCADE;
+        `);
+
+        if (usersIdType && usersIdType !== 'uuid') {
+          await pool.query(`
+            ALTER TABLE users
+            ALTER COLUMN id TYPE UUID
+            USING (
+              CASE
+                WHEN id ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+                THEN id::uuid
+                ELSE uuid_generate_v4()
+              END
+            )
+          `);
+          console.log('✅ users.id normalized to UUID');
+        }
+
+        if (productsIdType && productsIdType !== 'uuid') {
+          await pool.query(`
+            ALTER TABLE products
+            ALTER COLUMN id TYPE UUID
+            USING (
+              CASE
+                WHEN id ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+                THEN id::uuid
+                ELSE uuid_generate_v4()
+              END
+            )
+          `);
+          console.log('✅ products.id normalized to UUID');
+        }
+
+        // Ensure UUID defaults exist after legacy conversion
+        await pool.query(`
+          ALTER TABLE users ALTER COLUMN id SET DEFAULT uuid_generate_v4();
+          ALTER TABLE products ALTER COLUMN id SET DEFAULT uuid_generate_v4();
+        `);
+      }
+    } catch (compatError) {
+      console.error('❌ Legacy schema compatibility step failed:', compatError.message);
+      throw compatError;
+    }
 
     // Apply schema (CREATE TABLE IF NOT EXISTS — safe to run on every boot)
     const schemaPath = path.join(__dirname, 'schema.sql');
@@ -31,6 +114,10 @@ async function setupDatabase() {
     try {
       console.log('🔄 Ensuring database tables exist...');
       await pool.query(schema);
+      await pool.query(`
+        ALTER TABLE users ALTER COLUMN id SET DEFAULT uuid_generate_v4();
+        ALTER TABLE products ALTER COLUMN id SET DEFAULT uuid_generate_v4();
+      `);
       console.log('✅ Database schema ready');
     } catch (error) {
       console.error('❌ Schema creation failed:', error.message);
@@ -115,16 +202,21 @@ async function setupDatabase() {
         if (existing.rows.length > 0) {
           // Update image_url and category for existing products
           await pool.query(
-            `UPDATE products SET image_url = $1, category = $2, updated_at = NOW()
-             WHERE LOWER(name) = LOWER($3)`,
-            [product.image_url, product.category, product.name],
+            `UPDATE products
+             SET image_url = $1,
+                 image = COALESCE(image, $2),
+                 category = $3,
+                 slug = COALESCE(NULLIF(slug, ''), $4),
+                 updated_at = NOW()
+             WHERE LOWER(name) = LOWER($5)`,
+            [product.image_url, product.image_url, product.category, slugify(product.name), product.name],
           );
           updated++;
         } else {
           await pool.query(
-            `INSERT INTO products (name, category, description, price_per_kg, discount, image_url, is_active, quantity_available, created_at, updated_at)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW())`,
-            [product.name, product.category, product.description, product.price_per_kg, product.discount, product.image_url, true, 100],
+            `INSERT INTO products (name, slug, category, description, price_per_kg, discount, image, image_url, is_active, quantity_available, created_at, updated_at)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW(), NOW())`,
+            [product.name, slugify(product.name), product.category, product.description, product.price_per_kg, product.discount, product.image_url, product.image_url, true, 100],
           );
           inserted++;
         }

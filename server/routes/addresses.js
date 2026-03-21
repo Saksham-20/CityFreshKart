@@ -26,7 +26,7 @@ router.get('/', authenticateToken, async (req, res) => {
 router.post('/', authenticateToken, async (req, res) => {
   try {
     const {
-      firstName, first_name, lastName, last_name, 
+      firstName, first_name, lastName, last_name,
       addressLine, address_line,
       houseNumber, house_number,
       floor, society,
@@ -42,10 +42,10 @@ router.post('/', authenticateToken, async (req, res) => {
     const societyValue = society || '';
     const deflt = isDefault !== undefined ? isDefault : (is_default || false);
 
-    if (!fname || !line1 || !houseNo || !city || !state || !zip) {
+    if (!line1 || !houseNo) {
       return res.status(400).json({
         success: false,
-        error: { code: 'VALIDATION_ERROR', message: 'Required address fields are missing' },
+        error: { code: 'VALIDATION_ERROR', message: 'Address line and house number are required' },
       });
     }
 
@@ -74,10 +74,10 @@ router.post('/', authenticateToken, async (req, res) => {
       houseNo,
       floorValue,
       societyValue,
-      city,
-      state,
-      zip,
-      phone || null,
+      city || 'N/A',
+      state || 'N/A',
+      zip || '000000',
+      phone || '',
       deflt,
     ]);
 

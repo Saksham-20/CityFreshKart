@@ -133,7 +133,7 @@ const CarouselSection = ({ title, subtitle, items }) => {
 
 const DiscountFreshCarousel = () => {
   const [discounted, setDiscounted] = useState([]);
-  const [fresh, setFresh] = useState([]);
+  const [newProducts, setNewProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -145,7 +145,7 @@ const DiscountFreshCarousel = () => {
         const res = await api.get('/products/carousel');
         if (!mounted) return;
         setDiscounted(res.data?.data?.discounted || []);
-        setFresh(res.data?.data?.fresh || []);
+        setNewProducts(res.data?.data?.new_products || res.data?.data?.fresh || []);
       } catch (e) {
         if (!mounted) return;
         setError('Failed to load carousel items');
@@ -181,9 +181,9 @@ const DiscountFreshCarousel = () => {
       />
 
       <CarouselSection
-        title="Fresh in Last 24 Hours"
-        subtitle="Packed recently for best taste"
-        items={fresh}
+        title="New Products"
+        subtitle="Recently added in the last 24 hours"
+        items={newProducts}
       />
     </div>
   );

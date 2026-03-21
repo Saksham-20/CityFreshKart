@@ -43,7 +43,7 @@ router.get('/categories', async (req, res) => {
 });
 
 // @route   GET /api/products/carousel
-// @desc    Get products for home carousels (discounted + fresh)
+// @desc    Get products for home carousels (discounted + new)
 // @access  Public
 router.get('/carousel', async (req, res) => {
   try {
@@ -65,7 +65,7 @@ router.get('/carousel', async (req, res) => {
       LIMIT $1
     `, [limit]);
 
-    const fresh = await query(`
+    const newProducts = await query(`
       SELECT
         id,
         name,
@@ -86,7 +86,8 @@ router.get('/carousel', async (req, res) => {
       success: true,
       data: {
         discounted: discounted.rows,
-        fresh: fresh.rows,
+        new_products: newProducts.rows,
+        fresh: newProducts.rows, // backward compatibility for older clients
       },
     });
   } catch (error) {

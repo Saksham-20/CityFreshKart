@@ -1,5 +1,5 @@
 import React, { Suspense, lazy, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 
 // Layout Components
@@ -47,13 +47,27 @@ const PageLoader = () => (
 const MainLayout = ({ children }) => (
   <div className="min-h-screen bg-white flex flex-col">
     <Header />
-    <main className="flex-1 pb-16 md:pb-0">{children}</main>
+    <main className="flex-1 pb-24 md:pb-0">{children}</main>
     <Footer />
     <MobileBottomNav />
-    <WhatsAppFloatingButton />
-    <InstallPrompt />
   </div>
 );
+
+const FloatingOverlays = () => {
+  const location = useLocation();
+  const isAdminRoute = location.pathname.startsWith('/admin');
+  const hideOnBottomCtaPages = location.pathname === '/cart'
+    || location.pathname === '/checkout';
+
+  if (isAdminRoute || hideOnBottomCtaPages) return null;
+
+  return (
+    <>
+      <WhatsAppFloatingButton />
+      <InstallPrompt />
+    </>
+  );
+};
 
 function App() {
   const { isAuthenticated, loading } = useAuth();
@@ -148,6 +162,7 @@ function App() {
           <Route path="*" element={isAuthenticated ? <Navigate to="/" replace /> : <Navigate to="/login" replace />} />
         </Routes>
       </Suspense>
+      <FloatingOverlays />
       <Toaster />
     </Router>
   );
