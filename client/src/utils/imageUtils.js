@@ -1,3 +1,5 @@
+import { getPublicApiOrigin } from './publicOrigin';
+
 // Utility functions for handling image URLs in both development and production
 
 const getImageUrl = (imagePath) => {
@@ -10,7 +12,7 @@ const getImageUrl = (imagePath) => {
     return imagePath;
   }
 
-  const apiBaseUrl = (process.env.REACT_APP_API_URL || 'http://localhost:5000').replace(/\/+$/, '');
+  const apiBaseUrl = getPublicApiOrigin();
 
   // For paths starting with /uploads or uploads/ (disk storage paths from multer)
   if (imagePath.startsWith('/uploads') || imagePath.startsWith('uploads/')) {

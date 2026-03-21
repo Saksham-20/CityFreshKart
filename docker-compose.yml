@@ -15,7 +15,13 @@ services:
       retries: 20
 
   app:
-    build: .
+    build:
+      context: .
+      args:
+        # Optional. If unset, the client uses window.location.origin (same host as the browser).
+        # Set to your public site URL if the API is on another host (e.g. https://api.example.com).
+        REACT_APP_API_URL: ${REACT_APP_API_URL:-}
+        REACT_APP_VAPID_PUBLIC_KEY: ${REACT_APP_VAPID_PUBLIC_KEY:-}
     restart: unless-stopped
     depends_on:
       db:
@@ -28,8 +34,10 @@ services:
       DB_NAME: ${DB_NAME:-cityfreshkart}
       DB_USER: ${DB_USER:-cityfreshkart_user}
       DB_PASSWORD: ${DB_PASSWORD:-change_me}
+      # Browser origin(s) for CORS + Helmet CSP connect-src (comma-separate for www + api)
       CLIENT_URL: ${CLIENT_URL:-http://localhost:8080}
       CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:8080}
+      CSP_CONNECT_SRC: ${CSP_CONNECT_SRC:-}
       JWT_SECRET: ${JWT_SECRET:-change_me}
       RATE_LIMIT_WINDOW_MS: ${RATE_LIMIT_WINDOW_MS:-900000}
       RATE_LIMIT_MAX_REQUESTS: ${RATE_LIMIT_MAX_REQUESTS:-100}

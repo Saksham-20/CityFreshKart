@@ -5,6 +5,11 @@ RUN npm ci
 
 FROM node:20-alpine AS client-build
 WORKDIR /app
+# Baked into CRA build; optional if you use runtime origin (see client/src/utils/publicOrigin.js)
+ARG REACT_APP_API_URL
+ARG REACT_APP_VAPID_PUBLIC_KEY
+ENV REACT_APP_API_URL=$REACT_APP_API_URL
+ENV REACT_APP_VAPID_PUBLIC_KEY=$REACT_APP_VAPID_PUBLIC_KEY
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN cd client && npm ci

@@ -1,9 +1,11 @@
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5001';
+import { getPublicApiOrigin } from '../utils/publicOrigin';
+
+const apiRoot = () => `${getPublicApiOrigin()}/api`;
 
 class AuthService {
   async login(credentials) {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
+      const response = await fetch(`${apiRoot()}/auth/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -31,7 +33,7 @@ class AuthService {
 
   async register(userData) {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/auth/register`, {
+      const response = await fetch(`${apiRoot()}/auth/register`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -54,7 +56,7 @@ class AuthService {
   async logout() {
     try {
       // Call server to clear httpOnly cookie
-      await fetch(`${API_BASE_URL}/api/auth/logout`, {
+      await fetch(`${apiRoot()}/auth/logout`, {
         method: 'POST',
         credentials: 'include', // Essential for sending/receiving cookies
       });
@@ -69,7 +71,7 @@ class AuthService {
 
   async refreshToken() {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/auth/refresh`, {
+      const response = await fetch(`${apiRoot()}/auth/refresh`, {
         method: 'POST',
         credentials: 'include', // Essential for sending/receiving cookies
       });
@@ -96,7 +98,7 @@ class AuthService {
 
   async updateProfile(profileData) {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/auth/profile`, {
+      const response = await fetch(`${apiRoot()}/auth/profile`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -125,7 +127,7 @@ class AuthService {
 
   async changePassword(passwordData) {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/auth/change-password`, {
+      const response = await fetch(`${apiRoot()}/auth/change-password`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -147,7 +149,7 @@ class AuthService {
 
   async forgotPassword(email) {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/auth/forgot-password`, {
+      const response = await fetch(`${apiRoot()}/auth/forgot-password`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -168,7 +170,7 @@ class AuthService {
 
   async resetPassword(token, newPassword) {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/auth/reset-password`, {
+      const response = await fetch(`${apiRoot()}/auth/reset-password`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -189,7 +191,7 @@ class AuthService {
 
   async verifyEmail(token) {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/auth/verify-email`, {
+      const response = await fetch(`${apiRoot()}/auth/verify-email`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -210,7 +212,7 @@ class AuthService {
 
   async resendVerificationEmail(email) {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/auth/resend-verification`, {
+      const response = await fetch(`${apiRoot()}/auth/resend-verification`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

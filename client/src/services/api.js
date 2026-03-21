@@ -1,9 +1,8 @@
 import axios from 'axios';
 import { useAuthStore } from '../store/useAuthStore';
+import { getPublicApiOrigin } from '../utils/publicOrigin';
 
-const API_BASE_URL = process.env.REACT_APP_API_URL
-  ? `${process.env.REACT_APP_API_URL}/api`
-  : 'http://localhost:5000/api';
+const API_BASE_URL = `${getPublicApiOrigin()}/api`;
 
 // Create axios instance
 const apiClient = axios.create({

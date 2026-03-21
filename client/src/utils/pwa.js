@@ -3,6 +3,8 @@
  * Handles service worker registration and app installation
  */
 
+import { getPublicApiOrigin } from './publicOrigin';
+
 let deferredPrompt;
 const installPromptListeners = new Set();
 
@@ -207,7 +209,7 @@ export const subscribeToWebPush = async () => {
   }
 
   const response = await fetch(
-    `${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/notifications/subscribe`,
+    `${getPublicApiOrigin()}/api/notifications/subscribe`,
     {
       method: 'POST',
       headers: {
