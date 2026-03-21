@@ -6,30 +6,33 @@ const useAuthStore = create((set, get) => ({
   user: null,
   token: null,
   isAuthenticated: false,
-  loading: false,
+  loading: true,
   error: null,
 
   // Initialize auth from localStorage
   initialize: async () => {
-    const token = localStorage.getItem('token');
-    const user = localStorage.getItem('user');
+    set({ loading: true });
+    try {
+      const token = localStorage.getItem('token');
+      const user = localStorage.getItem('user');
 
-    if (token && user) {
-      try {
-        set({ token, user: JSON.parse(user), isAuthenticated: true });
-        // Verify token is still valid
-        const response = await api.get('/auth/me', {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        if (!response.data.data) {
-          throw new Error('Invalid token');
+      if (token && user) {
+        try {
+          set({ token, user: JSON.parse(user), isAuthenticated: true });
+          const response = await api.get('/auth/me', {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          if (!response.data.data) {
+            throw new Error('Invalid token');
+          }
+        } catch (error) {
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+          set({ token: null, user: null, isAuthenticated: false });
         }
-      } catch (error) {
-        // Token expired or invalid
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
-        set({ token: null, user: null, isAuthenticated: false });
       }
+    } finally {
+      set({ loading: false });
     }
   },
 

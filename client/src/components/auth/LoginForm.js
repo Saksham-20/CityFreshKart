@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { FiPhone, FiLock, FiEye, FiEyeOff, FiAlertCircle } from 'react-icons/fi';
 import useAuth from '../../hooks/useAuth';
 import toast from 'react-hot-toast';
+import { getSafeReturnPath } from '../../utils/safeReturnPath';
 
 const LoginForm = ({ onSwitchToRegister }) => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { login } = useAuth();
   const [formData, setFormData] = useState({ phone: '', password: '' });
   const [errors, setErrors] = useState({});
@@ -43,7 +45,17 @@ const LoginForm = ({ onSwitchToRegister }) => {
       const result = await login(formData.phone, formData.password);
       if (result?.success) {
         toast.success('Welcome back!');
-        navigate(result.user?.is_admin ? '/admin' : '/');
+        const safe = getSafeReturnPath(location.state?.from?.pathname);
+        const defaultPath = result.user?.is_admin ? '/admin' : '/';
+        let to = defaultPath;
+        if (safe) {
+          if (!result.user?.is_admin && safe.startsWith('/admin')) {
+            to = '/';
+          } else {
+            to = safe;
+          }
+        }
+        navigate(to);
       } else {
         const message = result?.message || 'Invalid phone or password';
         setErrors({ general: message });

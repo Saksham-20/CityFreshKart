@@ -17,16 +17,19 @@ const razorpayRoutes = require('./routes/razorpay');
 const cartRoutes = require('./routes/cart');
 const addressRoutes = require('./routes/addresses');
 const notificationRoutes = require('./routes/notifications');
+const { collectCspConnectOrigins } = require('./utils/cspOrigins');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 
 // Security middleware - enabled for production
 if (process.env.NODE_ENV === 'production') {
+  const connectSrc = collectCspConnectOrigins();
   app.use(helmet({
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
+        connectSrc,
         styleSrc: ["'self'", "'unsafe-inline'"],
         scriptSrc: ["'self'"],
         imgSrc: ["'self'", 'data:', 'https:', 'http://localhost:5000', 'http://localhost:3000'],

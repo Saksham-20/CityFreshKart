@@ -97,6 +97,7 @@ public
 !client/public/screenshots/
 !client/public/screenshots/*.png
 !client/public/favicon.ico
+!client/public/sw.js
 
 # Storybook build outputs
 .out

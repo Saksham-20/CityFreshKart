@@ -59,11 +59,11 @@ const FloatingOverlays = () => {
   const hideOnBottomCtaPages = location.pathname === '/cart'
     || location.pathname === '/checkout';
 
-  if (isAdminRoute || hideOnBottomCtaPages) return null;
+  if (hideOnBottomCtaPages) return null;
 
   return (
     <>
-      <WhatsAppFloatingButton />
+      {!isAdminRoute && <WhatsAppFloatingButton />}
       <InstallPrompt />
     </>
   );

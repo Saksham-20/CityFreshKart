@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import LoginForm from '../components/auth/LoginForm';
 import RegisterForm from '../components/auth/RegisterForm';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../store/useAuthStore';
+import { getSafeReturnPath } from '../utils/safeReturnPath';
 
 const TRUST_FEATURES = [
   { icon: '🌱', title: 'Farm-to-Door Freshness', desc: 'Sourced directly from local farms every morning' },
@@ -14,9 +15,20 @@ const LoginPage = () => {
   const [isLogin, setIsLogin] = useState(true);
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const user = useAuthStore((s) => s.user);
+  const location = useLocation();
 
   if (isAuthenticated) {
-    return <Navigate to={user?.is_admin ? '/admin' : '/products'} replace />;
+    const safe = getSafeReturnPath(location.state?.from?.pathname);
+    const defaultPath = user?.is_admin ? '/admin' : '/';
+    let to = defaultPath;
+    if (safe) {
+      if (!user?.is_admin && safe.startsWith('/admin')) {
+        to = '/';
+      } else {
+        to = safe;
+      }
+    }
+    return <Navigate to={to} replace />;
   }
 
   return (

@@ -278,6 +278,24 @@ certbot certonly --standalone -d cityfreshkart.com -d api.cityfreshkart.com
 certbot renew --quiet --no-self-upgrade
 ```
 
+### Nginx in front of Node (VPS)
+
+For file uploads (admin product images), set a body size limit **above** your `MAX_FILE_SIZE` (default 5MB):
+
+```nginx
+client_max_body_size 10M;
+```
+
+For a React SPA, always fall back to `index.html` so deep links like `/admin/products` work after refresh:
+
+```nginx
+location / {
+  try_files $uri $uri/ /index.html;
+}
+```
+
+If the browser loads the app from `www` but API calls go to `api.*`, set `CSP_CONNECT_SRC` in `.env` to include both origins (see `server/utils/cspOrigins.js`).
+
 ### 2. Environment Variables
 
 **.env.production:**
@@ -288,6 +306,7 @@ JWT_SECRET=<very-long-random-string>
 DATABASE_URL=postgresql://...
 STRIPE_SECRET_KEY=<production-key>
 CORS_ORIGIN=https://cityfreshkart.com
+CSP_CONNECT_SRC=https://cityfreshkart.com,https://api.cityfreshkart.com
 ```
 
 ### 3. Rate Limiting

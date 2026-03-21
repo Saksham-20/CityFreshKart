@@ -96,6 +96,29 @@ export const isAppInstalled = () => {
   );
 };
 
+/** True when running in Safari on iPhone/iPad (including iPadOS desktop UA). */
+export const isIOSBrowser = () => {
+  if (typeof window === 'undefined') return false;
+  const { userAgent, platform, maxTouchPoints } = window.navigator;
+  if (/iPad|iPhone|iPod/.test(userAgent)) return true;
+  return platform === 'MacIntel' && maxTouchPoints > 1;
+};
+
+/** PWA already added to home screen / standalone window. */
+export const isStandaloneDisplayMode = () => {
+  if (typeof window === 'undefined') return false;
+  if (window.navigator.standalone === true) return true;
+  try {
+    return window.matchMedia('(display-mode: standalone)').matches;
+  } catch {
+    return false;
+  }
+};
+
+/** iOS Safari cannot use beforeinstallprompt; show manual Add to Home Screen instructions. */
+export const shouldShowIOSInstallHelp = () =>
+  isIOSBrowser() && !isStandaloneDisplayMode() && !isAppInstalled();
+
 /**
  * Check if PWA features are available
  */
@@ -230,6 +253,9 @@ const pwa = {
   onInstallPromptChange,
   handleInstallClick,
   isAppInstalled,
+  isIOSBrowser,
+  isStandaloneDisplayMode,
+  shouldShowIOSInstallHelp,
   getPWACapabilities,
   requestNotificationPermission,
   sendNotification,

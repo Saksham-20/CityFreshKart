@@ -754,7 +754,7 @@ router.delete('/users/:id', async (req, res) => {
 // @desc    Update product stock quantity
 // @access  Admin
 router.put('/products/:id/stock', [
-  body('quantity').isInt({ min: 0 }).withMessage('Quantity must be a non-negative integer'),
+  body('quantity').isFloat({ min: 0 }).withMessage('Quantity must be a non-negative number'),
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
