@@ -96,6 +96,7 @@ public
 !client/public/icons/*.png
 !client/public/screenshots/
 !client/public/screenshots/*.png
+!client/public/
 !client/public/favicon.ico
 !client/public/sw.js
 
