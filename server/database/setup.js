@@ -215,6 +215,12 @@ async function setupDatabase() {
         }
       }
       console.log(`✅ Products synced — ${inserted} inserted, ${updated} updated with images & categories`);
+
+      const weightUnitPath = path.join(__dirname, 'migrations', '005_weight_display_unit.sql');
+      if (fs.existsSync(weightUnitPath)) {
+        await pool.query(fs.readFileSync(weightUnitPath, 'utf8'));
+        console.log('✅ weight_display_unit columns ensured');
+      }
     } catch (error) {
       console.error('❌ Sample products sync failed:', error.message);
       throw error;

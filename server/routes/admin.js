@@ -183,7 +183,10 @@ router.get('/products', async (req, res) => {
 // @access  Admin
 router.post('/products', upload.array('images', 10), handleUploadError, async (req, res) => {
   try {
-    const { name, description, price_per_kg, discount, category, stock_quantity, is_active, pricing_type } = req.body;
+    const {
+      name, description, price_per_kg, discount, category, stock_quantity, is_active, pricing_type,
+      search_keywords, weight_display_unit,
+    } = req.body;
 
     // Validate required fields
     if (!name || !price_per_kg) {
@@ -203,13 +206,17 @@ router.post('/products', upload.array('images', 10), handleUploadError, async (r
     if (req.files && req.files.length > 0) imageUrl = toPublicUploadPath(req.files[0]) || imageUrl;
 
     const validPricingType = ['per_kg', 'per_piece'].includes(pricing_type) ? pricing_type : 'per_kg';
+    const wduRaw = String(weight_display_unit || 'kg').toLowerCase();
+    const weightDisplayUnit = validPricingType === 'per_piece'
+      ? 'kg'
+      : (wduRaw === 'g' ? 'g' : 'kg');
 
     // Create product
     const newProduct = await pool.query(`
       INSERT INTO products (
         name, description, category, image_url, price_per_kg, discount,
-        quantity_available, is_active, pricing_type, created_at, updated_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW())
+        quantity_available, is_active, pricing_type, search_keywords, weight_display_unit, created_at, updated_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW(), NOW())
       RETURNING *
     `, [
       name, description || '', category || 'Uncategorized', imageUrl,
@@ -217,6 +224,8 @@ router.post('/products', upload.array('images', 10), handleUploadError, async (r
       parseFloat(stock_quantity) || 0,
       is_active !== 'false' && is_active !== false,
       validPricingType,
+      (search_keywords && String(search_keywords).trim()) || null,
+      weightDisplayUnit,
     ]);
 
     const product = newProduct.rows[0];
@@ -395,7 +404,9 @@ router.get('/orders', async (req, res) => {
               'product_name', oi.product_name,
               'quantity_kg', oi.quantity_kg,
               'price_per_kg', oi.price_per_kg,
-              'total_price', oi.total_price
+              'total_price', oi.total_price,
+              'pricing_type', oi.pricing_type,
+              'weight_display_unit', COALESCE(oi.weight_display_unit, 'kg')
             )
           ) FILTER (WHERE oi.id IS NOT NULL), 
           '[]'::json

@@ -9,6 +9,7 @@ import toast from 'react-hot-toast';
 
 const emptyForm = () => ({
   name: '',
+  search_keywords: '',
   price_per_kg: '',
   discount: '',
   category: '',
@@ -16,6 +17,7 @@ const emptyForm = () => ({
   image_url: '',
   is_active: true,
   pricing_type: 'per_kg',
+  weight_display_unit: 'kg',
 });
 
 const PricingTypeToggle = ({ value, onChange }) => (
@@ -28,6 +30,26 @@ const PricingTypeToggle = ({ value, onChange }) => (
           type="button"
           onClick={() => onChange(v)}
           className={`px-4 py-1.5 text-sm font-medium transition-colors ${
+            value === v ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'
+          }`}
+        >
+          {label}
+        </button>
+      ))}
+    </div>
+  </div>
+);
+
+const WeightUnitToggle = ({ value, onChange }) => (
+  <div className="flex items-center gap-2 flex-wrap">
+    <span className="text-sm font-medium text-gray-700">Quantity shown as:</span>
+    <div className="flex rounded-lg border border-gray-300 overflow-hidden">
+      {[{ v: 'kg', label: 'kg (e.g. 0.5 kg)' }, { v: 'g', label: 'g (e.g. 500g)' }].map(({ v, label }) => (
+        <button
+          key={v}
+          type="button"
+          onClick={() => onChange(v)}
+          className={`px-3 py-1.5 text-xs font-medium transition-colors ${
             value === v ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'
           }`}
         >
@@ -152,8 +174,27 @@ const ProductForm = ({
       <PricingTypeToggle value={formData.pricing_type}
         onChange={(v) => handleInputChange({ target: { name: 'pricing_type', value: v, type: 'text' } })} />
 
+      {formData.pricing_type === 'per_kg' && (
+        <WeightUnitToggle
+          value={formData.weight_display_unit}
+          onChange={(v) => handleInputChange({ target: { name: 'weight_display_unit', value: v, type: 'text' } })}
+        />
+      )}
+
       <Input label="Product Name *" name="name" value={formData.name}
         onChange={handleInputChange} required className="w-full" />
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">Search keywords (optional)</label>
+        <textarea
+          name="search_keywords"
+          value={formData.search_keywords}
+          onChange={handleInputChange}
+          rows={2}
+          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+          placeholder="Synonyms: tomato, tamatar, टमाटर (comma-separated)"
+        />
+      </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Input label={`${priceLabel} *`} name="price_per_kg" type="number"
@@ -360,6 +401,7 @@ const ProductManager = () => {
     setSelectedProduct(product);
     setFormData({
       name: product.name,
+      search_keywords: product.search_keywords || '',
       price_per_kg: product.price_per_kg || '',
       discount: product.discount || '',
       category: product.category || '',
@@ -367,6 +409,7 @@ const ProductManager = () => {
       image_url: product.image_url || '',
       is_active: product.is_active,
       pricing_type: product.pricing_type || 'per_kg',
+      weight_display_unit: product.weight_display_unit === 'g' ? 'g' : 'kg',
     });
     setExistingImages(product.image_url ? [{ id: product.id, url: product.image_url }] : []);
     setImagePreview([]);

@@ -40,44 +40,45 @@ const ProductsPage = () => {
   const highlightId = searchParams.get('highlight');
   const highlightsMode = searchParams.get('highlights') === '1';
 
-  const fetchProducts = useCallback(async () => {
+  const loadProducts = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await api.get('/products?page=1&limit=100');
-      const items = response.data?.data?.products || response.data?.products || [];
-      setProducts(items);
       setError(null);
+      if (highlightsMode) {
+        const response = await api.get('/products/carousel?all=1&limit=500');
+        const items = response.data?.data?.items || response.data?.data?.products || [];
+        setProducts(Array.isArray(items) ? items : []);
+        return;
+      }
+      const q = searchQuery.trim();
+      if (q.length >= 2) {
+        const response = await api.get(`/products/search?q=${encodeURIComponent(q)}&limit=100`);
+        const items = response.data?.data?.products || [];
+        setProducts(Array.isArray(items) ? items : []);
+      } else {
+        const response = await api.get('/products?page=1&limit=100');
+        const items = response.data?.data?.products || response.data?.products || [];
+        setProducts(Array.isArray(items) ? items : []);
+      }
     } catch (err) {
-      setError('Failed to load products. Please try again.');
+      setError(
+        highlightsMode
+          ? 'Failed to load deals and new arrivals. Please try again.'
+          : 'Failed to load products. Please try again.',
+      );
       console.error(err);
     } finally {
       setLoading(false);
     }
-  }, []);
-
-  const fetchHighlights = useCallback(async () => {
-    try {
-      setLoading(true);
-      const response = await api.get('/products/carousel?all=1&limit=500');
-      const items = response.data?.data?.items || response.data?.data?.products || [];
-      setProducts(Array.isArray(items) ? items : []);
-      setError(null);
-    } catch (err) {
-      setError('Failed to load deals and new arrivals. Please try again.');
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  }, [highlightsMode, searchQuery]);
 
   useEffect(() => {
     fetchCategories();
   }, []);
 
   useEffect(() => {
-    if (highlightsMode) fetchHighlights();
-    else fetchProducts();
-  }, [highlightsMode, fetchHighlights, fetchProducts]);
+    loadProducts();
+  }, [loadProducts]);
 
   useEffect(() => {
     applyFilters();
@@ -101,7 +102,6 @@ const ProductsPage = () => {
   useEffect(() => {
     if (!highlightId) return;
     setActiveCategory('All');
-    setSearchQuery('');
   }, [highlightId]);
 
   useEffect(() => {
@@ -158,6 +158,21 @@ const ProductsPage = () => {
     }
   };
 
+  const textMatchesQuery = (p, needle) => {
+    const q = needle.trim();
+    if (!q) return true;
+    const blob = [
+      p.name,
+      p.search_keywords,
+      p.description,
+    ]
+      .filter(Boolean)
+      .join('\u0000');
+    const lower = blob.toLowerCase();
+    const qLower = q.toLowerCase();
+    return lower.includes(qLower) || blob.includes(q);
+  };
+
   const applyFilters = () => {
     let filtered = [...products];
 
@@ -168,11 +183,10 @@ const ProductsPage = () => {
     }
 
     if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      filtered = filtered.filter(p =>
-        p.name?.toLowerCase().includes(q) ||
-        (p.description && p.description.toLowerCase().includes(q))
-      );
+      const q = searchQuery.trim();
+      if (q.length < 2) {
+        filtered = filtered.filter((p) => textMatchesQuery(p, q));
+      }
     }
 
     switch (sortBy) {
@@ -256,7 +270,16 @@ const ProductsPage = () => {
         >
           <button
             type="button"
-            onClick={() => { setActiveCategory('All'); setSearchQuery(''); }}
+            onClick={() => {
+              setActiveCategory('All');
+              setSearchQuery('');
+              setSearchParams((prev) => {
+                const next = new URLSearchParams(prev);
+                next.delete('search');
+                next.delete('category');
+                return next;
+              }, { replace: true });
+            }}
             className={`flex-shrink-0 flex items-center gap-1.5 text-xs font-semibold px-4 py-2.5 rounded-full transition-all whitespace-nowrap ${
               activeCategory === 'All'
                 ? 'bg-gradient-to-r from-primary to-primary-container text-on-primary shadow-primary-glow'
@@ -271,7 +294,16 @@ const ProductsPage = () => {
             <button
               key={catName}
               type="button"
-              onClick={() => { setActiveCategory(catName); setSearchQuery(''); }}
+              onClick={() => {
+                setActiveCategory(catName);
+                setSearchQuery('');
+                setSearchParams((prev) => {
+                  const next = new URLSearchParams(prev);
+                  next.delete('search');
+                  next.set('category', catName);
+                  return next;
+                }, { replace: true });
+              }}
               className={`flex-shrink-0 flex items-center gap-1.5 text-xs font-semibold px-4 py-2.5 rounded-full transition-all whitespace-nowrap ${
                 String(activeCategory).toLowerCase() === String(catName).toLowerCase()
                   ? 'bg-gradient-to-r from-primary to-primary-container text-on-primary shadow-primary-glow'
@@ -318,7 +350,7 @@ const ProductsPage = () => {
             <p className="text-on-surface-variant mb-4 text-sm">{error}</p>
             <button
               type="button"
-              onClick={() => (highlightsMode ? fetchHighlights() : fetchProducts())}
+              onClick={() => loadProducts()}
               className="text-sm text-on-primary bg-primary hover:opacity-95 font-medium px-5 py-2 rounded-full"
             >
               Try again
@@ -334,7 +366,17 @@ const ProductsPage = () => {
             {(searchQuery || activeCategory !== 'All') && !highlightsMode && (
               <button
                 type="button"
-                onClick={() => { setSearchQuery(''); setActiveCategory('All'); }}
+                onClick={() => {
+                  setSearchQuery('');
+                  setActiveCategory('All');
+                  setSearchParams((prev) => {
+                    const next = new URLSearchParams(prev);
+                    next.delete('search');
+                    next.delete('category');
+                    next.delete('highlight');
+                    return next;
+                  }, { replace: true });
+                }}
                 className="mt-4 text-sm text-primary font-semibold hover:underline"
               >
                 Show all products
@@ -343,7 +385,17 @@ const ProductsPage = () => {
             {(searchQuery || activeCategory !== 'All') && highlightsMode && (
               <button
                 type="button"
-                onClick={() => { setSearchQuery(''); setActiveCategory('All'); }}
+                onClick={() => {
+                  setSearchQuery('');
+                  setActiveCategory('All');
+                  setSearchParams((prev) => {
+                    const next = new URLSearchParams(prev);
+                    next.delete('search');
+                    next.delete('category');
+                    next.delete('highlight');
+                    return next;
+                  }, { replace: true });
+                }}
                 className="mt-4 text-sm text-primary font-semibold hover:underline"
               >
                 Clear filters

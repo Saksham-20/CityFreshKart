@@ -9,6 +9,7 @@ import Footer from './components/layout/Footer';
 import MobileBottomNav from './components/layout/MobileBottomNav';
 import WhatsAppFloatingButton from './components/common/WhatsAppFloatingButton';
 import InstallPrompt from './components/pwa/InstallPrompt';
+import RedirectPreserveSearch from './components/routing/RedirectPreserveSearch';
 
 // Auth Components
 import ProtectedRoute from './components/auth/ProtectedRoute';
@@ -57,16 +58,14 @@ const MainLayout = ({ children }) => (
 const FloatingOverlays = () => {
   const location = useLocation();
   const isAdminRoute = location.pathname.startsWith('/admin');
-  const hideOnBottomCtaPages = location.pathname === '/cart'
-    || location.pathname === '/checkout';
-  const isLoginPage = location.pathname === '/login';
+  const isCheckout = location.pathname === '/checkout';
 
-  if (hideOnBottomCtaPages) return null;
+  if (isAdminRoute) return null;
 
   return (
     <>
-      {!isAdminRoute && isLoginPage && <WhatsAppFloatingButton />}
-      <InstallPrompt />
+      {!isCheckout && <WhatsAppFloatingButton />}
+      {!isCheckout && <InstallPrompt />}
     </>
   );
 };
@@ -162,7 +161,7 @@ function App() {
               <MainLayout><ProductsPage /></MainLayout>
             ) : <Navigate to="/login" replace />}
           />
-          <Route path="/products" element={<Navigate to="/" replace />} />
+          <Route path="/products" element={<RedirectPreserveSearch to="/" />} />
           <Route path="/cart" element={isAuthenticated ? <MainLayout><CartPage /></MainLayout> : <Navigate to="/login" replace />} />
           <Route path="/checkout" element={<ProtectedRoute><MainLayout><CheckoutPage /></MainLayout></ProtectedRoute>} />
           <Route path="/orders" element={<ProtectedRoute><MainLayout><OrdersPage /></MainLayout></ProtectedRoute>} />

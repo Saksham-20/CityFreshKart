@@ -94,6 +94,9 @@ const useCartStore = create((set, get) => ({
         discount: product.discount || 0,
         image_url: product.image_url || '',
         pricing_type: product.pricing_type || 'per_kg',
+        weight_display_unit: product.pricing_type === 'per_piece'
+          ? 'kg'
+          : (product.weight_display_unit === 'g' ? 'g' : 'kg'),
         quantity,
       };
       const updated = [...items, newItem];

@@ -60,13 +60,50 @@ export const formatPrice = (price) => {
 };
 
 /**
- * Format weight for display
- * @param {number} weight
+ * Format weight for display (legacy: sub-kg shown as grams)
+ * @param {number} weight — kg
  * @returns {string} Formatted weight
  */
 export const formatWeight = (weight) => {
-  if (weight < 1) {
-    return `${Math.round(weight * 1000)}g`;
+  return formatWeightDisplay(weight, 'g');
+};
+
+/**
+ * @param {number} weightKg
+ * @param {'kg'|'g'} unit — admin preference for per-kg products
+ */
+export const formatWeightDisplay = (weightKg, unit = 'g') => {
+  const w = Number(weightKg) || 0;
+  if (w <= 0) return unit === 'kg' ? '0 kg' : '0g';
+  if (unit === 'kg') {
+    const rounded = Math.round(w * 1000) / 1000;
+    const s = rounded % 1 === 0 ? String(rounded) : String(rounded).replace(/\.?0+$/, '');
+    return `${s} kg`;
   }
-  return `${weight}kg`;
+  if (w < 1) {
+    return `${Math.round(w * 1000)}g`;
+  }
+  const rounded = Math.round(w * 100) / 100;
+  if (rounded % 1 === 0) return `${rounded}kg`;
+  return `${rounded.toFixed(2).replace(/\.?0+$/, '')}kg`;
+};
+
+/** Cart/checkout: human-readable total weight or piece count */
+export const formatCartQuantityLabel = (item) => {
+  if (item.pricing_type === 'per_piece') {
+    const q = Number(item.quantity) || 0;
+    return `${q} ${q === 1 ? 'pc' : 'pcs'}`;
+  }
+  const u = item.weight_display_unit === 'g' ? 'g' : 'kg';
+  return formatWeightDisplay(item.quantity, u);
+};
+
+/** Order line quantity (order items use quantity_kg + optional weight_display_unit) */
+export const formatOrderLineQuantity = (item) => {
+  if (item.pricing_type === 'per_piece') {
+    const q = parseFloat(item.quantity_kg || 0);
+    return `${q} ${q === 1 ? 'pc' : 'pcs'}`;
+  }
+  const u = item.weight_display_unit === 'g' ? 'g' : 'kg';
+  return formatWeightDisplay(parseFloat(item.quantity_kg || 0), u);
 };

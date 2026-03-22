@@ -69,10 +69,24 @@ app.use(cors(corsOptions));
 app.use(cookieParser());
 
 // Rate limiting - applied after CORS (relaxed in development for automated testing)
+// Skip cheap/public routes and /api/auth (auth routes use authLimiter separately).
+const parsedWindow = parseInt(process.env.RATE_LIMIT_WINDOW_MS, 10);
+const parsedMax = parseInt(process.env.RATE_LIMIT_MAX_REQUESTS, 10);
 const limiter = rateLimit({
-  windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // 15 minutes
-  max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || (process.env.NODE_ENV === 'production' ? 100 : 10000),
+  windowMs: Number.isFinite(parsedWindow) && parsedWindow > 0 ? parsedWindow : 15 * 60 * 1000,
+  max: Number.isFinite(parsedMax) && parsedMax > 0
+    ? parsedMax
+    : (process.env.NODE_ENV === 'production' ? 500 : 10000),
   message: 'Too many requests from this IP, please try again later.',
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: (req) => {
+    const url = req.originalUrl || req.url || '';
+    if (req.method === 'GET' && (url === '/api/health' || url.startsWith('/api/health?'))) return true;
+    if (req.method === 'GET' && (url === '/api/settings' || url.startsWith('/api/settings?'))) return true;
+    if (url.startsWith('/api/auth')) return true;
+    return false;
+  },
 });
 app.use('/api/', limiter);
 app.use(express.json({ limit: '10mb' }));

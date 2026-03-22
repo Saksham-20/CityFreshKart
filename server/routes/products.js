@@ -64,6 +64,7 @@ router.get('/carousel', async (req, res) => {
         quantity_available,
         created_at,
         COALESCE(pricing_type, 'per_kg') AS pricing_type,
+        COALESCE(weight_display_unit, 'kg') AS weight_display_unit,
         COALESCE(is_featured, false) AS is_featured
       FROM products
       WHERE is_active = true
@@ -89,7 +90,8 @@ router.get('/carousel', async (req, res) => {
         price_per_kg,
         discount,
         quantity_available,
-        created_at
+        created_at,
+        COALESCE(weight_display_unit, 'kg') AS weight_display_unit
       FROM products
       WHERE is_active = true
         AND (
@@ -107,7 +109,7 @@ router.get('/carousel', async (req, res) => {
       rows = await runFeatured();
     } catch (e) {
       if (e.code !== '42703') throw e;
-      rows = (await runBasic()).map((r) => ({ ...r, is_featured: false, pricing_type: 'per_kg' }));
+      rows = (await runBasic()).map((r) => ({ ...r, is_featured: false, pricing_type: 'per_kg', weight_display_unit: r.weight_display_unit || 'kg' }));
     }
 
     const items = rows.map((r) => {
@@ -120,6 +122,7 @@ router.get('/carousel', async (req, res) => {
         ...r,
         discount: discountNum,
         pricing_type: r.pricing_type || 'per_kg',
+        weight_display_unit: r.weight_display_unit || 'kg',
         is_discounted: discountNum > 0,
         is_new: isNew,
         is_featured: !!r.is_featured,
@@ -153,25 +156,62 @@ router.get('/search', async (req, res) => {
       return res.json({ success: true, data: { products: [], query: q } });
     }
 
-    const searchQuery = `%${q.toLowerCase()}%`;
+    const raw = q.trim();
+    const pattern = `%${raw}%`;
+    const lim = parseInt(limit || 20, 10);
 
-    const result = await query(`
+    const fullSearchSql = `
       SELECT
         id,
         name,
+        search_keywords,
         description,
         category,
         price_per_kg,
         discount,
-        image_url,
+        COALESCE(NULLIF(TRIM(image_url), ''), NULLIF(TRIM(image), '')) AS image_url,
         is_active,
-        quantity_available
+        quantity_available,
+        created_at,
+        COALESCE(pricing_type, 'per_kg') AS pricing_type,
+        COALESCE(weight_display_unit, 'kg') AS weight_display_unit
       FROM products
       WHERE is_active = true
-        AND LOWER(name) LIKE $1
+        AND (
+          name ILIKE $1
+          OR COALESCE(search_keywords, '') ILIKE $1
+          OR COALESCE(description, '') ILIKE $1
+        )
       ORDER BY name ASC
       LIMIT $2
-    `, [searchQuery, parseInt(limit || 20)]);
+    `;
+
+    let result;
+    try {
+      result = await query(fullSearchSql, [pattern, lim]);
+    } catch (e) {
+      if (e.code !== '42703') throw e;
+      result = await query(`
+        SELECT
+          id,
+          name,
+          description,
+          category,
+          price_per_kg,
+          discount,
+          COALESCE(NULLIF(TRIM(image_url), ''), NULLIF(TRIM(image), '')) AS image_url,
+          is_active,
+          quantity_available,
+          created_at,
+          COALESCE(pricing_type, 'per_kg') AS pricing_type,
+          COALESCE(weight_display_unit, 'kg') AS weight_display_unit
+        FROM products
+        WHERE is_active = true
+          AND (name ILIKE $1 OR COALESCE(description, '') ILIKE $1)
+        ORDER BY name ASC
+        LIMIT $2
+      `, [pattern, lim]);
+    }
 
     res.json({
       success: true,
@@ -213,8 +253,13 @@ router.get('/', async (req, res) => {
     let whereClause = 'WHERE is_active = true';
     if (search) {
       paramCount++;
-      whereClause += ` AND (name ILIKE $${paramCount} OR description ILIKE $${paramCount})`;
-      queryParams.push(`%${search}%`);
+      const sp = `%${search}%`;
+      whereClause += ` AND (
+        name ILIKE $${paramCount}
+        OR COALESCE(search_keywords, '') ILIKE $${paramCount}
+        OR COALESCE(description, '') ILIKE $${paramCount}
+      )`;
+      queryParams.push(sp);
     }
 
     // Get total count
@@ -226,15 +271,18 @@ router.get('/', async (req, res) => {
       SELECT 
         id,
         name,
+        search_keywords,
         description,
         category,
         price_per_kg,
         discount,
-        image_url,
+        COALESCE(NULLIF(TRIM(image_url), ''), NULLIF(TRIM(image), '')) AS image_url,
         is_active,
         quantity_available,
         created_at,
-        updated_at
+        updated_at,
+        COALESCE(pricing_type, 'per_kg') AS pricing_type,
+        COALESCE(weight_display_unit, 'kg') AS weight_display_unit
       FROM products
       ${whereClause}
       ORDER BY created_at DESC

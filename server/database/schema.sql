@@ -42,6 +42,9 @@ ALTER TABLE products ADD COLUMN IF NOT EXISTS quantity_available DECIMAL(10,2) D
 ALTER TABLE products ADD COLUMN IF NOT EXISTS created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;
 ALTER TABLE products ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;
 
+ALTER TABLE products ADD COLUMN IF NOT EXISTS name_hindi TEXT;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS search_keywords TEXT;
+
 
 -- Categories (normalized; optional FK on products.category_id for joins in cart/API)
 CREATE TABLE IF NOT EXISTS categories (
@@ -267,6 +270,10 @@ CREATE INDEX IF NOT EXISTS idx_user_addresses_is_default ON user_addresses(user_
 -- Per-piece / per-kg pricing support
 ALTER TABLE products ADD COLUMN IF NOT EXISTS pricing_type VARCHAR(20) DEFAULT 'per_kg';
 ALTER TABLE order_items ADD COLUMN IF NOT EXISTS pricing_type VARCHAR(20) DEFAULT 'per_kg';
+
+-- Quantity label preference for per_kg products (stored qty still in kg)
+ALTER TABLE products ADD COLUMN IF NOT EXISTS weight_display_unit VARCHAR(2) DEFAULT 'kg';
+ALTER TABLE order_items ADD COLUMN IF NOT EXISTS weight_display_unit VARCHAR(2) DEFAULT 'kg';
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS razorpay_order_id VARCHAR(255);
 
 -- Store settings (min order amount, free delivery threshold, delivery fee)

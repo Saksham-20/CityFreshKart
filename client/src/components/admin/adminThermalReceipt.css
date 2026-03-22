@@ -1,0 +1,130 @@
+/* 58mm thermal receipt — 384px ≈ printable width at 203dpi; height follows content.
+   Bluetooth / window.print(): keep monochrome, no backgrounds. If preview still shows a long page,
+   set the printer paper to 58mm roll/continuous (driver often defaults to a fixed height e.g. 210mm). */
+
+.thermal-receipt-screen-hidden {
+  position: fixed;
+  left: -9999px;
+  top: 0;
+  width: 384px;
+  max-width: 384px;
+  pointer-events: none;
+}
+
+.thermal-receipt-root {
+  box-sizing: border-box;
+  width: 384px;
+  max-width: 384px;
+  margin: 0;
+  padding: 5px;
+  font-family: ui-monospace, 'Cascadia Code', 'Consolas', 'Liberation Mono', monospace;
+  font-size: 11px;
+  line-height: 1.35;
+  color: #000;
+  background: #fff;
+  height: auto;
+  min-height: 0;
+}
+
+.thermal-header {
+  text-align: center;
+  margin: 0 0 6px;
+}
+
+.thermal-shop-name {
+  font-size: 13px;
+  font-weight: 700;
+  margin: 0 0 4px;
+  letter-spacing: -0.02em;
+  color: #000;
+}
+
+.thermal-meta {
+  margin: 0;
+  font-size: 10px;
+  color: #000;
+}
+
+.thermal-meta--small {
+  font-size: 9px;
+  margin-top: 2px;
+}
+
+/* Dashed rule (----) */
+.thermal-sep {
+  border: none;
+  border-top: 1px dashed #000;
+  margin: 6px 0;
+  height: 0;
+  padding: 0;
+  background: transparent;
+}
+
+.thermal-item {
+  margin: 6px 0;
+}
+
+.thermal-item-name {
+  font-weight: 700;
+  text-align: left;
+  color: #000;
+}
+
+.thermal-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  margin: 2px 0;
+}
+
+.thermal-row-left {
+  text-align: left;
+  flex: 1;
+  min-width: 0;
+}
+
+.thermal-row-right {
+  text-align: right;
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.thermal-row--total {
+  font-weight: 700;
+  font-size: 12px;
+  margin-top: 4px;
+}
+
+.thermal-block {
+  font-size: 10px;
+  color: #000;
+  margin: 4px 0;
+}
+
+.thermal-block--left {
+  text-align: left;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.thermal-block--compact {
+  margin-top: 2px;
+}
+
+.thermal-label {
+  font-weight: 700;
+}
+
+.thermal-address {
+  margin-top: 2px;
+}
+
+.thermal-thanks {
+  text-align: center;
+  margin: 8px 0 0;
+  font-size: 9px;
+  color: #000;
+}
+
+/* Printing uses iframe + thermalReceiptPrint.js so the main app layout is not part of the print job. */

@@ -1,8 +1,13 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Button from '../ui/Button';
 import Modal from '../ui/Modal';
 import Loading from '../ui/Loading';
 import api from '../../services/api';
+import { formatWeightDisplay } from '../../utils/weightSystem';
+import { printThermalReceiptElement } from '../../utils/thermalReceiptPrint';
+import './adminThermalReceipt.css';
+
+const STORE_NAME = process.env.REACT_APP_STORE_NAME || 'CityFreshKart';
 
 const STATUS_COLORS = {
   pending: 'bg-yellow-100 text-yellow-800',
@@ -53,6 +58,8 @@ const OrderManager = () => {
   const [selectedStatus, setSelectedStatus] = useState('pending');
   const [adminNote, setAdminNote] = useState('');
   const [updatingStatus, setUpdatingStatus] = useState(false);
+  const thermalReceiptRef = useRef(null);
+  const lastPrintAtRef = useRef(0);
 
   const fetchOrders = useCallback(async (opts = {}) => {
     const silent = !!opts.silent;
@@ -117,6 +124,15 @@ const OrderManager = () => {
     setAdminNote('');
     setShowStatusModal(true);
   };
+
+  const printThermalReceipt = useCallback(() => {
+    if (!selectedOrder) return;
+    const now = Date.now();
+    if (now - lastPrintAtRef.current < 2500) return;
+    lastPrintAtRef.current = now;
+    const el = thermalReceiptRef.current;
+    if (el) printThermalReceiptElement(el);
+  }, [selectedOrder]);
 
   const filteredOrders = orders.filter(order => {
     const matchesSearch =
@@ -390,8 +406,8 @@ const OrderManager = () => {
                   Update Status
                 </Button>
               )}
-              <Button variant="outline" onClick={() => window.print()} className="ml-2">
-                🖨 Print Bill
+              <Button variant="outline" onClick={printThermalReceipt} className="ml-2 no-print">
+                Print Bill (58mm)
               </Button>
               <Button variant="outline" onClick={() => setShowDetailsModal(false)} className="ml-auto">
                 Close
@@ -469,6 +485,79 @@ const OrderManager = () => {
           </div>
         )}
       </Modal>
+
+      {/* Hidden 58mm thermal receipt — visible only when printing */}
+      {selectedOrder && (
+        <div
+          ref={thermalReceiptRef}
+          className="thermal-receipt-root thermal-receipt-screen-hidden"
+          aria-hidden="true"
+        >
+          <header className="thermal-header">
+            <h1 className="thermal-shop-name">{STORE_NAME}</h1>
+            <p className="thermal-meta">Order #{selectedOrder.order_number}</p>
+            <p className="thermal-meta thermal-meta--small">
+              {new Date(selectedOrder.created_at).toLocaleString('en-IN')}
+            </p>
+          </header>
+
+          <div className="thermal-sep" aria-hidden="true" />
+
+          {(selectedOrder.items || []).map((item, idx) => {
+            const qty = parseFloat(item.quantity_kg) || 0;
+            const qtyLabel = item.pricing_type === 'per_piece'
+              ? `${qty} ${qty === 1 ? 'pc' : 'pcs'}`
+              : formatWeightDisplay(qty, item.weight_display_unit === 'g' ? 'g' : 'kg');
+            const rateLabel = item.pricing_type === 'per_piece' ? '/pc' : '/kg';
+            return (
+              <div key={idx} className="thermal-item">
+                <div className="thermal-item-name">{item.product_name}</div>
+                <div className="thermal-row">
+                  <span className="thermal-row-left">
+                    {qtyLabel} × ₹{(parseFloat(item.price_per_kg) || 0).toFixed(0)}{rateLabel}
+                  </span>
+                  <span className="thermal-row-right">₹{(parseFloat(item.total_price) || 0).toFixed(2)}</span>
+                </div>
+              </div>
+            );
+          })}
+
+          <div className="thermal-sep" aria-hidden="true" />
+
+          <div className="thermal-row">
+            <span className="thermal-row-left">Subtotal</span>
+            <span className="thermal-row-right">₹{(parseFloat(selectedOrder.subtotal) || 0).toFixed(2)}</span>
+          </div>
+          <div className="thermal-row">
+            <span className="thermal-row-left">Delivery</span>
+            <span className="thermal-row-right">
+              {parseFloat(selectedOrder.delivery_fee) === 0
+                ? 'FREE'
+                : `₹${parseFloat(selectedOrder.delivery_fee).toFixed(2)}`}
+            </span>
+          </div>
+          <div className="thermal-row thermal-row--total">
+            <span className="thermal-row-left">TOTAL</span>
+            <span className="thermal-row-right">₹{(parseFloat(selectedOrder.total_price) || 0).toFixed(2)}</span>
+          </div>
+
+          <div className="thermal-sep" aria-hidden="true" />
+
+          {selectedOrder.delivery_address && (
+            <div className="thermal-block thermal-block--left">
+              <span className="thermal-label">Deliver to:</span>
+              <div className="thermal-address">{selectedOrder.delivery_address}</div>
+            </div>
+          )}
+          {(selectedOrder.phone || selectedOrder.name) && (
+            <div className="thermal-block thermal-block--left thermal-block--compact">
+              {selectedOrder.name && <span>{selectedOrder.name} · </span>}
+              {selectedOrder.phone && <span>{selectedOrder.phone}</span>}
+            </div>
+          )}
+          <p className="thermal-thanks">Thank you!</p>
+        </div>
+      )}
     </div>
   );
 };

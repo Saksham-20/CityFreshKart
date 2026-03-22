@@ -6,6 +6,7 @@ import { useCartStore } from '../store/useCartStore';
 import Loading from '../components/ui/Loading';
 import toast from 'react-hot-toast';
 import { IMAGE_DIMS } from '../utils/imageUtils';
+import { formatOrderLineQuantity } from '../utils/weightSystem';
 
 // Simplified 3-step flow: pending → confirmed (Accepted) → delivered
 // Rejected is a separate branch off pending
@@ -79,14 +80,6 @@ const StatusTimeline = ({ status }) => {
       </div>
     </div>
   );
-};
-
-const formatQty = (item) => {
-  const qty = parseFloat(item.quantity_kg || 0);
-  if (item.pricing_type === 'per_piece') {
-    return `${qty} ${qty === 1 ? 'pc' : 'pcs'}`;
-  }
-  return qty < 1 ? `${qty * 1000}g` : `${qty} kg`;
 };
 
 const unitLabel = (item) => item.pricing_type === 'per_piece' ? '/pc' : '/kg';
@@ -169,6 +162,7 @@ const OrderDetailPage = () => {
           quantity: item.quantity_kg,
           image_url: item.product_image || null,
           pricing_type: item.pricing_type || 'per_kg',
+          weight_display_unit: item.weight_display_unit === 'g' ? 'g' : 'kg',
           discount: 0,
         }, item.quantity_kg);
         added++;
@@ -264,7 +258,7 @@ const OrderDetailPage = () => {
                 <div className="flex-1 min-w-0">
                   <p className="font-medium text-on-surface text-sm truncate">{item.product_name}</p>
                   <p className="text-xs text-on-surface-variant mt-0.5">
-                    {formatQty(item)} × ₹{(item.price_per_kg || 0).toLocaleString('en-IN')}{unitLabel(item)}
+                    {formatOrderLineQuantity(item)} × ₹{(item.price_per_kg || 0).toLocaleString('en-IN')}{unitLabel(item)}
                   </p>
                 </div>
                 <p className="font-semibold text-gray-900 text-sm">

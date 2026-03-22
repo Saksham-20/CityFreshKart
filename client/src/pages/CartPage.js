@@ -2,22 +2,32 @@ import React from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import useCart from '../hooks/useCart';
 import { getImageUrl, getPlaceholderImage, IMAGE_DIMS } from '../utils/imageUtils';
+import { formatCartQuantityLabel } from '../utils/weightSystem';
 
-const WEIGHT_STEP = 0.5;
+const GRAM_STEP_KG = 0.05; // 50g steps for variable weight (e.g. watermelon)
+const PIECE_STEP = 1;
 const FREE_DELIVERY_THRESHOLD = 300;
 
 const CartPage = () => {
   const navigate = useNavigate();
-  const { items, removeFromCart, updateItemQuantity, getCartItemCount, calculateSummary } = useCart();
+  const { items, removeFromCart, updateItemQuantity, calculateSummary } = useCart();
   const { subtotal, deliveryFee, total } = calculateSummary();
 
   const amountToFree = Math.max(FREE_DELIVERY_THRESHOLD - subtotal, 0);
   const deliveryProgress = Math.min((subtotal / FREE_DELIVERY_THRESHOLD) * 100, 100);
 
-  const handleIncrease = (item) => updateItemQuantity(item.id, parseFloat((item.quantity + WEIGHT_STEP).toFixed(2)));
+  const stepFor = (item) => (item.pricing_type === 'per_piece' ? PIECE_STEP : GRAM_STEP_KG);
+  const minQtyFor = (item) => (item.pricing_type === 'per_piece' ? PIECE_STEP : GRAM_STEP_KG);
+
+  const handleIncrease = (item) => {
+    const step = stepFor(item);
+    updateItemQuantity(item.id, parseFloat((item.quantity + step).toFixed(2)));
+  };
   const handleDecrease = (item) => {
-    const newQty = parseFloat((item.quantity - WEIGHT_STEP).toFixed(2));
-    if (newQty <= 0) removeFromCart(item.id);
+    const step = stepFor(item);
+    const minQ = minQtyFor(item);
+    const newQty = parseFloat((item.quantity - step).toFixed(2));
+    if (newQty < minQ - 1e-6) removeFromCart(item.id);
     else updateItemQuantity(item.id, newQty);
   };
 
@@ -87,9 +97,11 @@ const CartPage = () => {
           </div>
 
           {items.map((item) => {
+            const isPerPiece = item.pricing_type === 'per_piece';
             const pricePerKg = item.price_per_kg || 0;
             const discountedPricePerKg = item.discount ? pricePerKg * (1 - item.discount / 100) : pricePerKg;
             const lineTotal = (discountedPricePerKg * item.quantity).toFixed(2);
+            const unitLabel = isPerPiece ? '/pc' : '/kg';
 
             return (
               <div key={item.id} className="flex items-center gap-3 px-4 py-3">
@@ -122,29 +134,36 @@ const CartPage = () => {
                     </button>
                   </div>
                   <p className="text-xs text-on-surface-variant mt-0.5">
-                    ₹{pricePerKg}/kg{item.discount > 0 ? ` · ${item.discount}% off` : ''}
+                    ₹{pricePerKg}{unitLabel}{item.discount > 0 ? ` · ${item.discount}% off` : ''}
                   </p>
 
                   <div className="flex items-center justify-between mt-1.5">
-                    {/* Qty control */}
-                    <div className="flex items-center bg-gradient-to-r from-primary to-primary-container rounded-lg overflow-hidden shadow-primary-glow">
-                      <button
-                        type="button"
-                        onClick={() => handleDecrease(item)}
-                        className="w-7 h-6 flex items-center justify-center text-on-primary text-sm font-bold hover:opacity-90 transition-opacity"
-                      >
-                        −
-                      </button>
-                      <span className="text-on-primary text-[11px] font-bold px-2 min-w-[2.5rem] text-center">
-                        {item.quantity % 1 === 0 ? item.quantity : item.quantity.toFixed(1)} kg
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => handleIncrease(item)}
-                        className="w-7 h-6 flex items-center justify-center text-on-primary text-sm font-bold hover:opacity-90 transition-opacity"
-                      >
-                        +
-                      </button>
+                    {/* Qty / weight control — 50g steps for per-kg */}
+                    <div className="flex flex-col gap-1">
+                      <div className="flex items-center bg-gradient-to-r from-primary to-primary-container rounded-lg overflow-hidden shadow-primary-glow">
+                        <button
+                          type="button"
+                          onClick={() => handleDecrease(item)}
+                          className="w-7 h-6 flex items-center justify-center text-on-primary text-sm font-bold hover:opacity-90 transition-opacity"
+                          aria-label="Decrease quantity"
+                        >
+                          −
+                        </button>
+                        <span className="text-on-primary text-[11px] font-bold px-2 min-w-[3.25rem] text-center">
+                          {formatCartQuantityLabel(item)}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleIncrease(item)}
+                          className="w-7 h-6 flex items-center justify-center text-on-primary text-sm font-bold hover:opacity-90 transition-opacity"
+                          aria-label="Increase quantity"
+                        >
+                          +
+                        </button>
+                      </div>
+                      {!isPerPiece && (
+                        <span className="text-[10px] text-on-surface-variant">±50g · exact weight pricing</span>
+                      )}
                     </div>
                     <span className="text-sm font-bold text-on-surface">₹{lineTotal}</span>
                   </div>
@@ -173,7 +192,7 @@ const CartPage = () => {
         {/* Price summary */}
         <div className="flex items-center justify-between mb-3 text-sm">
           <div className="flex items-center gap-3 text-on-surface-variant">
-            <span>{getCartItemCount().toFixed(1)} kg</span>
+            <span>{items.length} {items.length === 1 ? 'item' : 'items'}</span>
             <span>·</span>
             <span>Delivery: <span className={deliveryFee === 0 ? 'text-primary font-bold' : 'font-medium text-on-surface'}>{deliveryFee === 0 ? 'FREE' : `₹${deliveryFee}`}</span></span>
           </div>

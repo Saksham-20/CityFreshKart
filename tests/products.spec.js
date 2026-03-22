@@ -58,16 +58,15 @@ test.describe('Product Browsing', () => {
 
   // ── Weight selector ────────────────────────────────────────────────────────
 
-  test('should display weight chip buttons (0.5kg, 1kg, 1.5kg, 2kg)', async ({ page }) => {
-    await expect(page.locator('button:has-text("0.5kg")').first()).toBeVisible();
-    await expect(page.locator('button:has-text("1kg")').first()).toBeVisible();
+  test('should display weight chip buttons (0.5 kg, 1 kg, …)', async ({ page }) => {
+    await expect(page.locator('button:has-text("0.5 kg")').first()).toBeVisible();
+    await expect(page.locator('button:has-text("1 kg")').first()).toBeVisible();
   });
 
   test('should change selected weight when chip clicked', async ({ page }) => {
-    const chip1kg = page.locator('button:has-text("1kg")').first();
+    const chip1kg = page.locator('button:has-text("1 kg")').first();
     await chip1kg.click();
-    // The 1kg chip should now have the active (green) style
-    await expect(chip1kg).toHaveClass(/bg-green-600/);
+    await expect(chip1kg).toHaveClass(/text-primary|outline-primary/);
   });
 
   // ── Add to cart ────────────────────────────────────────────────────────────
@@ -94,7 +93,7 @@ test.describe('Product Browsing', () => {
 
     // The Vegetables chip should be active
     const vegChip = page.locator('button:has-text("Vegetables")');
-    await expect(vegChip).toHaveClass(/bg-green-600/);
+    await expect(vegChip).toHaveClass(/from-primary|primary-container/);
 
     // Should still have products (or show empty state gracefully)
     const grid = page.locator('h3');
@@ -110,7 +109,7 @@ test.describe('Product Browsing', () => {
     await page.waitForTimeout(400);
 
     const allChip = page.locator('button:has-text("All")');
-    await expect(allChip).toHaveClass(/bg-green-600/);
+    await expect(allChip).toHaveClass(/from-primary|primary-container/);
   });
 
   test('should show product count', async ({ page }) => {
@@ -123,7 +122,7 @@ test.describe('Product Browsing', () => {
     await page.click('button:has-text("Price ↑")');
     await page.waitForTimeout(600);
     const sortBtn = page.locator('button:has-text("Price ↑")');
-    await expect(sortBtn).toHaveClass(/bg-gray-900/);
+    await expect(sortBtn).toHaveClass(/inverse-surface|bg-inverse/);
   });
 
   // ── Search ─────────────────────────────────────────────────────────────────
@@ -149,6 +148,7 @@ test.describe('Product Browsing', () => {
     await page.waitForTimeout(500);
 
     const fruitsChip = page.locator('button:has-text("Fruits")');
-    await expect(fruitsChip).toHaveClass(/bg-green-600/);
+    await expect(fruitsChip).toHaveClass(/from-primary|primary-container/);
+    await expect(page).toHaveURL(/category=Fruits/);
   });
 });

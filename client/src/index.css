@@ -522,11 +522,7 @@
   }
 }
 
-/* Print styles */
-@page {
-  size: 58mm auto;
-  margin: 0;
-}
+/* Print styles — thermal 58mm page rules live in adminThermalReceipt.css (named page) */
 @media print {
   .no-print {
     display: none !important;

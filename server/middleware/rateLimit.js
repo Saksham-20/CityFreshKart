@@ -9,12 +9,12 @@ const authWindowMs = Number.isFinite(parsedAuthWindow) && parsedAuthWindow > 0
 const parsedAuthMax = parseInt(process.env.AUTH_RATE_LIMIT_MAX, 10);
 const authMax = Number.isFinite(parsedAuthMax) && parsedAuthMax > 0
   ? parsedAuthMax
-  : (process.env.NODE_ENV === 'production' ? 30 : 1000);
+  : (process.env.NODE_ENV === 'production' ? 50 : 1000);
 
 // General API rate limiting (relaxed in development/test for automated testing)
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: process.env.NODE_ENV === 'production' ? 100 : 10000,
+  max: process.env.NODE_ENV === 'production' ? 500 : 10000,
   message: {
     message: 'Too many requests from this IP, please try again later.',
   },

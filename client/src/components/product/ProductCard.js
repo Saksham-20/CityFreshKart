@@ -1,16 +1,16 @@
 import React, { useMemo, useCallback, useState } from 'react';
 import useCart from '../../hooks/useCart';
 import { getImageUrl, IMAGE_DIMS } from '../../utils/imageUtils';
+import { formatWeightDisplay } from '../../utils/weightSystem';
 
-const KG_OPTIONS = [0.5, 1, 1.5, 2];
+const KG_OPTIONS = [0.25, 0.5, 1, 1.5, 2];
 const PIECE_OPTIONS = [1, 2, 3, 4];
-
-const formatWeight = (w) => w < 1 ? `${w * 1000}g` : `${w}kg`;
 
 const ProductCard = React.memo(({ product, className = '', highlightFlash = false }) => {
   const { addToCart, removeFromCart, items: cartItems, updateItemQuantity } = useCart();
 
   const isPerPiece = product.pricing_type === 'per_piece';
+  const weightUnit = isPerPiece ? 'kg' : (product.weight_display_unit === 'g' ? 'g' : 'kg');
   const weightOptions = isPerPiece ? PIECE_OPTIONS : KG_OPTIONS;
 
   const [selectedQty, setSelectedQty] = useState(weightOptions[0]);
@@ -40,8 +40,9 @@ const ProductCard = React.memo(({ product, className = '', highlightFlash = fals
       discount: discountPercent,
       image_url: product.image_url,
       pricing_type: product.pricing_type || 'per_kg',
+      weight_display_unit: weightUnit,
     }, selectedQty);
-  }, [addToCart, product, productId, pricePerUnit, selectedQty, discountPercent]);
+  }, [addToCart, product, productId, pricePerUnit, selectedQty, discountPercent, weightUnit]);
 
   const handleIncrease = useCallback(() => {
     if (cartItem) updateItemQuantity(cartItem.id, parseFloat((cartQty + selectedQty).toFixed(2)));
@@ -56,9 +57,9 @@ const ProductCard = React.memo(({ product, className = '', highlightFlash = fals
 
   const cartQtyLabel = isPerPiece
     ? `${cartQty} ${cartQty === 1 ? 'pc' : 'pcs'}`
-    : `${cartQty % 1 === 0 ? cartQty : cartQty.toFixed(1)} kg`;
+    : formatWeightDisplay(cartQty, weightUnit);
 
-  const unitLabel = isPerPiece ? '/pc' : `/${formatWeight(selectedQty)}`;
+  const unitLabel = isPerPiece ? '/pc' : `/${formatWeightDisplay(selectedQty, weightUnit)}`;
 
   if (!product) return null;
 
@@ -120,7 +121,7 @@ const ProductCard = React.memo(({ product, className = '', highlightFlash = fals
                   : 'text-on-surface-variant outline-outline-variant/20 bg-surface-container-low hover:outline-primary/25'
               }`}
             >
-              {isPerPiece ? `${w} ${w === 1 ? 'pc' : 'pcs'}` : formatWeight(w)}
+              {isPerPiece ? `${w} ${w === 1 ? 'pc' : 'pcs'}` : formatWeightDisplay(w, weightUnit)}
             </button>
           ))}
         </div>

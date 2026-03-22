@@ -150,7 +150,8 @@ router.post('/', authenticateToken, async (req, res) => {
     }
 
     const productsResult = await query(
-      `SELECT id, name, price_per_kg, discount, pricing_type, is_active
+      `SELECT id, name, price_per_kg, discount, pricing_type, is_active,
+              COALESCE(weight_display_unit, 'kg') AS weight_display_unit
        FROM products
        WHERE id = ANY($1::uuid[])`,
       [uniqueProductIds],
@@ -226,10 +227,13 @@ router.post('/', authenticateToken, async (req, res) => {
         const discount = parseFloat(product.discount || 0);
         const itemTotal = parseFloat((pricePerKg * quantityKg * (1 - discount / 100)).toFixed(2));
         const pricingType = product.pricing_type || 'per_kg';
+        const weightDisplayUnit = pricingType === 'per_piece'
+          ? 'kg'
+          : (product.weight_display_unit === 'g' ? 'g' : 'kg');
 
         await client.query(`
-          INSERT INTO order_items (order_id, product_id, product_name, quantity_kg, price_per_kg, total_price, pricing_type)
-          VALUES ($1, $2, $3, $4, $5, $6, $7)
+          INSERT INTO order_items (order_id, product_id, product_name, quantity_kg, price_per_kg, total_price, pricing_type, weight_display_unit)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
         `, [
           order.id,
           item.product_id,
@@ -238,6 +242,7 @@ router.post('/', authenticateToken, async (req, res) => {
           pricePerKg,
           itemTotal,
           pricingType,
+          weightDisplayUnit,
         ]);
 
         // Decrement available stock

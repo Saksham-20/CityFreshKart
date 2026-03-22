@@ -6,6 +6,7 @@ import Button from '../components/ui/Button';
 import Loading from '../components/ui/Loading';
 import Breadcrumb from '../components/common/Breadcrumb';
 import { IMAGE_DIMS } from '../utils/imageUtils';
+import { formatOrderLineQuantity } from '../utils/weightSystem';
 
 const OrderConfirmationPage = () => {
   const { orderId } = useParams();
@@ -158,7 +159,10 @@ const OrderConfirmationPage = () => {
                     />
                     <div className="flex-1">
                       <p className="font-medium text-on-surface">{item.product_name}</p>
-                      <p className="text-sm text-on-surface-variant">{item.quantity_kg} kg × ₹{(item.price_per_kg || 0).toLocaleString('en-IN')}/kg</p>
+                      <p className="text-sm text-on-surface-variant">
+                        {formatOrderLineQuantity(item)} × ₹{(item.price_per_kg || 0).toLocaleString('en-IN')}
+                        {item.pricing_type === 'per_piece' ? '/pc' : '/kg'}
+                      </p>
                     </div>
                     <div className="text-right">
                       <p className="font-medium text-on-surface">
