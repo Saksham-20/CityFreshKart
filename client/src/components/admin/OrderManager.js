@@ -58,6 +58,15 @@ const OrderManager = () => {
   const [selectedStatus, setSelectedStatus] = useState('pending');
   const [adminNote, setAdminNote] = useState('');
   const [updatingStatus, setUpdatingStatus] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [catalogProducts, setCatalogProducts] = useState([]);
+  const [createForm, setCreateForm] = useState({
+    phone: '',
+    delivery_address: '',
+    payment_method: 'cod',
+    notes: '',
+    items: [{ product_id: '', quantity_kg: 1 }],
+  });
   const thermalReceiptRef = useRef(null);
   const lastPrintAtRef = useRef(0);
 
@@ -82,6 +91,17 @@ const OrderManager = () => {
   useEffect(() => {
     fetchOrders({ silent: false });
   }, [fetchOrders]);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await api.get('/admin/products', { params: { limit: 200, status: 'active' } });
+        setCatalogProducts(res.data?.products || []);
+      } catch {
+        setCatalogProducts([]);
+      }
+    })();
+  }, []);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -142,6 +162,32 @@ const OrderManager = () => {
     return matchesSearch;
   });
 
+  const createOrder = async () => {
+    try {
+      const cleanItems = createForm.items.filter(i => i.product_id && Number(i.quantity_kg) > 0);
+      if (!/^\d{10}$/.test(String(createForm.phone || ''))) return;
+      if (!createForm.delivery_address.trim() || cleanItems.length === 0) return;
+      await api.post('/admin/orders', {
+        phone: createForm.phone,
+        delivery_address: createForm.delivery_address,
+        payment_method: createForm.payment_method,
+        notes: createForm.notes,
+        items: cleanItems,
+      });
+      setShowCreateModal(false);
+      setCreateForm({
+        phone: '',
+        delivery_address: '',
+        payment_method: 'cod',
+        notes: '',
+        items: [{ product_id: '', quantity_kg: 1 }],
+      });
+      fetchOrders({ silent: false });
+    } catch (error) {
+      console.error('Failed to create order:', error);
+    }
+  };
+
   if (loading && orders.length === 0) {
     return <Loading />;
   }
@@ -151,6 +197,9 @@ const OrderManager = () => {
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-6">
         <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Order Management</h1>
         <div className="flex flex-wrap items-center gap-3 text-sm text-gray-600">
+          <button type="button" onClick={() => setShowCreateModal(true)} className="text-green-600 hover:underline font-medium">
+            Create Order
+          </button>
           {silentRefreshing && (
             <span className="text-blue-600 font-medium" aria-live="polite">
               Syncing…
@@ -172,7 +221,7 @@ const OrderManager = () => {
       </div>
 
       {/* Filters */}
-      <div className="mb-6 flex flex-col sm:flex-row gap-4">
+      <div className="mb-6 flex flex-col sm:flex-row gap-3 sm:gap-4">
         <div className="flex-1">
           <input
             type="text"
@@ -185,7 +234,7 @@ const OrderManager = () => {
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
-          className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full sm:w-auto px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           <option value="all">All Statuses</option>
           {ALL_STATUSES.map(s => (
@@ -226,7 +275,7 @@ const OrderManager = () => {
               <span>{new Date(order.created_at).toLocaleDateString('en-IN')}</span>
               <span className="font-bold text-gray-900">₹{(parseFloat(order.total_price) || 0).toFixed(2)}</span>
             </div>
-            <div className="mt-3 flex items-center gap-2">
+            <div className="mt-3 flex flex-wrap items-center gap-2">
               <Button variant="outline" size="sm" onClick={() => openDetailsModal(order)}>View</Button>
               {STATUS_FLOW[order.status]?.length > 0 && (
                 <Button variant="outline" size="sm" onClick={() => openStatusModal(order)}>Update</Button>
@@ -400,16 +449,16 @@ const OrderManager = () => {
               </div>
             )}
 
-            <div className="flex justify-between items-center pt-2 gap-2 flex-wrap">
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center pt-2 gap-2">
               {STATUS_FLOW[selectedOrder.status]?.length > 0 && (
                 <Button onClick={() => { setShowDetailsModal(false); openStatusModal(selectedOrder); }}>
                   Update Status
                 </Button>
               )}
-              <Button variant="outline" onClick={printThermalReceipt} className="ml-2 no-print">
+              <Button variant="outline" onClick={printThermalReceipt} className="sm:ml-2 no-print">
                 Print Bill (58mm)
               </Button>
-              <Button variant="outline" onClick={() => setShowDetailsModal(false)} className="ml-auto">
+              <Button variant="outline" onClick={() => setShowDetailsModal(false)} className="sm:ml-auto">
                 Close
               </Button>
             </div>
@@ -558,6 +607,51 @@ const OrderManager = () => {
           <p className="thermal-thanks">Thank you!</p>
         </div>
       )}
+
+      <Modal isOpen={showCreateModal} onClose={() => setShowCreateModal(false)} title="Create Order (Admin)">
+        <div className="space-y-3">
+          <input
+            type="tel"
+            placeholder="Customer phone (10 digits)"
+            value={createForm.phone}
+            onChange={(e) => setCreateForm((p) => ({ ...p, phone: String(e.target.value || '').replace(/\D/g, '').slice(0, 10) }))}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+          />
+          <textarea
+            placeholder="Delivery address"
+            value={createForm.delivery_address}
+            onChange={(e) => setCreateForm((p) => ({ ...p, delivery_address: e.target.value }))}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+            rows={2}
+          />
+          {createForm.items.map((item, idx) => (
+            <div key={idx} className="grid grid-cols-3 gap-2">
+              <select
+                value={item.product_id}
+                onChange={(e) => setCreateForm((p) => ({ ...p, items: p.items.map((r, i) => i === idx ? { ...r, product_id: e.target.value } : r) }))}
+                className="col-span-2 px-3 py-2 border border-gray-300 rounded-md text-sm"
+              >
+                <option value="">Select product</option>
+                {catalogProducts.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+              <input
+                type="number"
+                min="0.25"
+                step="0.25"
+                value={item.quantity_kg}
+                onChange={(e) => setCreateForm((p) => ({ ...p, items: p.items.map((r, i) => i === idx ? { ...r, quantity_kg: Number(e.target.value) } : r) }))}
+                className="px-3 py-2 border border-gray-300 rounded-md text-sm"
+              />
+            </div>
+          ))}
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => setCreateForm((p) => ({ ...p, items: [...p.items, { product_id: '', quantity_kg: 1 }] }))}>
+              Add Item
+            </Button>
+            <Button onClick={createOrder}>Create</Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 };

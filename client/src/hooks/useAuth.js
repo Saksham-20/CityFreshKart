@@ -1,7 +1,16 @@
 import { useAuthStore } from '../store/useAuthStore';
 
 const useAuth = () => {
-  const { user, isAuthenticated, loading, token, register: storeRegister, login: storeLogin, logout } = useAuthStore();
+  const {
+    user,
+    isAuthenticated,
+    loading,
+    token,
+    register: storeRegister,
+    login: storeLogin,
+    loginWithGoogle: storeLoginWithGoogle,
+    logout,
+  } = useAuthStore();
   
   return {
     user: isAuthenticated ? user : null,
@@ -13,6 +22,7 @@ const useAuth = () => {
       return storeRegister(data.phone, data.password, data.name);
     },
     login: storeLogin,
+    loginWithGoogle: storeLoginWithGoogle,
     logout,
   };
 };

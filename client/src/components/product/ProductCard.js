@@ -1,7 +1,7 @@
 import React, { useMemo, useCallback, useState } from 'react';
 import useCart from '../../hooks/useCart';
 import { getImageUrl, IMAGE_DIMS } from '../../utils/imageUtils';
-import { formatWeightDisplay } from '../../utils/weightSystem';
+import { formatWeightDisplay, resolveBasePriceForWeight } from '../../utils/weightSystem';
 
 const KG_OPTIONS = [0.25, 0.5, 1, 1.5, 2];
 const PIECE_OPTIONS = [1, 2, 3, 4];
@@ -19,11 +19,14 @@ const ProductCard = React.memo(({ product, className = '', highlightFlash = fals
   const discountPercent = useMemo(() => Number(product.discount) || 0, [product.discount]);
 
   const effectivePrice = useMemo(() => {
-    const base = pricePerUnit * selectedQty;
+    const base = resolveBasePriceForWeight(pricePerUnit, selectedQty, product.weight_price_overrides || {});
     return discountPercent > 0 ? base * (1 - discountPercent / 100) : base;
-  }, [pricePerUnit, selectedQty, discountPercent]);
+  }, [pricePerUnit, selectedQty, discountPercent, product.weight_price_overrides]);
 
-  const originalPrice = useMemo(() => pricePerUnit * selectedQty, [pricePerUnit, selectedQty]);
+  const originalPrice = useMemo(
+    () => resolveBasePriceForWeight(pricePerUnit, selectedQty, product.weight_price_overrides || {}),
+    [pricePerUnit, selectedQty, product.weight_price_overrides],
+  );
 
   const productId = product.product_id || product.id;
   const cartItem = useMemo(() => cartItems?.find(i => (i.product_id || i.id) === productId), [cartItems, productId]);
@@ -41,6 +44,7 @@ const ProductCard = React.memo(({ product, className = '', highlightFlash = fals
       image_url: product.image_url,
       pricing_type: product.pricing_type || 'per_kg',
       weight_display_unit: weightUnit,
+      weight_price_overrides: product.weight_price_overrides || {},
     }, selectedQty);
   }, [addToCart, product, productId, pricePerUnit, selectedQty, discountPercent, weightUnit]);
 

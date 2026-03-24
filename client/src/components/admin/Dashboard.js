@@ -12,6 +12,8 @@ const Dashboard = () => {
   const [recentOrders, setRecentOrders] = useState([]);
   const [recentProducts, setRecentProducts] = useState([]);
   const [topProducts, setTopProducts] = useState([]);
+  const [dailyRevenue, setDailyRevenue] = useState(0);
+  const [dailyOrders, setDailyOrders] = useState(0);
   // const [analyticsData, setAnalyticsData] = useState(null);
 
   // Helper function to safely format numbers
@@ -55,6 +57,8 @@ const Dashboard = () => {
 
       if (analyticsResponse.status === 'fulfilled') {
         setTopProducts(analyticsResponse.value.data.topProducts || []);
+        setDailyRevenue(Number(analyticsResponse.value.data.dailyRevenue || analyticsResponse.value.data.stats?.dailyRevenue || 0));
+        setDailyOrders(Number(analyticsResponse.value.data.dailyOrders || analyticsResponse.value.data.stats?.dailyOrders || 0));
       } else {
         console.error('Failed to fetch analytics data:', analyticsResponse.reason);
         setTopProducts([]);
@@ -90,7 +94,21 @@ const Dashboard = () => {
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 sm:gap-6 mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4 sm:gap-6 mb-8">
+        <StatCard
+          title="Today Revenue"
+          value={`₹${safeToFixed(dailyRevenue)}`}
+          change={0}
+          icon="📈"
+          color="green"
+        />
+        <StatCard
+          title="Today Orders"
+          value={dailyOrders || 0}
+          change={0}
+          icon="📅"
+          color="blue"
+        />
         <StatCard
           title="Total Revenue"
           value={`₹${safeToFixed(stats?.totalRevenue)}`}
@@ -131,7 +149,7 @@ const Dashboard = () => {
       {/* Quick Actions */}
       <div className="mb-8">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Quick Actions</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6">
           <QuickActionCard
             title="Add Product"
             description="Create a new product listing"
@@ -184,7 +202,7 @@ const Dashboard = () => {
       <div className="grid grid-cols-1 gap-8">
         {/* Recent Orders - Full Width */}
         <div className="bg-white rounded-lg shadow">
-          <div className="px-6 py-4 border-b border-gray-200">
+          <div className="px-4 sm:px-6 py-4 border-b border-gray-200">
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-medium text-gray-900">Recent Orders</h3>
               <Link
@@ -195,7 +213,7 @@ const Dashboard = () => {
               </Link>
             </div>
           </div>
-          <div className="p-6">
+          <div className="p-4 sm:p-6">
             {!recentOrders || recentOrders.length === 0 ? (
               <p className="text-gray-500 text-center py-4">No recent orders</p>
             ) : (
@@ -204,8 +222,8 @@ const Dashboard = () => {
                   <div key={order.id || index} className="bg-gray-50 rounded-lg p-4 hover:bg-gray-100 transition-colors">
                     <div className="flex flex-col space-y-3">
                       {/* Order Header */}
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-3">
+                      <div className="flex items-start sm:items-center justify-between gap-3">
+                        <div className="flex items-center space-x-3 min-w-0">
                            <p className="text-sm font-semibold text-gray-900">
                              Order #{order.order_number ? order.order_number.split('-')[0] : order.id}
                            </p>
@@ -219,7 +237,7 @@ const Dashboard = () => {
                             {order.status}
                           </span>
                         </div>
-                        <p className="text-lg font-bold text-gray-900">
+                        <p className="text-base sm:text-lg font-bold text-gray-900 whitespace-nowrap">
                           ₹{safeToFixed(order.total_amount)}
                         </p>
                       </div>
@@ -246,7 +264,7 @@ const Dashboard = () => {
 
         {/* Low Stock Products */}
         <div className="bg-white rounded-lg shadow">
-          <div className="px-6 py-4 border-b border-gray-200">
+          <div className="px-4 sm:px-6 py-4 border-b border-gray-200">
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-medium text-gray-900">Low Stock Alert</h3>
               <Link
@@ -257,13 +275,13 @@ const Dashboard = () => {
               </Link>
             </div>
           </div>
-          <div className="p-6">
+          <div className="p-4 sm:p-6">
             {!recentProducts || recentProducts.length === 0 ? (
               <p className="text-gray-500 text-center py-4">All products are well stocked</p>
             ) : (
               <div className="space-y-3">
                 {recentProducts.slice(0, 5).map((product, index) => (
-                  <div key={product.id || index} className="flex items-center space-x-4 p-4 rounded-lg hover:bg-gray-50 transition-colors border border-gray-100">
+                  <div key={product.id || index} className="flex items-center space-x-3 sm:space-x-4 p-3 sm:p-4 rounded-lg hover:bg-gray-50 transition-colors border border-gray-100">
                     <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0">
                       <span className="text-gray-400 text-lg">📦</span>
                     </div>
@@ -296,14 +314,14 @@ const Dashboard = () => {
         <div className="mt-8">
           <h2 className="text-xl font-semibold text-gray-900 mb-4">Top Selling Products</h2>
           <div className="bg-white rounded-lg shadow">
-            <div className="px-6 py-4 border-b border-gray-200">
+            <div className="px-4 sm:px-6 py-4 border-b border-gray-200">
               <h3 className="text-lg font-medium text-gray-900">Best Sellers</h3>
             </div>
-            <div className="p-6">
+            <div className="p-4 sm:p-6">
               <div className="space-y-4">
                 {topProducts.slice(0, 5).map((product, index) => (
-                  <div key={product.id} className="flex items-center justify-between p-3 rounded-lg hover:bg-gray-50 transition-colors">
-                    <div className="flex items-center">
+                  <div key={product.id} className="flex items-start sm:items-center justify-between gap-3 p-3 rounded-lg hover:bg-gray-50 transition-colors">
+                    <div className="flex items-center min-w-0">
                       <span className="text-sm font-medium text-gray-500 w-6">{index + 1}</span>
                       <img
                         src={product.image_url ? getImageUrl(product.image_url) : '/placeholder-product.jpg'}
@@ -314,12 +332,12 @@ const Dashboard = () => {
                         loading="lazy"
                         decoding="async"
                       />
-                      <div className="ml-3">
-                        <p className="text-sm font-medium text-gray-900">{product.name}</p>
-                        <p className="text-sm text-gray-500">{product.category_name}</p>
+                      <div className="ml-3 min-w-0">
+                        <p className="text-sm font-medium text-gray-900 truncate">{product.name}</p>
+                        <p className="text-sm text-gray-500 truncate">{product.category_name}</p>
                       </div>
                     </div>
-                    <div className="text-right">
+                    <div className="text-right flex-shrink-0">
                       <p className="text-sm font-medium text-gray-900">
                         {product.total_quantity || 0} sold
                       </p>
@@ -359,7 +377,7 @@ const StatCard = ({ title, value, change, icon, color = 'blue' }) => {
   };
   
   return (
-    <div className={`bg-white rounded-xl shadow-sm border-2 p-6 transition-all duration-200 hover:shadow-md ${colorClasses[color]}`}>
+    <div className={`bg-white rounded-xl shadow-sm border-2 p-4 sm:p-6 transition-all duration-200 hover:shadow-md ${colorClasses[color]}`}>
       <div className="flex items-center">
         <div className="flex-shrink-0">
           <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${colorClasses[color]}`}>
@@ -368,7 +386,7 @@ const StatCard = ({ title, value, change, icon, color = 'blue' }) => {
         </div>
         <div className="ml-4 flex-1">
           <p className="text-sm font-medium text-gray-600">{title}</p>
-          <p className="text-3xl font-bold text-gray-900 mt-1">{value}</p>
+          <p className="text-2xl sm:text-3xl font-bold text-gray-900 mt-1 break-words">{value}</p>
         </div>
       </div>
       {change !== 0 && (
@@ -399,7 +417,7 @@ const QuickActionCard = ({ title, description, icon, link, color }) => {
   return (
     <Link
       to={link}
-      className={`block p-6 rounded-xl border-2 transition-all duration-200 hover:shadow-md hover:scale-105 ${colorClasses[color]}`}
+      className={`block p-4 sm:p-6 rounded-xl border-2 transition-all duration-200 hover:shadow-md sm:hover:scale-105 ${colorClasses[color]}`}
     >
       <div className="flex items-center">
         <div className="w-12 h-12 rounded-lg flex items-center justify-center mr-4 bg-white/50">

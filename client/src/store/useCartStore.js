@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import api from '../services/api';
+import { resolveBasePriceForWeight } from '../utils/weightSystem';
 
 const useCartStore = create((set, get) => ({
   // State
@@ -46,7 +47,7 @@ const useCartStore = create((set, get) => ({
     const { items, freeDeliveryThreshold, deliveryFeeAmount } = get();
 
     const subtotal = items.reduce((sum, item) => {
-      const price = (item.price_per_kg || 0) * (item.quantity || 0);
+      const price = resolveBasePriceForWeight(item.price_per_kg || 0, item.quantity || 0, item.weight_price_overrides || {});
       const discountedPrice = item.discount ? price * (1 - item.discount / 100) : price;
       return sum + discountedPrice;
     }, 0);
@@ -97,6 +98,7 @@ const useCartStore = create((set, get) => ({
         weight_display_unit: product.pricing_type === 'per_piece'
           ? 'kg'
           : (product.weight_display_unit === 'g' ? 'g' : 'kg'),
+        weight_price_overrides: product.weight_price_overrides || {},
         quantity,
       };
       const updated = [...items, newItem];

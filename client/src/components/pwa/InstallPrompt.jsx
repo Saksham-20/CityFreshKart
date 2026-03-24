@@ -77,15 +77,15 @@ const InstallPrompt = () => {
       <div
         id="install-banner"
         className={cn(
-          'fixed left-4 right-4 sm:left-auto sm:right-6 sm:w-80',
-          'relative',
+          'fixed left-3 right-3 sm:left-auto sm:right-6 sm:w-[22rem]',
           'bg-gradient-to-r from-primary to-primary-container text-on-primary rounded-2xl shadow-primary-glow',
           'p-4 pt-3 flex flex-col gap-3 z-[35]',
+          'max-h-[calc(100vh-7rem)] overflow-y-auto',
           'outline outline-1 outline-on-primary/20',
-          /* Sit above WhatsApp FAB (h-14 + gap) — same horizontal row as FAB uses bottom 5.5rem */
         )}
         style={{
-          bottom: 'calc(env(safe-area-inset-bottom) + 5.5rem + 4rem)',
+          // Keep above bottom nav / FAB while staying within viewport.
+          bottom: 'calc(env(safe-area-inset-bottom) + 5.25rem)',
         }}
       >
         <button
@@ -105,7 +105,7 @@ const InstallPrompt = () => {
           <Download className="w-5 h-5 flex-shrink-0 mt-0.5" />
           <div className="flex-1 min-w-0">
             <h3 className="font-semibold text-sm">
-              Install City Fresh Kart
+              Install CityFreshKart
             </h3>
             <p className="text-xs text-on-primary/85 mt-1">
               {showAndroidUi
@@ -172,7 +172,7 @@ const InstallPrompt = () => {
               </div>
               <div className="flex-1 min-w-0">
                 <h2 id="ios-install-title" className="font-semibold text-gray-900 text-sm">
-                  Install City Fresh Kart
+                  Install CityFreshKart
                 </h2>
                 <p className="text-xs text-gray-500 mt-0.5">
                   Add to Home Screen for quick access.

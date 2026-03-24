@@ -18,7 +18,43 @@ const emptyForm = () => ({
   is_active: true,
   pricing_type: 'per_kg',
   weight_display_unit: 'kg',
+  weight_price_rows: [{ weight: '', price: '' }],
 });
+
+const convertWeightRows = (rows = [], fromUnit = 'kg', toUnit = 'kg') => {
+  if (fromUnit === toUnit) return rows;
+  return rows.map((row) => {
+    const w = parseFloat(row.weight);
+    if (!Number.isFinite(w) || w <= 0) return row;
+    const converted = fromUnit === 'g' ? (w / 1000) : (w * 1000);
+    return { ...row, weight: String(Number(converted.toFixed(fromUnit === 'g' ? 3 : 0))) };
+  });
+};
+
+const rowsToWeightOverrides = (rows = [], inputUnit = 'kg') => {
+  const out = {};
+  rows.forEach((row) => {
+    const rawWeight = parseFloat(row.weight);
+    const weight = inputUnit === 'g' ? (rawWeight / 1000) : rawWeight;
+    const price = parseFloat(row.price);
+    if (!Number.isFinite(weight) || weight <= 0) return;
+    if (!Number.isFinite(price) || price < 0) return;
+    out[weight.toFixed(2)] = price;
+  });
+  return out;
+};
+
+const weightOverridesToRows = (overrides = {}, outputUnit = 'kg') => {
+  const entries = Object.entries(overrides || {});
+  if (entries.length === 0) return [{ weight: '', price: '' }];
+  return entries
+    .map(([weight, price]) => {
+      const kgWeight = parseFloat(weight);
+      const shownWeight = outputUnit === 'g' ? kgWeight * 1000 : kgWeight;
+      return { weight: String(Number((shownWeight || 0).toFixed(outputUnit === 'g' ? 0 : 2))), price: String(price) };
+    })
+    .sort((a, b) => parseFloat(a.weight) - parseFloat(b.weight));
+};
 
 const PricingTypeToggle = ({ value, onChange }) => (
   <div className="flex items-center gap-2">
@@ -165,9 +201,11 @@ const ProductForm = ({
   existingImages,
   setExistingImages,
   handleImageChange,
+  handleWeightUnitChange,
 }) => {
   const priceLabel = formData.pricing_type === 'per_piece' ? 'Price per piece (Rs)' : 'Price per kg (Rs)';
   const stockLabel = formData.pricing_type === 'per_piece' ? 'Stock (pieces)' : 'Stock (kg)';
+  const weightInputUnit = formData.weight_display_unit === 'g' ? 'g' : 'kg';
 
   return (
     <form onSubmit={onSubmit} className="space-y-4 max-w-2xl mx-auto">
@@ -177,7 +215,7 @@ const ProductForm = ({
       {formData.pricing_type === 'per_kg' && (
         <WeightUnitToggle
           value={formData.weight_display_unit}
-          onChange={(v) => handleInputChange({ target: { name: 'weight_display_unit', value: v, type: 'text' } })}
+          onChange={handleWeightUnitChange}
         />
       )}
 
@@ -205,6 +243,75 @@ const ProductForm = ({
         <Input label={`${stockLabel} *`} name="stock_quantity" type="number"
           value={formData.stock_quantity} onChange={handleInputChange} required className="w-full" placeholder="0" />
       </div>
+      {formData.pricing_type === 'per_kg' && (
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Custom weight tiers and prices (Rs)</label>
+          <div className="space-y-2">
+            {(formData.weight_price_rows || []).map((row, idx) => (
+              <div key={`weight-row-${idx}`} className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-end">
+                <div className="sm:col-span-5">
+                  <label className="block text-xs text-gray-500 mb-1">Weight ({weightInputUnit})</label>
+                  <input
+                    type="number"
+                    min={weightInputUnit === 'g' ? '1' : '0.01'}
+                    step={weightInputUnit === 'g' ? '1' : '0.01'}
+                    value={row.weight}
+                    onChange={(e) => {
+                      const next = [...(formData.weight_price_rows || [])];
+                      next[idx] = { ...next[idx], weight: e.target.value };
+                      handleInputChange({ target: { name: 'weight_price_rows', value: next, type: 'text' } });
+                    }}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                    placeholder={weightInputUnit === 'g' ? 'e.g. 750' : 'e.g. 0.75'}
+                  />
+                </div>
+                <div className="sm:col-span-5">
+                  <label className="block text-xs text-gray-500 mb-1">Price (Rs)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={row.price}
+                    onChange={(e) => {
+                      const next = [...(formData.weight_price_rows || [])];
+                      next[idx] = { ...next[idx], price: e.target.value };
+                      handleInputChange({ target: { name: 'weight_price_rows', value: next, type: 'text' } });
+                    }}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                    placeholder="e.g. 59"
+                  />
+                </div>
+                <div className="sm:col-span-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      const rows = formData.weight_price_rows || [];
+                      const next = rows.length <= 1 ? [{ weight: '', price: '' }] : rows.filter((_, i) => i !== idx);
+                      handleInputChange({ target: { name: 'weight_price_rows', value: next, type: 'text' } });
+                    }}
+                    className="w-full"
+                  >
+                    Remove
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="mt-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                const next = [...(formData.weight_price_rows || []), { weight: '', price: '' }];
+                handleInputChange({ target: { name: 'weight_price_rows', value: next, type: 'text' } });
+              }}
+            >
+              Add Weight Tier
+            </Button>
+          </div>
+        </div>
+      )}
 
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-2">Category *</label>
@@ -238,7 +345,7 @@ const ProductForm = ({
         isEdit={submitLabel.includes('Update')}
       />
 
-      <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
+      <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3 pt-4 border-t border-gray-200">
         <Button type="button" variant="outline" onClick={onCancel}>Cancel</Button>
         <Button type="submit" disabled={loading}>{loading ? 'Saving...' : submitLabel}</Button>
       </div>
@@ -305,6 +412,19 @@ const ProductManager = () => {
     setFormData(prev => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
   };
 
+  const handleWeightUnitChange = (nextUnit) => {
+    setFormData((prev) => {
+      const currentUnit = prev.weight_display_unit === 'g' ? 'g' : 'kg';
+      const targetUnit = nextUnit === 'g' ? 'g' : 'kg';
+      const convertedRows = convertWeightRows(prev.weight_price_rows || [], currentUnit, targetUnit);
+      return {
+        ...prev,
+        weight_display_unit: targetUnit,
+        weight_price_rows: convertedRows,
+      };
+    });
+  };
+
   const resetForm = () => {
     setFormData(emptyForm());
     setSelectedImages([]);
@@ -335,7 +455,11 @@ const ProductManager = () => {
     try {
       setLoading(true);
       const fd = new FormData();
-      Object.keys(formData).forEach(key => fd.append(key, formData[key]));
+      Object.keys(formData).forEach((key) => {
+        if (key === 'weight_price_rows') return;
+        fd.append(key, formData[key]);
+      });
+      fd.set('weight_price_overrides', JSON.stringify(rowsToWeightOverrides(formData.weight_price_rows, formData.weight_display_unit)));
       selectedImages.slice(0, 6).forEach(img => fd.append('images', img));
       await api.post('/admin/products', fd);
       setShowAddModal(false);
@@ -355,8 +479,10 @@ const ProductManager = () => {
       setLoading(true);
       const fd = new FormData();
       Object.keys(formData).forEach(key => {
+        if (key === 'weight_price_rows') return;
         if (formData[key] !== undefined && formData[key] !== null) fd.append(key, formData[key]);
       });
+      fd.set('weight_price_overrides', JSON.stringify(rowsToWeightOverrides(formData.weight_price_rows, formData.weight_display_unit)));
       if (existingImages.length === 0 && selectedImages.length === 0) fd.set('image_url', '');
       if (selectedImages.length > 0) fd.append('images', selectedImages[0]);
       await api.put(`/admin/products/${selectedProduct.id}`, fd);
@@ -410,6 +536,7 @@ const ProductManager = () => {
       is_active: product.is_active,
       pricing_type: product.pricing_type || 'per_kg',
       weight_display_unit: product.weight_display_unit === 'g' ? 'g' : 'kg',
+      weight_price_rows: weightOverridesToRows(product.weight_price_overrides || {}, product.weight_display_unit === 'g' ? 'g' : 'kg'),
     });
     setExistingImages(product.image_url ? [{ id: product.id, url: product.image_url }] : []);
     setImagePreview([]);
@@ -423,13 +550,57 @@ const ProductManager = () => {
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Product Management</h1>
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-6">
+        <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Product Management</h1>
         <Button onClick={() => { resetForm(); setShowAddModal(true); }}>Add New Product</Button>
       </div>
 
+      {/* Mobile product cards */}
+      <div className="space-y-3 md:hidden mb-4">
+        {products.length === 0 ? (
+          <div className="bg-white border border-gray-200 rounded-xl p-6 text-center text-gray-500">No products found</div>
+        ) : products.map(product => (
+          <div key={product.id} className="bg-white border border-gray-200 rounded-xl p-3">
+            <div className="flex items-start gap-3">
+              <img
+                className="h-12 w-12 rounded-lg object-cover border border-gray-200 flex-shrink-0"
+                src={getImageUrl(product.image_url)}
+                alt={product.name}
+                width={IMAGE_DIMS.adminRow.width}
+                height={IMAGE_DIMS.adminRow.height}
+                loading="lazy"
+                decoding="async"
+                onError={(e) => { e.target.src = getPlaceholderImage(); }}
+              />
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold text-gray-900 truncate">{product.name}</p>
+                <p className="text-xs text-gray-500 mt-0.5">{product.category || 'Uncategorized'}</p>
+                <p className="text-xs font-medium text-gray-700 mt-1">{priceDisplay(product)}</p>
+                <p className="text-xs text-gray-500 mt-1">
+                  Stock: {product.quantity_available}{product.pricing_type === 'per_piece' ? ' pc' : ' kg'}
+                </p>
+              </div>
+              <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${product.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                {product.is_active ? 'Active' : 'Inactive'}
+              </span>
+            </div>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Button variant="outline" size="sm" onClick={() => openEditModal(product)}>Edit</Button>
+              <Button
+                variant="danger"
+                size="sm"
+                onClick={() => { setSelectedProduct(product); setShowDeleteModal(true); }}
+                className="bg-red-600 hover:bg-red-700"
+              >
+                Remove
+              </Button>
+            </div>
+          </div>
+        ))}
+      </div>
+
       {/* Products Table */}
-      <div className="bg-white shadow-md rounded-lg overflow-hidden">
+      <div className="hidden md:block bg-white shadow-md rounded-lg overflow-hidden">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
@@ -530,6 +701,7 @@ const ProductManager = () => {
           existingImages={existingImages}
           setExistingImages={setExistingImages}
           handleImageChange={handleImageChange}
+          handleWeightUnitChange={handleWeightUnitChange}
         />
       </Modal>
 
@@ -551,6 +723,7 @@ const ProductManager = () => {
           existingImages={existingImages}
           setExistingImages={setExistingImages}
           handleImageChange={handleImageChange}
+          handleWeightUnitChange={handleWeightUnitChange}
         />
       </Modal>
 
@@ -560,7 +733,7 @@ const ProductManager = () => {
           <p className="text-gray-700">
             This will hide <strong>"{selectedProduct?.name}"</strong> from the store. It can be re-activated later by editing the product.
           </p>
-          <div className="flex justify-end gap-3">
+          <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3">
             <Button variant="outline" onClick={() => setShowDeleteModal(false)} disabled={loading}>Cancel</Button>
             <Button variant="danger" onClick={handleDeleteProduct} disabled={loading}
               className="bg-red-600 hover:bg-red-700">

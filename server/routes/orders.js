@@ -128,6 +128,7 @@ router.post('/', authenticateToken, async (req, res) => {
       items, delivery_address, notes,
       payment_method = 'cod',
       razorpay_payment_id, razorpay_order_id,
+      phone,
     } = req.body;
 
     if (!items || !Array.isArray(items) || items.length === 0) {
@@ -136,6 +137,10 @@ router.post('/', authenticateToken, async (req, res) => {
 
     if (!delivery_address || !delivery_address.trim()) {
       return res.status(400).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Delivery address is required' } });
+    }
+    const normalizedPhone = String(phone || req.user.phone || '').replace(/\D/g, '').slice(-10);
+    if (!/^\d{10}$/.test(normalizedPhone)) {
+      return res.status(400).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Valid 10-digit phone number is required' } });
     }
 
     const {
@@ -157,6 +162,14 @@ router.post('/', authenticateToken, async (req, res) => {
       [uniqueProductIds],
     );
     const productsById = new Map(productsResult.rows.map(p => [p.id, p]));
+    const productWeightRows = await query(
+      'SELECT product_id, weight_option, price_override FROM product_weight_prices WHERE product_id = ANY($1::uuid[])',
+      [uniqueProductIds],
+    );
+    const weightOverrideMap = new Map();
+    for (const row of productWeightRows.rows) {
+      weightOverrideMap.set(`${row.product_id}:${Number(row.weight_option).toFixed(2)}`, parseFloat(row.price_override));
+    }
 
     for (const item of items) {
       const product = productsById.get(item.product_id);
@@ -176,7 +189,9 @@ router.post('/', authenticateToken, async (req, res) => {
       const pricePerKg = parseFloat(product.price_per_kg || 0);
       const quantityKg = parseFloat(item.quantity_kg || 0);
       const discount = parseFloat(product.discount || 0);
-      const itemTotal = pricePerKg * quantityKg * (1 - discount / 100);
+      const overridePrice = weightOverrideMap.get(`${item.product_id}:${quantityKg.toFixed(2)}`);
+      const baseTotal = Number.isFinite(overridePrice) ? overridePrice : (pricePerKg * quantityKg);
+      const itemTotal = baseTotal * (1 - discount / 100);
       subtotal += itemTotal;
     }
     subtotal = parseFloat(subtotal.toFixed(2));
@@ -205,7 +220,7 @@ router.post('/', authenticateToken, async (req, res) => {
       `, [
         orderNumber,
         req.user.id,
-        req.user.phone,
+        normalizedPhone,
         delivery_address.trim(),
         notes ? notes.trim() : null,
         subtotal,
@@ -225,7 +240,10 @@ router.post('/', authenticateToken, async (req, res) => {
         const pricePerKg = parseFloat(product.price_per_kg || 0);
         const quantityKg = parseFloat(item.quantity_kg || 0);
         const discount = parseFloat(product.discount || 0);
-        const itemTotal = parseFloat((pricePerKg * quantityKg * (1 - discount / 100)).toFixed(2));
+        const overridePrice = weightOverrideMap.get(`${item.product_id}:${quantityKg.toFixed(2)}`);
+        const baseTotal = Number.isFinite(overridePrice) ? overridePrice : (pricePerKg * quantityKg);
+        const itemTotal = parseFloat((baseTotal * (1 - discount / 100)).toFixed(2));
+        const linePricePerKg = parseFloat((baseTotal / quantityKg).toFixed(2));
         const pricingType = product.pricing_type || 'per_kg';
         const weightDisplayUnit = pricingType === 'per_piece'
           ? 'kg'
@@ -239,7 +257,7 @@ router.post('/', authenticateToken, async (req, res) => {
           item.product_id,
           product.name || '',
           quantityKg,
-          pricePerKg,
+          linePricePerKg,
           itemTotal,
           pricingType,
           weightDisplayUnit,

@@ -4,11 +4,13 @@ import { FiPhone, FiLock, FiEye, FiEyeOff, FiAlertCircle } from 'react-icons/fi'
 import useAuth from '../../hooks/useAuth';
 import toast from 'react-hot-toast';
 import { getSafeReturnPath } from '../../utils/safeReturnPath';
+import { firebaseAuth, hasFirebaseClientConfig } from '../../services/firebaseClient';
+import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 
 const LoginForm = ({ onSwitchToRegister }) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { login } = useAuth();
+  const { login, loginWithGoogle } = useAuth();
   const [formData, setFormData] = useState({ phone: '', password: '' });
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
@@ -64,6 +66,32 @@ const LoginForm = ({ onSwitchToRegister }) => {
     } catch (error) {
       setErrors({ general: error.message || 'Login failed' });
       toast.error('Login failed');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleGoogleSignIn = async () => {
+    if (!hasFirebaseClientConfig || !firebaseAuth) {
+      toast.error('Google login is not configured yet');
+      return;
+    }
+    setIsLoading(true);
+    try {
+      const provider = new GoogleAuthProvider();
+      const credential = await signInWithPopup(firebaseAuth, provider);
+      const idToken = await credential.user.getIdToken();
+      const result = await loginWithGoogle(idToken);
+      if (!result?.success) {
+        throw new Error(result?.message || 'Google login failed');
+      }
+      toast.success('Signed in with Google');
+      const safe = getSafeReturnPath(location.state?.from?.pathname);
+      const defaultPath = result.user?.is_admin ? '/admin' : '/';
+      navigate(safe || defaultPath);
+    } catch (error) {
+      toast.error(error.message || 'Google sign-in failed');
+      setErrors({ general: error.message || 'Google sign-in failed' });
     } finally {
       setIsLoading(false);
     }
@@ -150,6 +178,14 @@ const LoginForm = ({ onSwitchToRegister }) => {
               Signing In...
             </span>
           ) : 'Sign In'}
+        </button>
+        <button
+          type="button"
+          onClick={handleGoogleSignIn}
+          disabled={isLoading}
+          className="w-full border border-outline-variant/30 bg-surface-container-highest hover:bg-surface-container text-on-surface font-semibold py-3 rounded-full text-sm transition-all duration-200 disabled:opacity-60 disabled:cursor-not-allowed"
+        >
+          Continue with Google
         </button>
       </form>
 

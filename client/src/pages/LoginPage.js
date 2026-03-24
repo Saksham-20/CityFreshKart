@@ -4,11 +4,12 @@ import RegisterForm from '../components/auth/RegisterForm';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../store/useAuthStore';
 import { getSafeReturnPath } from '../utils/safeReturnPath';
+import { FiCheckCircle, FiClock, FiTruck } from 'react-icons/fi';
 
 const TRUST_FEATURES = [
-  { icon: '🌱', title: 'Farm-to-Door Freshness', desc: 'Sourced directly from local farms every morning' },
-  { icon: '⚡', title: '30-Minute Delivery', desc: 'Lightning-fast delivery right to your doorstep' },
-  { icon: '🚚', title: 'Free Delivery over ₹300', desc: 'No hidden charges, ever' },
+  { icon: FiCheckCircle, title: 'Farm-to-Door Freshness', desc: 'Sourced directly from local farms every morning' },
+  { icon: FiClock, title: '30-Minute Delivery', desc: 'Lightning-fast delivery right to your doorstep' },
+  { icon: FiTruck, title: 'Free Delivery over ₹300', desc: 'No hidden charges, ever' },
 ];
 
 const LoginPage = () => {
@@ -43,7 +44,6 @@ const LoginPage = () => {
         {/* Brand */}
         <div className="relative z-10">
           <div className="flex items-center gap-2 mb-3">
-            <span className="material-symbols-outlined text-4xl text-on-primary" aria-hidden>eco</span>
             <span className="text-2xl font-headline font-extrabold tracking-tight">CityFreshKart</span>
           </div>
           <p className="text-on-primary/90 text-sm font-medium">India&apos;s freshest produce, delivered in 30 minutes.</p>
@@ -51,7 +51,7 @@ const LoginPage = () => {
 
         {/* Central illustration */}
         <div className="relative z-10 flex flex-col items-center text-center py-8">
-          <div className="text-8xl mb-6 drop-shadow-lg select-none">🥬</div>
+          <img src="/CityFreshKart.png" alt="CityFreshKart" className="h-44 w-auto mb-6 drop-shadow-lg select-none" />
           <h2 className="text-white text-3xl font-extrabold leading-tight mb-3">
             Khet Se<br />Aapki Thali Tak
           </h2>
@@ -64,7 +64,7 @@ const LoginPage = () => {
         <div className="relative z-10 space-y-3">
           {TRUST_FEATURES.map((f) => (
             <div key={f.title} className="flex items-start gap-3 bg-white/10 backdrop-blur-sm rounded-2xl px-4 py-3 border border-white/10">
-              <span className="text-xl flex-shrink-0 mt-0.5">{f.icon}</span>
+              <f.icon className="text-lg flex-shrink-0 mt-0.5 text-white" />
               <div>
                 <p className="text-white text-sm font-semibold">{f.title}</p>
                 <p className="text-on-primary/80 text-xs mt-0.5">{f.desc}</p>
@@ -78,9 +78,7 @@ const LoginPage = () => {
       <div className="flex-1 flex flex-col justify-center items-center bg-surface px-6 py-12 sm:px-12">
         {/* Mobile brand header */}
         <div className="flex lg:hidden flex-col items-center mb-8">
-          <div className="w-14 h-14 bg-gradient-to-br from-primary to-primary-container rounded-2xl flex items-center justify-center shadow-primary-glow mb-3">
-            <span className="material-symbols-outlined text-on-primary text-4xl">eco</span>
-          </div>
+          <img src="/CityFreshKart.png" alt="CityFreshKart" className="h-20 w-auto object-contain mb-3" />
           <h1 className="text-2xl font-headline font-extrabold text-on-surface">CityFreshKart</h1>
           <p className="text-primary text-sm mt-1 font-medium">Farm-fresh, delivered in 30 min</p>
         </div>

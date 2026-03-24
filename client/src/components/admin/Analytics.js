@@ -33,6 +33,8 @@ const Analytics = () => {
   const [recentOrders, setRecentOrders] = useState([]);
   const [salesData, setSalesData] = useState([]);
   const [categoryData, setCategoryData] = useState([]);
+  const [dailyRevenue, setDailyRevenue] = useState(0);
+  const [dailyOrders, setDailyOrders] = useState(0);
 
   useEffect(() => {
     fetchAnalytics();
@@ -72,6 +74,8 @@ const Analytics = () => {
       setRecentOrders(data.recentOrders || []);
       setSalesData(data.salesData || []);
       setCategoryData(data.categoryData || []);
+      setDailyRevenue(Number(data.dailyRevenue || data.stats?.dailyRevenue || 0));
+      setDailyOrders(Number(data.dailyOrders || data.stats?.dailyOrders || 0));
     } catch (error) {
       console.error('Error fetching analytics:', error);
     } finally {
@@ -113,13 +117,13 @@ const Analytics = () => {
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Analytics Dashboard</h1>
-        <div className="flex items-center space-x-4">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-6">
+        <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Analytics Dashboard</h1>
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
           <select
             value={timeRange}
             onChange={(e) => setTimeRange(e.target.value)}
-            className="border border-gray-300 rounded-md px-3 py-2 text-sm"
+            className="w-full sm:w-auto border border-gray-300 rounded-md px-3 py-2 text-sm"
           >
             <option value="24h">Last 24 Hours</option>
             <option value="7d">Last 7 Days</option>
@@ -134,9 +138,19 @@ const Analytics = () => {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+        <div className="bg-white rounded-lg shadow p-4">
+          <p className="text-sm text-gray-600">Daily Revenue (Today)</p>
+          <p className="text-2xl font-bold text-gray-900">{formatCurrency(dailyRevenue)}</p>
+        </div>
+        <div className="bg-white rounded-lg shadow p-4">
+          <p className="text-sm text-gray-600">Daily Orders (Today)</p>
+          <p className="text-2xl font-bold text-gray-900">{formatNumber(dailyOrders)}</p>
+        </div>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 sm:gap-6 mb-8">
         {/* Revenue Card */}
-        <div className="bg-white rounded-lg shadow p-6">
+        <div className="bg-white rounded-lg shadow p-4 sm:p-6">
           <div className="flex items-center">
             <div className="p-2 bg-blue-100 rounded-lg">
               <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -160,7 +174,7 @@ const Analytics = () => {
         </div>
 
         {/* Orders Card */}
-        <div className="bg-white rounded-lg shadow p-6">
+        <div className="bg-white rounded-lg shadow p-4 sm:p-6">
           <div className="flex items-center">
             <div className="p-2 bg-green-100 rounded-lg">
               <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -184,7 +198,7 @@ const Analytics = () => {
         </div>
 
         {/* Customers Card */}
-        <div className="bg-white rounded-lg shadow p-6">
+        <div className="bg-white rounded-lg shadow p-4 sm:p-6">
           <div className="flex items-center">
             <div className="p-2 bg-purple-100 rounded-lg">
               <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -208,7 +222,7 @@ const Analytics = () => {
         </div>
 
         {/* Products Card */}
-        <div className="bg-white rounded-lg shadow p-6">
+        <div className="bg-white rounded-lg shadow p-4 sm:p-6">
           <div className="flex items-center">
             <div className="p-2 bg-yellow-100 rounded-lg">
               <svg className="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -232,18 +246,18 @@ const Analytics = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8">
         {/* Top Products */}
         <div className="bg-white rounded-lg shadow">
-          <div className="px-6 py-4 border-b border-gray-200">
+          <div className="px-4 sm:px-6 py-4 border-b border-gray-200">
             <h3 className="text-lg font-medium text-gray-900">Top Selling Products</h3>
           </div>
-          <div className="p-6">
+          <div className="p-4 sm:p-6">
             {topProducts.length > 0 ? (
               <div className="space-y-4">
                 {topProducts.map((product, index) => (
-                  <div key={product.id} className="flex items-center justify-between">
-                    <div className="flex items-center">
+                  <div key={product.id} className="flex items-start sm:items-center justify-between gap-3">
+                    <div className="flex items-center min-w-0">
                       <span className="text-sm font-medium text-gray-500 w-6">{index + 1}</span>
                       <img
                         src={product.image_url ? getImageUrl(product.image_url) : '/placeholder-product.jpg'}
@@ -254,12 +268,12 @@ const Analytics = () => {
                         loading="lazy"
                         decoding="async"
                       />
-                      <div className="ml-3">
-                        <p className="text-sm font-medium text-gray-900">{product.name}</p>
-                        <p className="text-sm text-gray-500">{product.category_name}</p>
+                      <div className="ml-3 min-w-0">
+                        <p className="text-sm font-medium text-gray-900 truncate">{product.name}</p>
+                        <p className="text-sm text-gray-500 truncate">{product.category_name}</p>
                       </div>
                     </div>
-                    <div className="text-right">
+                    <div className="text-right flex-shrink-0">
                       <p className="text-sm font-medium text-gray-900">
                         {formatNumber(product.total_quantity || 0)} sold
                       </p>
@@ -278,18 +292,18 @@ const Analytics = () => {
 
         {/* Recent Orders */}
         <div className="bg-white rounded-lg shadow">
-          <div className="px-6 py-4 border-b border-gray-200">
+          <div className="px-4 sm:px-6 py-4 border-b border-gray-200">
             <h3 className="text-lg font-medium text-gray-900">Recent Orders</h3>
           </div>
-          <div className="p-6">
+          <div className="p-4 sm:p-6">
             {recentOrders.length > 0 ? (
               <div className="space-y-3">
                 {recentOrders.map((order) => (
                   <div key={order.id} className="bg-gray-50 rounded-lg p-4 hover:bg-gray-100 transition-colors">
                     <div className="flex flex-col space-y-2">
                       {/* Order Header */}
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-3">
+                      <div className="flex items-start sm:items-center justify-between gap-3">
+                        <div className="flex items-center space-x-3 min-w-0">
                           <p className="text-sm font-semibold text-gray-900">
                             Order #{order.order_number ? order.order_number.split('-')[0] : order.id}
                           </p>
@@ -302,7 +316,7 @@ const Analytics = () => {
                             {order.status}
                           </span>
                         </div>
-                        <p className="text-sm font-bold text-gray-900">
+                        <p className="text-sm font-bold text-gray-900 whitespace-nowrap">
                           {formatCurrency(order.total_amount)}
                         </p>
                       </div>
@@ -332,10 +346,10 @@ const Analytics = () => {
 
       {/* Sales Chart Placeholder */}
       <div className="mt-8 bg-white rounded-lg shadow">
-        <div className="px-6 py-4 border-b border-gray-200">
+        <div className="px-4 sm:px-6 py-4 border-b border-gray-200">
           <h3 className="text-lg font-medium text-gray-900">Sales Trend</h3>
         </div>
-        <div className="p-6">
+        <div className="p-4 sm:p-6">
           {salesData.length > 0 ? (
             <div className="h-64 bg-gray-50 rounded-lg p-4">
               <div className="flex items-end justify-between h-full space-x-2">
@@ -372,19 +386,19 @@ const Analytics = () => {
 
       {/* Category Performance */}
       <div className="mt-8 bg-white rounded-lg shadow">
-        <div className="px-6 py-4 border-b border-gray-200">
+        <div className="px-4 sm:px-6 py-4 border-b border-gray-200">
           <h3 className="text-lg font-medium text-gray-900">Category Performance</h3>
         </div>
-        <div className="p-6">
+        <div className="p-4 sm:p-6">
           {categoryData.length > 0 ? (
             <div className="space-y-4">
               {categoryData.map((category) => (
-                <div key={category.id} className="flex items-center justify-between">
-                  <div className="flex items-center">
+                <div key={category.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                  <div className="flex items-center min-w-0">
                     <div className="w-4 h-4 rounded-full" style={{ backgroundColor: category.color }}></div>
                     <span className="ml-3 text-sm font-medium text-gray-900">{category.name}</span>
                   </div>
-                  <div className="flex items-center space-x-4">
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
                     <span className="text-sm text-gray-500">{formatNumber(category.product_count || 0)} products</span>
                     <span className="text-sm text-gray-500">{formatNumber(category.order_count || 0)} sales</span>
                     <span className="text-sm font-medium text-gray-900">{formatCurrency(category.revenue)}</span>

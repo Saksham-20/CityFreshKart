@@ -32,6 +32,26 @@ export const calculatePrice = (pricePerKg, weight, discount = 0) => {
   };
 };
 
+export const resolveBasePriceForWeight = (pricePerKg, weight, weightPriceOverrides = {}) => {
+  const w = Number(weight) || 1;
+  const override = Number(weightPriceOverrides?.[w.toFixed(2)] ?? weightPriceOverrides?.[String(w)] ?? NaN);
+  if (Number.isFinite(override) && override >= 0) return override;
+  return (Number(pricePerKg) || 0) * w;
+};
+
+export const calculatePriceWithOverrides = (pricePerKg, weight, discount = 0, weightPriceOverrides = {}) => {
+  const basePrice = resolveBasePriceForWeight(pricePerKg, weight, weightPriceOverrides);
+  const disc = Number(discount) || 0;
+  const finalPrice = basePrice * (1 - disc / 100);
+  return {
+    weight: Number(weight) || 1,
+    basePrice: Math.round(basePrice * 100) / 100,
+    discount: disc,
+    finalPrice: Math.round(finalPrice * 100) / 100,
+    discountPercentage: disc,
+  };
+};
+
 /**
  * Calculate delivery fee based on order total
  * @param {number} subtotal - Order subtotal

@@ -6,7 +6,7 @@ import api from '../services/api';
 import { razorpayService } from '../services/razorpayService';
 import { addressService } from '../services/addressService';
 import toast from 'react-hot-toast';
-import { formatCartQuantityLabel } from '../utils/weightSystem';
+import { formatCartQuantityLabel, resolveBasePriceForWeight } from '../utils/weightSystem';
 
 const CheckoutPage = () => {
   const navigate = useNavigate();
@@ -25,6 +25,7 @@ const CheckoutPage = () => {
   });
   const [saveNewAddress, setSaveNewAddress] = useState(false);
   const [deliveryNotes, setDeliveryNotes] = useState('');
+  const [orderPhone, setOrderPhone] = useState(String(user?.phone || '').replace(/\D/g, '').slice(0, 10));
   const [paymentMethod, setPaymentMethod] = useState('cod');
   const [loading, setLoading] = useState(false);
   const [addressesLoading, setAddressesLoading] = useState(true);
@@ -106,6 +107,7 @@ const CheckoutPage = () => {
       items: orderItems,
       delivery_address: getDeliveryAddress(),
       notes: deliveryNotes.trim() || undefined,
+      phone: orderPhone,
       payment_method: paymentMethod,
       subtotal,
       delivery_fee: deliveryFee,
@@ -127,6 +129,10 @@ const CheckoutPage = () => {
     const addressValidationError = validateNewAddress();
     if (addressValidationError) {
       setError(addressValidationError);
+      return;
+    }
+    if (!/^\d{10}$/.test(String(orderPhone || '').trim())) {
+      setError('Please enter a valid 10-digit phone number for this order');
       return;
     }
 
@@ -225,8 +231,8 @@ const CheckoutPage = () => {
           <div className="px-4 py-3 space-y-2">
             {items.map(item => {
               const itemPrice = item.discount
-                ? item.price_per_kg * item.quantity * (1 - item.discount / 100)
-                : item.price_per_kg * item.quantity;
+                ? resolveBasePriceForWeight(item.price_per_kg, item.quantity, item.weight_price_overrides || {}) * (1 - item.discount / 100)
+                : resolveBasePriceForWeight(item.price_per_kg, item.quantity, item.weight_price_overrides || {});
               return (
                 <div key={item.id} className="flex justify-between text-sm text-on-surface-variant">
                   <span className="flex-1 pr-2">{item.name} × {formatCartQuantityLabel(item)}</span>
@@ -258,6 +264,24 @@ const CheckoutPage = () => {
 
         {/* Delivery Address */}
         <form onSubmit={handleOrderSubmit} id="checkout-form">
+          <div className="bg-surface-container-lowest rounded-2xl outline outline-1 outline-outline-variant/15 overflow-hidden mb-3 shadow-editorial">
+            <div className="px-4 py-3 border-b border-surface-container">
+              <h3 className="font-semibold text-on-surface text-sm">Contact Number for Order</h3>
+            </div>
+            <div className="px-4 py-3">
+              <input
+                type="tel"
+                value={orderPhone}
+                onChange={(e) => {
+                  setOrderPhone(String(e.target.value || '').replace(/\D/g, '').slice(0, 10));
+                  if (error) setError('');
+                }}
+                placeholder="10-digit mobile number"
+                className="w-full px-3 py-2 rounded-lg text-sm bg-surface-container-highest focus:bg-surface-container-lowest focus:outline-none focus:ring-2 focus:ring-primary/25 ghost-outline-primary"
+                required
+              />
+            </div>
+          </div>
           <div className="bg-surface-container-lowest rounded-2xl outline outline-1 outline-outline-variant/15 overflow-hidden shadow-editorial">
             <div className="px-4 py-3 border-b border-surface-container flex items-center justify-between">
               <h3 className="font-semibold text-on-surface text-sm">Delivery Address</h3>

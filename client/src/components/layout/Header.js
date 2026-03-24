@@ -237,10 +237,7 @@ const Header = () => {
         <div className="flex flex-col gap-2 md:gap-0 md:flex-row md:items-center md:h-[3.75rem] py-2 md:py-0">
           <div className="flex items-center gap-2 sm:gap-3 min-h-[3.25rem] md:min-h-0 md:flex-1 md:min-w-0">
             <Link to="/" className="flex-shrink-0 flex items-center gap-1 max-w-[8rem] sm:max-w-[9.5rem] sm:max-w-none">
-              <span className="material-symbols-outlined text-primary text-2xl" aria-hidden>eco</span>
-              <span className="text-base sm:text-lg font-headline font-extrabold tracking-tight text-on-surface truncate">
-                CityFreshKart
-              </span>
+              <img src="/CityFreshKart.svg" alt="CityFreshKart" className="h-8 sm:h-9 w-auto object-contain" />
             </Link>
 
             <button

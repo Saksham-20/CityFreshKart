@@ -249,8 +249,8 @@ const UserManager = () => {
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className="mt-6 flex justify-center">
-          <nav className="flex space-x-2">
+      <div className="mt-6 flex justify-center">
+          <nav className="flex flex-wrap justify-center gap-2">
             <Button variant="outline" onClick={() => setCurrentPage(Math.max(1, currentPage - 1))} disabled={currentPage === 1}>
               Previous
             </Button>

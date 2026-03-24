@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { ShoppingCart, Plus, Minus } from 'lucide-react';
 import { cn } from '@/utils/cn';
-import { calculatePrice } from '@/utils/weightSystem';
+import { calculatePriceWithOverrides } from '@/utils/weightSystem';
 import WeightSelector from '../ui/WeightSelector';
 import Button from '../ui/Button';
 import { useCartStore } from '../../store/useCartStore';
@@ -25,10 +25,11 @@ const ProductCard = ({
   const addToCart = useCartStore(state => state.addToCart);
   const updateItemQuantity = useCartStore(state => state.updateItemQuantity);
 
-  const pricing = calculatePrice(
+  const pricing = calculatePriceWithOverrides(
     product.price_per_kg,
     selectedWeight,
-    product.discount || 0
+    product.discount || 0,
+    product.weight_price_overrides || {}
   );
 
   const imageSrc = product.image_url || product.image;
@@ -169,6 +170,7 @@ const ProductCard = ({
               onWeightChange={setSelectedWeight}
               pricePerKg={product.price_per_kg}
               discount={product.discount}
+              weightPriceOverrides={product.weight_price_overrides || {}}
             />
           </div>
         )}

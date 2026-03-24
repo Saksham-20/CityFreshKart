@@ -34,8 +34,55 @@ const optionalSingleImageUpload = (req, res, next) => {
   return next();
 };
 
+const parseAndNormalizeWeightOverrides = (raw) => {
+  if (raw === undefined || raw === null || raw === '') return {};
+  let parsed = raw;
+  if (typeof parsed === 'string') {
+    try {
+      parsed = JSON.parse(parsed);
+    } catch (_) {
+      throw new Error('weight_price_overrides must be valid JSON object');
+    }
+  }
+  if (typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw new Error('weight_price_overrides must be an object of { weightKg: price }');
+  }
+
+  const normalized = {};
+  for (const [weightKey, overridePrice] of Object.entries(parsed)) {
+    const weightVal = parseFloat(weightKey);
+    const priceVal = parseFloat(overridePrice);
+    if (!Number.isFinite(weightVal) || weightVal <= 0) {
+      throw new Error(`Invalid weight key: ${weightKey}`);
+    }
+    if (!Number.isFinite(priceVal) || priceVal < 0) {
+      throw new Error(`Invalid override price for weight ${weightKey}`);
+    }
+    normalized[weightVal.toFixed(2)] = parseFloat(priceVal.toFixed(2));
+  }
+  return normalized;
+};
+
 // Apply admin auth to all routes
 router.use(authenticateToken, requireAdmin);
+
+async function getStoreOrderSettings() {
+  const out = { free_delivery_threshold: 300, delivery_fee: 50, min_order_amount: 0 };
+  try {
+    const result = await pool.query(
+      'SELECT key, value FROM store_settings WHERE key = ANY($1::text[])',
+      [['free_delivery_threshold', 'delivery_fee', 'min_order_amount']],
+    );
+    for (const row of result.rows) {
+      const v = parseFloat(row.value);
+      if (!Number.isFinite(v)) continue;
+      if (row.key === 'free_delivery_threshold') out.free_delivery_threshold = v;
+      else if (row.key === 'delivery_fee') out.delivery_fee = v;
+      else if (row.key === 'min_order_amount') out.min_order_amount = v;
+    }
+  } catch (_) {}
+  return out;
+}
 
 // @route   GET /api/admin/dashboard
 // @desc    Get admin dashboard stats
@@ -70,7 +117,7 @@ router.get('/dashboard', async (req, res) => {
       pool.query(`
       SELECT o.*, u.name, u.phone
       FROM orders o
-      JOIN users u ON o.user_id = u.id
+      LEFT JOIN users u ON o.user_id = u.id
       ORDER BY o.created_at DESC
       LIMIT 5
     `),
@@ -119,24 +166,33 @@ router.get('/products', async (req, res) => {
     const limitNum = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 20));
     const offset = (pageNum - 1) * limitNum;
 
-    let query = `SELECT * FROM products WHERE 1=1`;
+    let query = `
+      SELECT p.*, COALESCE(wp.weight_price_overrides, '{}'::json) AS weight_price_overrides
+      FROM products p
+      LEFT JOIN LATERAL (
+        SELECT json_object_agg(weight_option::text, price_override) AS weight_price_overrides
+        FROM product_weight_prices
+        WHERE product_id = p.id
+      ) wp ON true
+      WHERE 1=1
+    `;
 
     const queryParams = [];
     let paramCount = 0;
 
     if (search) {
       paramCount++;
-      query += ` AND name ILIKE $${paramCount}`;
+      query += ` AND p.name ILIKE $${paramCount}`;
       queryParams.push(`%${search}%`);
     }
 
     if (status) {
       paramCount++;
-      query += ` AND is_active = $${paramCount}`;
+      query += ` AND p.is_active = $${paramCount}`;
       queryParams.push(status === 'active');
     }
 
-    query += ` ORDER BY created_at DESC LIMIT $${paramCount + 1} OFFSET $${paramCount + 2}`;
+    query += ` ORDER BY p.created_at DESC LIMIT $${paramCount + 1} OFFSET $${paramCount + 2}`;
     queryParams.push(limitNum, offset);
 
     const products = await pool.query(query, queryParams);
@@ -185,7 +241,7 @@ router.post('/products', upload.array('images', 10), handleUploadError, async (r
   try {
     const {
       name, description, price_per_kg, discount, category, stock_quantity, is_active, pricing_type,
-      search_keywords, weight_display_unit,
+      search_keywords, weight_display_unit, weight_price_overrides,
     } = req.body;
 
     // Validate required fields
@@ -229,6 +285,22 @@ router.post('/products', upload.array('images', 10), handleUploadError, async (r
     ]);
 
     const product = newProduct.rows[0];
+    let parsedOverrides;
+    try {
+      parsedOverrides = parseAndNormalizeWeightOverrides(weight_price_overrides);
+    } catch (e) {
+      return res.status(400).json({ message: e.message });
+    }
+    for (const [weightKey, overridePrice] of Object.entries(parsedOverrides)) {
+      const weightVal = parseFloat(weightKey);
+      await pool.query(
+        `INSERT INTO product_weight_prices (product_id, weight_option, price_override)
+         VALUES ($1, $2, $3)
+         ON CONFLICT (product_id, weight_option) DO UPDATE
+         SET price_override = EXCLUDED.price_override, updated_at = CURRENT_TIMESTAMP`,
+        [product.id, weightVal, overridePrice],
+      );
+    }
 
     // Promo notifications: discounted and fresh item alerts
     Promise.allSettled([
@@ -305,6 +377,8 @@ router.put('/products/:id', upload.array('images', 1), handleUploadError, [
     const updateValues = [];
     let paramCount = 0;
 
+    const weightPriceOverridesRaw = updateData.weight_price_overrides;
+    delete updateData.weight_price_overrides;
     Object.keys(updateData).forEach(key => {
       if (!skipKeys.has(key) && updateData[key] !== undefined && updateData[key] !== null) {
         paramCount++;
@@ -326,6 +400,23 @@ router.put('/products/:id', upload.array('images', 1), handleUploadError, [
 
     const updatedProduct = await pool.query(updateQuery, updateValues);
     const updated = updatedProduct.rows[0];
+    if (weightPriceOverridesRaw !== undefined) {
+      let parsed;
+      try {
+        parsed = parseAndNormalizeWeightOverrides(weightPriceOverridesRaw);
+      } catch (e) {
+        return res.status(400).json({ message: e.message });
+      }
+      await pool.query('DELETE FROM product_weight_prices WHERE product_id = $1', [id]);
+      for (const [weightKey, overridePrice] of Object.entries(parsed)) {
+        const weightVal = parseFloat(weightKey);
+        await pool.query(
+          `INSERT INTO product_weight_prices (product_id, weight_option, price_override)
+           VALUES ($1, $2, $3)`,
+          [id, weightVal, overridePrice],
+        );
+      }
+    }
     const nextDiscount = parseFloat(updated.discount || 0);
 
     // Promo notification only when discount transitions to > 0
@@ -395,7 +486,8 @@ router.get('/orders', async (req, res) => {
     let query = `
       SELECT 
         o.*,
-        u.name, u.phone,
+        COALESCE(u.name, 'Walk-in Customer') AS name,
+        COALESCE(o.phone, u.phone) AS phone,
         COUNT(oi.id) as item_count,
         COALESCE(
           JSON_AGG(
@@ -412,7 +504,7 @@ router.get('/orders', async (req, res) => {
           '[]'::json
         ) as items
       FROM orders o
-      JOIN users u ON o.user_id = u.id
+      LEFT JOIN users u ON o.user_id = u.id
       LEFT JOIN order_items oi ON o.id = oi.order_id
       WHERE 1=1
     `;
@@ -475,6 +567,99 @@ router.get('/orders', async (req, res) => {
 
   } catch (error) {
     console.error('Get admin orders error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// @route   POST /api/admin/orders
+// @desc    Create order as admin
+// @access  Admin
+router.post('/orders', async (req, res) => {
+  try {
+    const { user_id, customer_name, phone, items, delivery_address, notes, payment_method = 'cod' } = req.body || {};
+    const normalizedPhone = String(phone || '').replace(/\D/g, '').slice(-10);
+    if (!/^\d{10}$/.test(normalizedPhone)) return res.status(400).json({ message: 'Valid 10-digit phone is required' });
+    if (!delivery_address || !String(delivery_address).trim()) return res.status(400).json({ message: 'Delivery address is required' });
+    if (!Array.isArray(items) || items.length === 0) return res.status(400).json({ message: 'Order items are required' });
+
+    const uniqueProductIds = [...new Set(items.map(item => item.product_id).filter(Boolean))];
+    if (uniqueProductIds.length !== items.length) return res.status(400).json({ message: 'Duplicate/invalid product IDs in order' });
+
+    const productsResult = await pool.query(
+      `SELECT id, name, price_per_kg, discount, pricing_type, is_active, COALESCE(weight_display_unit, 'kg') AS weight_display_unit
+       FROM products WHERE id = ANY($1::uuid[])`,
+      [uniqueProductIds],
+    );
+    const productsById = new Map(productsResult.rows.map(p => [p.id, p]));
+
+    const productWeightRows = await pool.query(
+      'SELECT product_id, weight_option, price_override FROM product_weight_prices WHERE product_id = ANY($1::uuid[])',
+      [uniqueProductIds],
+    );
+    const overrideMap = new Map();
+    for (const row of productWeightRows.rows) {
+      const key = `${row.product_id}:${Number(row.weight_option).toFixed(2)}`;
+      overrideMap.set(key, parseFloat(row.price_override));
+    }
+
+    let subtotal = 0;
+    const normalizedItems = [];
+    for (const item of items) {
+      const p = productsById.get(item.product_id);
+      const qty = parseFloat(item.quantity_kg || 0);
+      if (!p || !p.is_active || !Number.isFinite(qty) || qty <= 0) return res.status(400).json({ message: 'Invalid items in order' });
+      const overrideKey = `${p.id}:${qty.toFixed(2)}`;
+      const overridePrice = overrideMap.get(overrideKey);
+      const basePrice = parseFloat(p.price_per_kg || 0);
+      const itemBase = Number.isFinite(overridePrice) ? overridePrice : (basePrice * qty);
+      const itemTotal = itemBase * (1 - (parseFloat(p.discount || 0) / 100));
+      subtotal += itemTotal;
+      normalizedItems.push({ product: p, quantityKg: qty, itemBase, itemTotal });
+    }
+    subtotal = parseFloat(subtotal.toFixed(2));
+
+    const settings = await getStoreOrderSettings();
+    if (settings.min_order_amount > 0 && subtotal < settings.min_order_amount) {
+      return res.status(400).json({ message: `Minimum order amount is ₹${settings.min_order_amount}` });
+    }
+    const deliveryFee = subtotal >= settings.free_delivery_threshold ? 0 : settings.delivery_fee;
+    const totalPrice = parseFloat((subtotal + deliveryFee).toFixed(2));
+    const orderNumber = `ADM-${Date.now()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
+
+    const client = await pool.pool.connect();
+    try {
+      await client.query('BEGIN');
+      const orderResult = await client.query(
+        `INSERT INTO orders (order_number, user_id, phone, delivery_address, notes, subtotal, delivery_fee, total_price, payment_method, status)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,
+        [orderNumber, user_id || null, normalizedPhone, String(delivery_address).trim(), notes ? String(notes).trim() : null, subtotal, deliveryFee, totalPrice, payment_method, 'confirmed'],
+      );
+      const order = orderResult.rows[0];
+      for (const line of normalizedItems) {
+        const pricingType = line.product.pricing_type || 'per_kg';
+        const unit = pricingType === 'per_piece' ? 'kg' : (line.product.weight_display_unit === 'g' ? 'g' : 'kg');
+        const linePricePerKg = parseFloat((line.itemBase / line.quantityKg).toFixed(2));
+        await client.query(
+          `INSERT INTO order_items (order_id, product_id, product_name, quantity_kg, price_per_kg, total_price, pricing_type, weight_display_unit)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+          [order.id, line.product.id, line.product.name || customer_name || 'Item', line.quantityKg, linePricePerKg, parseFloat(line.itemTotal.toFixed(2)), pricingType, unit],
+        );
+        const stockUpdate = await client.query(
+          'UPDATE products SET quantity_available = quantity_available - $1 WHERE id = $2 AND quantity_available >= $1',
+          [line.quantityKg, line.product.id],
+        );
+        if (stockUpdate.rowCount !== 1) throw new Error(`Insufficient stock for ${line.product.name}`);
+      }
+      await client.query('COMMIT');
+      res.status(201).json({ success: true, data: { order } });
+    } catch (e) {
+      await client.query('ROLLBACK');
+      throw e;
+    } finally {
+      client.release();
+    }
+  } catch (error) {
+    console.error('Create admin order error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -920,6 +1105,14 @@ router.get('/analytics', async (req, res) => {
       FROM orders 
       WHERE status IN ('delivered', 'confirmed', 'pending')
     `);
+    const dailyKpis = await pool.query(`
+      SELECT
+        COALESCE(SUM(total_price), 0) AS daily_revenue,
+        COUNT(*) AS daily_orders
+      FROM orders
+      WHERE status != 'cancelled'
+        AND DATE(created_at AT TIME ZONE 'Asia/Kolkata') = DATE(NOW() AT TIME ZONE 'Asia/Kolkata')
+    `);
 
     res.json({
       period: normalizedPeriod,
@@ -933,7 +1126,11 @@ router.get('/analytics', async (req, res) => {
         totalOrders: parseInt(totalOrders.rows[0].count),
         totalUsers: parseInt(totalUsers.rows[0].count),
         totalRevenue: parseFloat(totalRevenue.rows[0].revenue),
+        dailyRevenue: parseFloat(dailyKpis.rows[0].daily_revenue || 0),
+        dailyOrders: parseInt(dailyKpis.rows[0].daily_orders || 0, 10),
       },
+      dailyRevenue: parseFloat(dailyKpis.rows[0].daily_revenue || 0),
+      dailyOrders: parseInt(dailyKpis.rows[0].daily_orders || 0, 10),
     });
 
   } catch (error) {

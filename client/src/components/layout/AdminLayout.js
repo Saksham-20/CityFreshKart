@@ -43,7 +43,15 @@ const AdminLayout = ({ children }) => {
                 <FiMenu className="w-5 h-5" />
               </button>
               <Link to="/admin" className="flex items-center">
-                <span className="text-xl sm:text-2xl font-bold text-gray-900">Admin Panel</span>
+                <img
+                  src="/CityFreshKart.svg"
+                  alt="CityFreshKart"
+                  className="h-7 sm:h-8 w-auto object-contain"
+                />
+                <div className="ml-2 sm:ml-3 min-w-0">
+                  <p className="text-base sm:text-xl font-bold text-gray-900 leading-tight">Admin Panel</p>
+                  <p className="text-[11px] sm:text-xs text-gray-500 leading-tight hidden sm:block">CityFreshKart</p>
+                </div>
               </Link>
             </div>
             

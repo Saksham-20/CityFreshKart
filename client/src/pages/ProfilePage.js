@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import useAuth from '../hooks/useAuth';
 import Button from '../components/ui/Button';
@@ -8,7 +8,7 @@ import Breadcrumb from '../components/common/Breadcrumb';
 import api from '../services/api';
 import toast from 'react-hot-toast';
 import { addressService } from '../services/addressService';
-import { subscribeToWebPush } from '../utils/pwa';
+import { subscribeToWebPush, unsubscribeFromWebPush, getCurrentPushSubscription } from '../utils/pwa';
 
 const ProfilePage = () => {
   const navigate = useNavigate();
@@ -48,6 +48,8 @@ const ProfilePage = () => {
   const [ordersLoading, setOrdersLoading] = useState(false);
   const [pushSubscribing, setPushSubscribing] = useState(false);
   const [showPushModal, setShowPushModal] = useState(false);
+  const [pushEnabled, setPushEnabled] = useState(false);
+  const [pushStateLoading, setPushStateLoading] = useState(false);
 
   const vapidConfigured = !!process.env.REACT_APP_VAPID_PUBLIC_KEY;
 
@@ -76,15 +78,43 @@ const ProfilePage = () => {
     }
   }, [user, activeSection]);
 
+  const refreshPushStatus = useCallback(async () => {
+    if (!vapidConfigured) {
+      setPushEnabled(false);
+      return;
+    }
+    if (typeof window === 'undefined' || !('Notification' in window)) {
+      setPushEnabled(false);
+      return;
+    }
+    try {
+      setPushStateLoading(true);
+      const sub = await getCurrentPushSubscription();
+      setPushEnabled(Boolean(sub) && Notification.permission === 'granted');
+    } catch {
+      setPushEnabled(false);
+    } finally {
+      setPushStateLoading(false);
+    }
+  }, [vapidConfigured]);
+
+  useEffect(() => {
+    if (activeSection !== 'security') return;
+    refreshPushStatus();
+  }, [activeSection, refreshPushStatus]);
+
   useEffect(() => {
     if (activeSection !== 'security') return;
     if (!vapidConfigured) return;
+    if (pushEnabled) return;
     if (typeof window === 'undefined' || !('Notification' in window)) return;
     if (Notification.permission !== 'default') return;
-    if (sessionStorage.getItem('cfk_push_intro_v2')) return;
-    sessionStorage.setItem('cfk_push_intro_v2', '1');
+    const today = new Date().toISOString().slice(0, 10);
+    const dailyKey = `cfk_push_prompt_${today}`;
+    if (localStorage.getItem(dailyKey)) return;
+    localStorage.setItem(dailyKey, '1');
     setShowPushModal(true);
-  }, [activeSection, vapidConfigured]);
+  }, [activeSection, vapidConfigured, pushEnabled]);
 
   useEffect(() => () => {
     setPushSubscribing(false);
@@ -277,7 +307,7 @@ const ProfilePage = () => {
       toast.error('This browser does not support notifications.');
       return;
     }
-    if (Notification.permission === 'denied') {
+    if (!pushEnabled && Notification.permission === 'denied') {
       toast.error(
         'Notifications are blocked for this site. Use the lock or site icon in the address bar → Site settings → Notifications → Allow, then try again.',
         { duration: 6500 },
@@ -294,11 +324,18 @@ const ProfilePage = () => {
     }
     try {
       setPushSubscribing(true);
-      await subscribeToWebPush();
-      toast.success('Push notifications enabled successfully');
+      if (pushEnabled) {
+        await unsubscribeFromWebPush();
+        setPushEnabled(false);
+        toast.success('Push notifications disabled for this device');
+      } else {
+        await subscribeToWebPush();
+        setPushEnabled(true);
+        toast.success('Push notifications enabled successfully');
+      }
       setShowPushModal(false);
     } catch (error) {
-      toast.error(error.message || 'Failed to enable notifications');
+      toast.error(error.message || `Failed to ${pushEnabled ? 'disable' : 'enable'} notifications`);
     } finally {
       setPushSubscribing(false);
     }
@@ -316,7 +353,7 @@ const ProfilePage = () => {
           setPushSubscribing(false);
           setShowPushModal(false);
         }}
-        title="Enable push notifications?"
+        title={pushEnabled ? 'Disable push notifications?' : 'Enable push notifications?'}
         size="sm"
         closeOnOverlayClick={!pushSubscribing}
         closeOnEscape={!pushSubscribing}
@@ -329,6 +366,10 @@ const ProfilePage = () => {
               <code className="text-xs bg-surface-container-low px-1 rounded">REACT_APP_VAPID_PUBLIC_KEY</code>
               {' '}
               at build time to match the server&apos;s VAPID public key.
+            </p>
+          ) : pushEnabled ? (
+            <p className="text-sm text-on-surface-variant">
+              You are currently receiving notifications on this device. Turn them off?
             </p>
           ) : (
             <p className="text-sm text-on-surface-variant">
@@ -348,8 +389,8 @@ const ProfilePage = () => {
               {vapidConfigured ? 'Cancel' : 'Close'}
             </button>
             {vapidConfigured && (
-              <Button type="button" onClick={handleConfirmPushSubscribe} loading={pushSubscribing}>
-                Continue
+                <Button type="button" onClick={handleConfirmPushSubscribe} loading={pushSubscribing}>
+                {pushEnabled ? 'Disable' : 'Continue'}
               </Button>
             )}
           </div>
@@ -684,10 +725,10 @@ const ProfilePage = () => {
                       <button
                         type="button"
                         onClick={handleOpenPushModal}
-                        disabled={pushSubscribing}
+                        disabled={pushSubscribing || pushStateLoading}
                         className="px-4 py-2 outline outline-2 outline-primary/40 rounded-lg text-primary font-medium hover:bg-secondary-container/30 transition-colors disabled:opacity-60"
                       >
-                        {pushSubscribing ? 'Enabling...' : 'Enable Push Notifications'}
+                        {pushStateLoading ? 'Checking...' : (pushSubscribing ? (pushEnabled ? 'Disabling...' : 'Enabling...') : (pushEnabled ? 'Disable Notifications' : 'Enable Push Notifications'))}
                       </button>
                     </div>
                   </div>

@@ -91,8 +91,14 @@ router.get('/carousel', async (req, res) => {
         discount,
         quantity_available,
         created_at,
-        COALESCE(weight_display_unit, 'kg') AS weight_display_unit
+        COALESCE(weight_display_unit, 'kg') AS weight_display_unit,
+        COALESCE(wp.weight_price_overrides, '{}'::json) AS weight_price_overrides
       FROM products
+      LEFT JOIN LATERAL (
+        SELECT json_object_agg(weight_option::text, price_override) AS weight_price_overrides
+        FROM product_weight_prices
+        WHERE product_id = products.id
+      ) wp ON true
       WHERE is_active = true
         AND (
           discount > 0
@@ -282,8 +288,14 @@ router.get('/', async (req, res) => {
         created_at,
         updated_at,
         COALESCE(pricing_type, 'per_kg') AS pricing_type,
-        COALESCE(weight_display_unit, 'kg') AS weight_display_unit
+        COALESCE(weight_display_unit, 'kg') AS weight_display_unit,
+        COALESCE(wp.weight_price_overrides, '{}'::json) AS weight_price_overrides
       FROM products
+      LEFT JOIN LATERAL (
+        SELECT json_object_agg(weight_option::text, price_override) AS weight_price_overrides
+        FROM product_weight_prices
+        WHERE product_id = products.id
+      ) wp ON true
       ${whereClause}
       ORDER BY created_at DESC
       LIMIT $${paramCount + 1} OFFSET $${paramCount + 2}
@@ -334,7 +346,15 @@ router.get('/:id', async (req, res) => {
     const { id } = req.params;
 
     const result = await query(
-      'SELECT * FROM products WHERE id = $1 AND is_active = true',
+      `SELECT p.*,
+              COALESCE(wp.weight_price_overrides, '{}'::json) AS weight_price_overrides
+       FROM products p
+       LEFT JOIN LATERAL (
+         SELECT json_object_agg(weight_option::text, price_override) AS weight_price_overrides
+         FROM product_weight_prices
+         WHERE product_id = p.id
+       ) wp ON true
+       WHERE p.id = $1 AND p.is_active = true`,
       [id]
     );
 
@@ -347,7 +367,7 @@ router.get('/:id', async (req, res) => {
 
     res.json({
       success: true,
-      data: result.rows[0],
+      data: { product: result.rows[0] },
     });
 
   } catch (error) {

@@ -53,6 +53,25 @@ class AuthService {
     }
   }
 
+  async loginWithGoogle(idToken) {
+    const response = await fetch(`${apiRoot()}/auth/google`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include',
+      body: JSON.stringify({ idToken }),
+    });
+
+    const data = await response.json();
+    if (!response.ok || !data?.success) {
+      throw new Error(data?.message || 'Google login failed');
+    }
+
+    localStorage.setItem('user', JSON.stringify(data.data.user));
+    return data;
+  }
+
   async logout() {
     try {
       // Call server to clear httpOnly cookie

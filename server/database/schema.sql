@@ -55,6 +55,11 @@ CREATE TABLE IF NOT EXISTS categories (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Backward compatibility: existing categories tables may miss UUID default.
+ALTER TABLE categories ALTER COLUMN id SET DEFAULT uuid_generate_v4();
+ALTER TABLE categories ALTER COLUMN created_at SET DEFAULT CURRENT_TIMESTAMP;
+ALTER TABLE categories ALTER COLUMN updated_at SET DEFAULT CURRENT_TIMESTAMP;
+
 INSERT INTO categories (name, slug) VALUES
     ('Vegetables', 'vegetables'),
     ('Fruits', 'fruits'),

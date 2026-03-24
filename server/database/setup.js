@@ -221,6 +221,11 @@ async function setupDatabase() {
         await pool.query(fs.readFileSync(weightUnitPath, 'utf8'));
         console.log('✅ weight_display_unit columns ensured');
       }
+      const googleWeightPath = path.join(__dirname, 'migrations', '006_google_and_weight_overrides.sql');
+      if (fs.existsSync(googleWeightPath)) {
+        await pool.query(fs.readFileSync(googleWeightPath, 'utf8'));
+        console.log('✅ google auth and weight override columns ensured');
+      }
     } catch (error) {
       console.error('❌ Sample products sync failed:', error.message);
       throw error;

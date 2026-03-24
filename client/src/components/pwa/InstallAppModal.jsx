@@ -32,8 +32,12 @@ const InstallAppModal = ({ isOpen, onClose }) => {
   const showIosHelp = shouldShowIOSInstallHelp();
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Install City Fresh Kart" size="sm">
+    <Modal isOpen={isOpen} onClose={onClose} title="Install CityFreshKart" size="sm">
       <div className="space-y-4 text-sm text-on-surface-variant">
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+          If you still see an old app name after install, remove the previously installed app, clear site data once,
+          and install again to refresh the latest CityFreshKart branding.
+        </div>
         {showIosHelp && (
           <ol className="list-decimal list-inside space-y-2 text-on-surface">
             <li>Open the Share menu in Safari.</li>

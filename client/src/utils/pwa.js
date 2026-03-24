@@ -258,6 +258,52 @@ export const subscribeToWebPush = async () => {
 };
 
 /**
+ * Get the current browser push subscription, if available.
+ */
+export const getCurrentPushSubscription = async () => {
+  if (!('serviceWorker' in navigator)) return null;
+  const registration = await navigator.serviceWorker.register('/sw.js', { scope: '/' });
+  await registration.update();
+  return registration.pushManager.getSubscription();
+};
+
+/**
+ * Unsubscribe current browser from Web Push and notify backend.
+ */
+export const unsubscribeFromWebPush = async () => {
+  if (!('serviceWorker' in navigator)) {
+    throw new Error('Service worker not supported in this browser');
+  }
+
+  const registration = await navigator.serviceWorker.register('/sw.js', { scope: '/' });
+  await registration.update();
+
+  const subscription = await registration.pushManager.getSubscription();
+  if (!subscription) {
+    return false;
+  }
+
+  const endpoint = subscription.endpoint;
+  if (endpoint) {
+    try {
+      await api.delete('/notifications/unsubscribe', { data: { endpoint } });
+    } catch (err) {
+      const status = err.response?.status;
+      if (status !== 404) {
+        const message =
+          err.response?.data?.message ||
+          err.message ||
+          'Failed to unsubscribe on server';
+        throw new Error(message);
+      }
+    }
+  }
+
+  const ok = await subscription.unsubscribe();
+  return ok;
+};
+
+/**
  * Check online status
  */
 export const isOnline = () => navigator.onLine;
@@ -290,6 +336,8 @@ const pwa = {
   requestNotificationPermission,
   sendNotification,
   subscribeToWebPush,
+  getCurrentPushSubscription,
+  unsubscribeFromWebPush,
   isOnline,
   onOnlineStatusChange,
 };

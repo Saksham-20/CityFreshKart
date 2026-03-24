@@ -1,15 +1,22 @@
 {
-  "short_name": "E-Commerce Shop",
-  "name": "Luxury E-Commerce Shop",
+  "id": "/?source=pwa",
+  "short_name": "CityFreshKart",
+  "name": "CityFreshKart | Fresh Grocery",
   "icons": [
+    {
+      "src": "CityFreshKart.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    },
     {
       "src": "favicon.ico",
       "sizes": "64x64 32x32 24x24 16x16",
       "type": "image/x-icon"
     }
   ],
-  "start_url": ".",
+  "start_url": "/",
+  "scope": "/",
   "display": "standalone",
-  "theme_color": "#81D8D0",
+  "theme_color": "#006C49",
   "background_color": "#ffffff"
 }

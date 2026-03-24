@@ -97,6 +97,31 @@ const useAuthStore = create((set, get) => ({
     }
   },
 
+  loginWithGoogle: async (idToken) => {
+    set({ loading: true, error: null });
+    try {
+      const response = await api.post('/auth/google', { idToken });
+      if (response.data.success && response.data.data) {
+        const { user, token } = response.data.data;
+        localStorage.setItem('token', token);
+        localStorage.setItem('user', JSON.stringify(user));
+        set({
+          user,
+          token,
+          isAuthenticated: true,
+          loading: false,
+          error: null,
+        });
+        return { success: true, user };
+      }
+      throw new Error(response.data.message || 'Google login failed');
+    } catch (error) {
+      const message = error.response?.data?.message || error.message;
+      set({ error: message, loading: false });
+      return { success: false, message };
+    }
+  },
+
   // Logout
   logout: () => {
     localStorage.removeItem('token');

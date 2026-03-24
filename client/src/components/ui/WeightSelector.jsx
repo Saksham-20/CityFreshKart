@@ -1,7 +1,7 @@
 import React from 'react';
 import { ChevronDown } from 'lucide-react';
 import { cn } from '@/utils/cn';
-import { WEIGHT_OPTIONS, formatWeight, calculatePrice } from '@/utils/weightSystem';
+import { WEIGHT_OPTIONS, formatWeight, formatPrice, calculatePriceWithOverrides, resolveBasePriceForWeight } from '@/utils/weightSystem';
 
 /**
  * WeightSelector Component
@@ -12,9 +12,10 @@ const WeightSelector = ({
   onWeightChange,
   pricePerKg,
   discount = 0,
+  weightPriceOverrides = {},
   className,
 }) => {
-  const pricing = calculatePrice(pricePerKg, weight, discount);
+  const pricing = calculatePriceWithOverrides(pricePerKg, weight, discount, weightPriceOverrides);
   const [isOpen, setIsOpen] = React.useState(false);
 
   return (
@@ -69,7 +70,7 @@ const WeightSelector = ({
                 <span className="flex items-center justify-between">
                   <span>{formatWeight(w)}</span>
                   <span className="text-xs text-gray-500">
-                    {formatPrice(pricePerKg * w)}
+                    {formatPrice(resolveBasePriceForWeight(pricePerKg, w, weightPriceOverrides))}
                   </span>
                 </span>
               </button>
