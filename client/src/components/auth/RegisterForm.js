@@ -3,10 +3,12 @@ import { useNavigate } from 'react-router-dom';
 import { FiUser, FiPhone, FiLock, FiEye, FiEyeOff, FiAlertCircle } from 'react-icons/fi';
 import useAuth from '../../hooks/useAuth';
 import toast from 'react-hot-toast';
+import { firebaseAuth, hasFirebaseClientConfig } from '../../services/firebaseClient';
+import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 
 const RegisterForm = ({ onSwitchToLogin }) => {
   const navigate = useNavigate();
-  const { register } = useAuth();
+  const { register, loginWithGoogle } = useAuth();
   
   const [formData, setFormData] = useState({
     phone: '',
@@ -98,6 +100,30 @@ const RegisterForm = ({ onSwitchToLogin }) => {
     } catch (error) {
       setErrors({ general: error.message || 'Registration failed' });
       toast.error('Registration failed');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleGoogleSignIn = async () => {
+    if (!hasFirebaseClientConfig || !firebaseAuth) {
+      toast.error('Google login is not configured yet');
+      return;
+    }
+    setIsLoading(true);
+    try {
+      const provider = new GoogleAuthProvider();
+      const credential = await signInWithPopup(firebaseAuth, provider);
+      const idToken = await credential.user.getIdToken();
+      const result = await loginWithGoogle(idToken);
+      if (!result?.success) {
+        throw new Error(result?.message || 'Google sign-in failed');
+      }
+      toast.success('Signed in with Google');
+      navigate(result.user?.is_admin ? '/admin' : '/');
+    } catch (error) {
+      toast.error(error.message || 'Google sign-in failed');
+      setErrors({ general: error.message || 'Google sign-in failed' });
     } finally {
       setIsLoading(false);
     }
@@ -224,6 +250,14 @@ const RegisterForm = ({ onSwitchToLogin }) => {
               Creating Account...
             </span>
           ) : 'Create Account'}
+        </button>
+        <button
+          type="button"
+          onClick={handleGoogleSignIn}
+          disabled={isLoading}
+          className="w-full border border-outline-variant/30 bg-surface-container-highest hover:bg-surface-container text-on-surface font-semibold py-3 rounded-full text-sm transition-all duration-200 disabled:opacity-60 disabled:cursor-not-allowed"
+        >
+          Continue with Google
         </button>
       </form>
 
