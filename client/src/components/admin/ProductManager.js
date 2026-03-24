@@ -16,50 +16,79 @@ const emptyForm = () => ({
   is_active: true,
   pricing_type: 'per_kg',
   weight_display_unit: 'kg',
-  weight_price_rows: [{ weight: '', price: '' }],
+  weight_price_rows: [{ weight: '', price: '', unit: 'kg' }],
 });
 
-const convertWeightRows = (rows = [], fromUnit = 'kg', toUnit = 'kg') => {
-  if (fromUnit === toUnit) return rows;
-  return rows.map((row) => {
-    const w = parseFloat(row.weight);
-    if (!Number.isFinite(w) || w <= 0) return row;
-    const converted = fromUnit === 'g' ? (w / 1000) : (w * 1000);
-    return { ...row, weight: String(Number(converted.toFixed(fromUnit === 'g' ? 3 : 0))) };
-  });
+/** Convert stored kg tier to admin row display (g for pack sizes under 1 kg when whole grams). */
+const kgTierToDisplay = (kgWeight) => {
+  const w = Number(kgWeight);
+  if (!Number.isFinite(w) || w <= 0) return { weight: '', unit: 'kg' };
+  const grams = w * 1000;
+  const roundedG = Math.round(grams);
+  if (w < 1 && Math.abs(grams - roundedG) < 1e-5) {
+    return { weight: String(roundedG), unit: 'g' };
+  }
+  const kgStr = Number(w.toFixed(4)).toString();
+  return { weight: kgStr, unit: 'kg' };
 };
 
-const convertStockValue = (rawValue, fromUnit = 'kg', toUnit = 'kg') => {
-  if (fromUnit === toUnit) return rawValue;
-  const n = parseFloat(rawValue);
-  if (!Number.isFinite(n) || n < 0) return rawValue;
-  const converted = fromUnit === 'g' ? (n / 1000) : (n * 1000);
-  return String(Number(converted.toFixed(fromUnit === 'g' ? 3 : 0)));
-};
-
-const rowsToWeightOverrides = (rows = [], inputUnit = 'kg') => {
+const rowsToWeightOverrides = (rows = [], pricingType = 'per_kg') => {
   const out = {};
+  const dup = new Set();
   rows.forEach((row) => {
     const rawWeight = parseFloat(row.weight);
-    const weight = inputUnit === 'g' ? (rawWeight / 1000) : rawWeight;
     const price = parseFloat(row.price);
-    if (!Number.isFinite(weight) || weight <= 0) return;
+    if (!Number.isFinite(rawWeight) || rawWeight <= 0) return;
     if (!Number.isFinite(price) || price < 0) return;
-    out[weight.toFixed(2)] = price;
+
+    let weightKg;
+    if (pricingType === 'per_piece') {
+      weightKg = rawWeight;
+    } else {
+      const u = row.unit === 'g' ? 'g' : 'kg';
+      weightKg = u === 'g' ? rawWeight / 1000 : rawWeight;
+    }
+    const key = weightKg.toFixed(2);
+    if (Object.prototype.hasOwnProperty.call(out, key)) dup.add(key);
+    out[key] = price;
   });
+  if (dup.size > 0) {
+    toast.error('Duplicate weight tiers were merged — keep each weight unique.');
+  }
   return out;
 };
 
-const weightOverridesToRows = (overrides = {}, outputUnit = 'kg') => {
-  const entries = Object.entries(overrides || {});
-  if (entries.length === 0) return [{ weight: '', price: '' }];
-  return entries
-    .map(([weight, price]) => {
-      const kgWeight = parseFloat(weight);
-      const shownWeight = outputUnit === 'g' ? kgWeight * 1000 : kgWeight;
-      return { weight: String(Number((shownWeight || 0).toFixed(outputUnit === 'g' ? 0 : 2))), price: String(price) };
-    })
-    .sort((a, b) => parseFloat(a.weight) - parseFloat(b.weight));
+const weightOverridesToRows = (overrides = {}, pricingType = 'per_kg') => {
+  const entries = Object.entries(overrides || {})
+    .map(([k, price]) => ({ kg: parseFloat(k), price }))
+    .filter((e) => Number.isFinite(e.kg) && e.kg > 0 && Number.isFinite(parseFloat(e.price)))
+    .sort((a, b) => a.kg - b.kg);
+
+  if (entries.length === 0) {
+    return pricingType === 'per_piece'
+      ? [{ weight: '', price: '' }]
+      : [{ weight: '', price: '', unit: 'kg' }];
+  }
+
+  return entries.map(({ kg, price }) => {
+    if (pricingType === 'per_piece') {
+      return { weight: String(Number(kg.toFixed(2))), price: String(price) };
+    }
+    const { weight, unit } = kgTierToDisplay(kg);
+    return { weight, price: String(price), unit };
+  });
+};
+
+const deriveWeightDisplayUnit = (rows = [], pricingType = 'per_kg') => {
+  if (pricingType === 'per_piece') return 'kg';
+  const tiers = (rows || []).filter((r) => {
+    const w = parseFloat(r.weight);
+    const p = parseFloat(r.price);
+    return Number.isFinite(w) && w > 0 && Number.isFinite(p) && p >= 0;
+  });
+  if (tiers.length === 0) return 'kg';
+  const allG = tiers.every((r) => r.unit === 'g');
+  return allG ? 'g' : 'kg';
 };
 
 const PricingTypeToggle = ({ value, onChange }) => (
@@ -72,26 +101,6 @@ const PricingTypeToggle = ({ value, onChange }) => (
           type="button"
           onClick={() => onChange(v)}
           className={`px-4 py-1.5 text-sm font-medium transition-colors ${
-            value === v ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'
-          }`}
-        >
-          {label}
-        </button>
-      ))}
-    </div>
-  </div>
-);
-
-const WeightUnitToggle = ({ value, onChange }) => (
-  <div className="flex items-center gap-2 flex-wrap">
-    <span className="text-sm font-medium text-gray-700">Quantity shown as:</span>
-    <div className="flex rounded-lg border border-gray-300 overflow-hidden">
-      {[{ v: 'kg', label: 'kg (e.g. 0.5 kg)' }, { v: 'g', label: 'g (e.g. 500g)' }].map(({ v, label }) => (
-        <button
-          key={v}
-          type="button"
-          onClick={() => onChange(v)}
-          className={`px-3 py-1.5 text-xs font-medium transition-colors ${
             value === v ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'
           }`}
         >
@@ -207,25 +216,13 @@ const ProductForm = ({
   existingImages,
   setExistingImages,
   handleImageChange,
-  handleWeightUnitChange,
 }) => {
-  const stockUnit = formData.weight_display_unit === 'g' ? 'g' : 'kg';
-  const stockLabel = formData.pricing_type === 'per_piece'
-    ? 'Stock (pieces)'
-    : `Stock (${stockUnit})`;
-  const weightInputUnit = formData.weight_display_unit === 'g' ? 'g' : 'kg';
+  const stockLabel = formData.pricing_type === 'per_piece' ? 'Stock (pieces)' : 'Stock (kg)';
 
   return (
     <form onSubmit={onSubmit} className="space-y-4 max-w-2xl mx-auto">
       <PricingTypeToggle value={formData.pricing_type}
         onChange={(v) => handleInputChange({ target: { name: 'pricing_type', value: v, type: 'text' } })} />
-
-      {formData.pricing_type === 'per_kg' && (
-        <WeightUnitToggle
-          value={formData.weight_display_unit}
-          onChange={handleWeightUnitChange}
-        />
-      )}
 
       <Input label="Product Name" name="name" value={formData.name}
         onChange={handleInputChange} required className="w-full" />
@@ -234,73 +231,101 @@ const ProductForm = ({
         <Input label="Discount (%)" name="discount" type="number" step="0.01" min="0" max="100"
           value={formData.discount} onChange={handleInputChange} className="w-full" placeholder="0" />
         <Input label={stockLabel} name="stock_quantity" type="number"
-          step={formData.pricing_type === 'per_piece' ? '1' : (stockUnit === 'g' ? '1' : '0.01')}
+          step={formData.pricing_type === 'per_piece' ? '1' : '0.01'}
           min="0"
           value={formData.stock_quantity} onChange={handleInputChange} required className="w-full"
-          placeholder={stockUnit === 'g' ? 'e.g. 1000' : '0'} />
+          placeholder={formData.pricing_type === 'per_piece' ? 'e.g. 100' : 'e.g. 10.5'} />
       </div>
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-2">Custom weight tiers and prices (Rs)</label>
         <div className="space-y-2">
-          {(formData.weight_price_rows || []).map((row, idx) => (
-            <div key={`weight-row-${idx}`} className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-end">
-              <div className="sm:col-span-5">
-                <label className="block text-xs text-gray-500 mb-1">
-                  {formData.pricing_type === 'per_piece' ? 'Pieces' : `Weight (${weightInputUnit})`}
-                </label>
-                <input
-                  type="number"
-                  min={formData.pricing_type === 'per_piece' ? '1' : (weightInputUnit === 'g' ? '1' : '0.01')}
-                  step={formData.pricing_type === 'per_piece' ? '1' : (weightInputUnit === 'g' ? '1' : '0.01')}
-                  value={row.weight}
-                  onChange={(e) => {
-                    const next = [...(formData.weight_price_rows || [])];
-                    next[idx] = { ...next[idx], weight: e.target.value };
-                    handleInputChange({ target: { name: 'weight_price_rows', value: next, type: 'text' } });
-                  }}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                  placeholder={formData.pricing_type === 'per_piece' ? 'e.g. 2' : (weightInputUnit === 'g' ? 'e.g. 750' : 'e.g. 0.75')}
-                />
+          {(formData.weight_price_rows || []).map((row, idx) => {
+            const rowUnit = row.unit === 'g' ? 'g' : 'kg';
+            const isPiece = formData.pricing_type === 'per_piece';
+            return (
+              <div key={`weight-row-${idx}`} className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-end">
+                <div className={isPiece ? 'sm:col-span-5' : 'sm:col-span-4'}>
+                  <label className="block text-xs text-gray-500 mb-1">
+                    {isPiece ? 'Pieces' : `Weight (${rowUnit})`}
+                  </label>
+                  <input
+                    type="number"
+                    min={isPiece ? '1' : (rowUnit === 'g' ? '1' : '0.01')}
+                    step={isPiece ? '1' : (rowUnit === 'g' ? '1' : '0.01')}
+                    value={row.weight}
+                    onChange={(e) => {
+                      const next = [...(formData.weight_price_rows || [])];
+                      next[idx] = { ...next[idx], weight: e.target.value };
+                      handleInputChange({ target: { name: 'weight_price_rows', value: next, type: 'text' } });
+                    }}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                    placeholder={isPiece ? 'e.g. 2' : (rowUnit === 'g' ? 'e.g. 750' : 'e.g. 0.75')}
+                  />
+                </div>
+                <div className={isPiece ? 'sm:col-span-5' : 'sm:col-span-4'}>
+                  <label className="block text-xs text-gray-500 mb-1">Price (Rs)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={row.price}
+                    onChange={(e) => {
+                      const next = [...(formData.weight_price_rows || [])];
+                      next[idx] = { ...next[idx], price: e.target.value };
+                      handleInputChange({ target: { name: 'weight_price_rows', value: next, type: 'text' } });
+                    }}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                    placeholder="e.g. 59"
+                  />
+                </div>
+                {!isPiece && (
+                  <div className="sm:col-span-2">
+                    <label className="block text-xs text-gray-500 mb-1">Unit</label>
+                    <select
+                      value={rowUnit}
+                      onChange={(e) => {
+                        const next = [...(formData.weight_price_rows || [])];
+                        const u = e.target.value === 'g' ? 'g' : 'kg';
+                        next[idx] = { ...next[idx], unit: u };
+                        handleInputChange({ target: { name: 'weight_price_rows', value: next, type: 'text' } });
+                      }}
+                      className="w-full px-2 py-2 border border-gray-300 rounded-lg text-sm bg-white"
+                    >
+                      <option value="kg">kg</option>
+                      <option value="g">g</option>
+                    </select>
+                  </div>
+                )}
+                <div className="sm:col-span-2 flex items-end pb-0.5">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      const rows = formData.weight_price_rows || [];
+                      const emptyRow = isPiece
+                        ? { weight: '', price: '' }
+                        : { weight: '', price: '', unit: 'kg' };
+                      const next = rows.length <= 1 ? [emptyRow] : rows.filter((_, i) => i !== idx);
+                      handleInputChange({ target: { name: 'weight_price_rows', value: next, type: 'text' } });
+                    }}
+                    className="w-full"
+                  >
+                    Remove
+                  </Button>
+                </div>
               </div>
-              <div className="sm:col-span-5">
-                <label className="block text-xs text-gray-500 mb-1">Price (Rs)</label>
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={row.price}
-                  onChange={(e) => {
-                    const next = [...(formData.weight_price_rows || [])];
-                    next[idx] = { ...next[idx], price: e.target.value };
-                    handleInputChange({ target: { name: 'weight_price_rows', value: next, type: 'text' } });
-                  }}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                  placeholder="e.g. 59"
-                />
-              </div>
-              <div className="sm:col-span-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => {
-                    const rows = formData.weight_price_rows || [];
-                    const next = rows.length <= 1 ? [{ weight: '', price: '' }] : rows.filter((_, i) => i !== idx);
-                    handleInputChange({ target: { name: 'weight_price_rows', value: next, type: 'text' } });
-                  }}
-                  className="w-full"
-                >
-                  Remove
-                </Button>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
         <div className="mt-2">
           <Button
             type="button"
             variant="outline"
             onClick={() => {
-              const next = [...(formData.weight_price_rows || []), { weight: '', price: '' }];
+              const isPiece = formData.pricing_type === 'per_piece';
+              const next = [...(formData.weight_price_rows || []), isPiece
+                ? { weight: '', price: '' }
+                : { weight: '', price: '', unit: 'kg' }];
               handleInputChange({ target: { name: 'weight_price_rows', value: next, type: 'text' } });
             }}
           >
@@ -409,24 +434,17 @@ const ProductManager = () => {
     setFormData((prev) => {
       if (name === 'pricing_type') {
         const nextType = nextValue === 'per_piece' ? 'per_piece' : 'per_kg';
-        return { ...prev, pricing_type: nextType, weight_display_unit: nextType === 'per_piece' ? 'kg' : prev.weight_display_unit };
+        const nextRows = nextType === 'per_piece'
+          ? [{ weight: '', price: '' }]
+          : [{ weight: '', price: '', unit: 'kg' }];
+        return {
+          ...prev,
+          pricing_type: nextType,
+          weight_display_unit: 'kg',
+          weight_price_rows: nextRows,
+        };
       }
       return { ...prev, [name]: nextValue };
-    });
-  };
-
-  const handleWeightUnitChange = (nextUnit) => {
-    setFormData((prev) => {
-      const currentUnit = prev.weight_display_unit === 'g' ? 'g' : 'kg';
-      const targetUnit = nextUnit === 'g' ? 'g' : 'kg';
-      const convertedRows = convertWeightRows(prev.weight_price_rows || [], currentUnit, targetUnit);
-      const convertedStock = convertStockValue(prev.stock_quantity, currentUnit, targetUnit);
-      return {
-        ...prev,
-        weight_display_unit: targetUnit,
-        weight_price_rows: convertedRows,
-        stock_quantity: convertedStock,
-      };
     });
   };
 
@@ -458,11 +476,12 @@ const ProductManager = () => {
   const handleAddProduct = async (e) => {
     e.preventDefault();
     try {
-      const overrides = rowsToWeightOverrides(formData.weight_price_rows, formData.weight_display_unit);
+      const overrides = rowsToWeightOverrides(formData.weight_price_rows, formData.pricing_type);
       if (Object.keys(overrides).length === 0) {
         toast.error('Add at least one valid custom weight tier with price.');
         return;
       }
+      const derivedUnit = deriveWeightDisplayUnit(formData.weight_price_rows, formData.pricing_type);
       setLoading(true);
       const fd = new FormData();
       Object.keys(formData).forEach((key) => {
@@ -470,8 +489,9 @@ const ProductManager = () => {
         if (key === 'price_per_kg') return;
         fd.append(key, formData[key]);
       });
+      fd.set('weight_display_unit', derivedUnit);
       if (formData.pricing_type !== 'per_piece') {
-        fd.set('stock_quantity', convertStockValue(formData.stock_quantity, formData.weight_display_unit, 'kg'));
+        fd.set('stock_quantity', String(parseFloat(formData.stock_quantity) || 0));
       }
       fd.set('weight_price_overrides', JSON.stringify(overrides));
       selectedImages.slice(0, 6).forEach(img => fd.append('images', img));
@@ -490,11 +510,12 @@ const ProductManager = () => {
   const handleEditProduct = async (e) => {
     e.preventDefault();
     try {
-      const overrides = rowsToWeightOverrides(formData.weight_price_rows, formData.weight_display_unit);
+      const overrides = rowsToWeightOverrides(formData.weight_price_rows, formData.pricing_type);
       if (Object.keys(overrides).length === 0) {
         toast.error('Add at least one valid custom weight tier with price.');
         return;
       }
+      const derivedUnit = deriveWeightDisplayUnit(formData.weight_price_rows, formData.pricing_type);
       setLoading(true);
       const fd = new FormData();
       Object.keys(formData).forEach(key => {
@@ -502,8 +523,9 @@ const ProductManager = () => {
         if (key === 'price_per_kg') return;
         if (formData[key] !== undefined && formData[key] !== null) fd.append(key, formData[key]);
       });
+      fd.set('weight_display_unit', derivedUnit);
       if (formData.pricing_type !== 'per_piece') {
-        fd.set('stock_quantity', convertStockValue(formData.stock_quantity, formData.weight_display_unit, 'kg'));
+        fd.set('stock_quantity', String(parseFloat(formData.stock_quantity) || 0));
       }
       fd.set('weight_price_overrides', JSON.stringify(overrides));
       if (existingImages.length === 0 && selectedImages.length === 0) fd.set('image_url', '');
@@ -547,7 +569,7 @@ const ProductManager = () => {
   };
 
   const openEditModal = (product) => {
-    const displayUnit = product.weight_display_unit === 'g' ? 'g' : 'kg';
+    const pt = product.pricing_type || 'per_kg';
     setSelectedProduct(product);
     setFormData({
       name: product.name,
@@ -555,12 +577,12 @@ const ProductManager = () => {
       category: product.category || '',
       stock_quantity: product.pricing_type === 'per_piece'
         ? (product.quantity_available || '')
-        : convertStockValue(product.quantity_available || '', 'kg', displayUnit),
+        : String(product.quantity_available ?? ''),
       image_url: product.image_url || '',
       is_active: product.is_active,
-      pricing_type: product.pricing_type || 'per_kg',
-      weight_display_unit: displayUnit,
-      weight_price_rows: weightOverridesToRows(product.weight_price_overrides || {}, displayUnit),
+      pricing_type: pt,
+      weight_display_unit: product.weight_display_unit === 'g' ? 'g' : 'kg',
+      weight_price_rows: weightOverridesToRows(product.weight_price_overrides || {}, pt),
     });
     setExistingImages(product.image_url ? [{ id: product.id, url: product.image_url }] : []);
     setImagePreview([]);
@@ -568,17 +590,40 @@ const ProductManager = () => {
     setShowEditModal(true);
   };
 
+  const formatTierSummary = (kgW, price) => {
+    const { weight, unit } = kgTierToDisplay(kgW);
+    const pr = Number(price);
+    return `₹${Number.isFinite(pr) ? pr.toFixed(0) : '0'}/${weight}${unit}`;
+  };
+
   const priceDisplay = (p) => {
     const entries = Object.entries(p.weight_price_overrides || {})
-      .map(([weight, price]) => ({ w: parseFloat(weight), p: parseFloat(price) }))
-      .filter((row) => Number.isFinite(row.w) && row.w > 0 && Number.isFinite(row.p) && row.p >= 0)
-      .sort((a, b) => a.w - b.w);
-    const firstPrice = entries.length > 0 ? entries[0].p : 0;
-    return `₹${firstPrice}/${p.pricing_type === 'per_piece' ? 'pc' : 'kg'}`;
+      .map(([weight, price]) => ({ kg: parseFloat(weight), price: parseFloat(price) }))
+      .filter((row) => Number.isFinite(row.kg) && row.kg > 0 && Number.isFinite(row.price) && row.price >= 0)
+      .sort((a, b) => a.kg - b.kg);
+    if (entries.length === 0) return '—';
+    if (p.pricing_type === 'per_piece') {
+      const parts = entries.slice(0, 3).map((e) => `₹${Number(e.price).toFixed(0)}/${e.kg} pc`);
+      return entries.length > 3 ? `${parts.join(' · ')} …` : parts.join(' · ');
+    }
+    const parts = entries.slice(0, 3).map((e) => formatTierSummary(e.kg, e.price));
+    return entries.length > 3 ? `${parts.join(' · ')} …` : parts.join(' · ');
   };
+
+  const productHasSubKgTier = (p) => {
+    if (p.pricing_type !== 'per_kg') return false;
+    const o = p.weight_price_overrides || {};
+    return Object.keys(o).some((k) => {
+      const v = parseFloat(k);
+      return Number.isFinite(v) && v > 0 && v < 1;
+    });
+  };
+
   const getStockStep = (p) => {
     if (p.pricing_type === 'per_piece') return 1;
-    return p.weight_display_unit === 'g' ? 0.05 : 1;
+    if (p.weight_display_unit === 'g') return 0.05;
+    if (productHasSubKgTier(p)) return 0.01;
+    return 1;
   };
   const formatStock = (p) => {
     const qty = Number(p.quantity_available || 0);
@@ -696,12 +741,12 @@ const ProductManager = () => {
                         {product.discount > 0 && (
                           <p className="text-xs text-green-600 font-medium">{product.discount}% off</p>
                         )}
-                        <p className="text-[10px] text-gray-400">{product.pricing_type === 'per_piece' ? 'Per piece' : 'Per kg'}</p>
+                        <p className="text-[10px] text-gray-400">{product.pricing_type === 'per_piece' ? 'Per piece' : 'Weight tiers'}</p>
                       </div>
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{product.category || 'Uncategorized'}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">{priceDisplay(product)}</td>
+                  <td className="px-6 py-4 text-sm font-semibold text-gray-900 max-w-[14rem] leading-snug">{priceDisplay(product)}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm">
                     <div className="flex items-center space-x-1">
                       <button onClick={() => handleStockUpdate(product.id, parseFloat(((parseFloat(product.quantity_available) || 0) + getStockStep(product)).toFixed(2)))}
@@ -748,7 +793,6 @@ const ProductManager = () => {
           existingImages={existingImages}
           setExistingImages={setExistingImages}
           handleImageChange={handleImageChange}
-          handleWeightUnitChange={handleWeightUnitChange}
         />
       </Modal>
 
@@ -770,7 +814,6 @@ const ProductManager = () => {
           existingImages={existingImages}
           setExistingImages={setExistingImages}
           handleImageChange={handleImageChange}
-          handleWeightUnitChange={handleWeightUnitChange}
         />
       </Modal>
 
