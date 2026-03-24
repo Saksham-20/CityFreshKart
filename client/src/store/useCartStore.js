@@ -1,6 +1,21 @@
 import { create } from 'zustand';
 import api from '../services/api';
-import { resolveBasePriceForWeight } from '../utils/weightSystem';
+import { getTierWeightsFromOverrides, resolveBasePriceForWeight } from '../utils/weightSystem';
+
+const normalizeQuantityForItem = (item, quantity) => {
+  const q = Number(quantity);
+  if (!Number.isFinite(q) || q <= 0) return 0;
+  const tiers = getTierWeightsFromOverrides(item.weight_price_overrides || {});
+  if (tiers.length > 0) {
+    const exact = tiers.find((t) => Math.abs(t - q) < 1e-6);
+    if (exact) return exact;
+    return tiers[0];
+  }
+  if (item.pricing_type === 'per_piece') {
+    return Math.max(1, Math.round(q));
+  }
+  return parseFloat(q.toFixed(2));
+};
 
 const useCartStore = create((set, get) => ({
   // State
@@ -80,9 +95,10 @@ const useCartStore = create((set, get) => ({
     const existingItem = items.find(i => i.id === product.id);
 
     if (existingItem) {
+      const mergedQty = normalizeQuantityForItem(existingItem, existingItem.quantity + quantity);
       const updated = items.map(i =>
         i.id === product.id
-          ? { ...i, quantity: parseFloat((i.quantity + quantity).toFixed(2)) }
+          ? { ...i, quantity: mergedQty }
           : i,
       );
       set({ items: updated });
@@ -99,7 +115,7 @@ const useCartStore = create((set, get) => ({
           ? 'kg'
           : (product.weight_display_unit === 'g' ? 'g' : 'kg'),
         weight_price_overrides: product.weight_price_overrides || {},
-        quantity,
+        quantity: normalizeQuantityForItem(product, quantity),
       };
       const updated = [...items, newItem];
       set({ items: updated });
@@ -113,7 +129,9 @@ const useCartStore = create((set, get) => ({
       get().removeFromCart(productId);
       return;
     }
-    const items = get().items.map(i => i.id === productId ? { ...i, quantity } : i);
+    const items = get().items.map(i => (
+      i.id === productId ? { ...i, quantity: normalizeQuantityForItem(i, quantity) } : i
+    ));
     set({ items });
     localStorage.setItem('cart', JSON.stringify(items));
   },

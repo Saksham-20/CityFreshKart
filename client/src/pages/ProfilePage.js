@@ -9,10 +9,12 @@ import api from '../services/api';
 import toast from 'react-hot-toast';
 import { addressService } from '../services/addressService';
 import { subscribeToWebPush, unsubscribeFromWebPush, getCurrentPushSubscription } from '../utils/pwa';
+import { firebaseAuth, hasFirebaseClientConfig } from '../services/firebaseClient';
+import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 
 const ProfilePage = () => {
   const navigate = useNavigate();
-  const { user, logout } = useAuth();
+  const { user, logout, linkGoogleAccount, unlinkGoogleAccount, refreshCurrentUser } = useAuth();
   const [profile, setProfile] = useState(user || {});
   const [loading, setLoading] = useState(false);
   const [editMode, setEditMode] = useState(false);
@@ -50,6 +52,8 @@ const ProfilePage = () => {
   const [showPushModal, setShowPushModal] = useState(false);
   const [pushEnabled, setPushEnabled] = useState(false);
   const [pushStateLoading, setPushStateLoading] = useState(false);
+  const [googleLinked, setGoogleLinked] = useState(!!user?.google_linked);
+  const [googleLinkLoading, setGoogleLinkLoading] = useState(false);
 
   const vapidConfigured = !!process.env.REACT_APP_VAPID_PUBLIC_KEY;
 
@@ -77,6 +81,10 @@ const ProfilePage = () => {
       fetchRecentOrders();
     }
   }, [user, activeSection]);
+
+  useEffect(() => {
+    setGoogleLinked(!!user?.google_linked);
+  }, [user?.google_linked]);
 
   const refreshPushStatus = useCallback(async () => {
     if (!vapidConfigured) {
@@ -300,6 +308,36 @@ const ProfilePage = () => {
     logout();
     navigate('/');
     toast.success('Logged out successfully');
+  };
+
+  const handleGoogleLinkAction = async () => {
+    if (!hasFirebaseClientConfig || !firebaseAuth) {
+      toast.error('Google login is not configured yet');
+      return;
+    }
+    setGoogleLinkLoading(true);
+    try {
+      if (googleLinked) {
+        const result = await unlinkGoogleAccount();
+        if (!result?.success) throw new Error(result?.message || 'Failed to unlink Google account');
+        await refreshCurrentUser();
+        setGoogleLinked(false);
+        toast.success('Google account unlinked');
+      } else {
+        const provider = new GoogleAuthProvider();
+        const credential = await signInWithPopup(firebaseAuth, provider);
+        const idToken = await credential.user.getIdToken();
+        const result = await linkGoogleAccount(idToken);
+        if (!result?.success) throw new Error(result?.message || 'Failed to link Google account');
+        await refreshCurrentUser();
+        setGoogleLinked(true);
+        toast.success('Google account linked');
+      }
+    } catch (error) {
+      toast.error(error.message || 'Google account action failed');
+    } finally {
+      setGoogleLinkLoading(false);
+    }
   };
 
   const handleOpenPushModal = () => {
@@ -721,6 +759,14 @@ const ProfilePage = () => {
                       <button onClick={() => setShowPasswordForm(true)}
                         className="px-4 py-2 rounded-lg bg-surface-container-highest text-on-surface font-medium hover:bg-gray-50 transition-colors">
                         Change Password
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleGoogleLinkAction}
+                        disabled={googleLinkLoading}
+                        className="px-4 py-2 outline outline-2 outline-primary/40 rounded-lg text-primary font-medium hover:bg-secondary-container/30 transition-colors disabled:opacity-60"
+                      >
+                        {googleLinkLoading ? 'Please wait...' : (googleLinked ? 'Unlink Google Account' : 'Link Google Account')}
                       </button>
                       <button
                         type="button"

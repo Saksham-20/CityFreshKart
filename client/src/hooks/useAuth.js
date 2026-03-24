@@ -9,6 +9,9 @@ const useAuth = () => {
     register: storeRegister,
     login: storeLogin,
     loginWithGoogle: storeLoginWithGoogle,
+    linkGoogleAccount,
+    unlinkGoogleAccount,
+    refreshCurrentUser,
     logout,
   } = useAuthStore();
   
@@ -23,6 +26,9 @@ const useAuth = () => {
     },
     login: storeLogin,
     loginWithGoogle: storeLoginWithGoogle,
+    linkGoogleAccount,
+    unlinkGoogleAccount,
+    refreshCurrentUser,
     logout,
   };
 };

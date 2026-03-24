@@ -1,9 +1,9 @@
-import React, { useMemo, useCallback, useState } from 'react';
+import React, { useMemo, useCallback, useState, useEffect } from 'react';
 import useCart from '../../hooks/useCart';
 import { getImageUrl, IMAGE_DIMS } from '../../utils/imageUtils';
-import { formatWeightDisplay, resolveBasePriceForWeight } from '../../utils/weightSystem';
+import { formatWeightDisplay, resolveBasePriceForWeight, getTierWeightsFromOverrides, getAdjacentTierWeight } from '../../utils/weightSystem';
 
-const KG_OPTIONS = [0.25, 0.5, 1, 1.5, 2];
+const KG_OPTIONS = [0.5, 1];
 const PIECE_OPTIONS = [1, 2, 3, 4];
 
 const ProductCard = React.memo(({ product, className = '', highlightFlash = false }) => {
@@ -11,9 +11,21 @@ const ProductCard = React.memo(({ product, className = '', highlightFlash = fals
 
   const isPerPiece = product.pricing_type === 'per_piece';
   const weightUnit = isPerPiece ? 'kg' : (product.weight_display_unit === 'g' ? 'g' : 'kg');
-  const weightOptions = isPerPiece ? PIECE_OPTIONS : KG_OPTIONS;
+  const tierWeights = useMemo(
+    () => getTierWeightsFromOverrides(product.weight_price_overrides || {}),
+    [product.weight_price_overrides],
+  );
+  const weightOptions = tierWeights.length > 0
+    ? tierWeights
+    : (isPerPiece ? PIECE_OPTIONS : KG_OPTIONS);
 
   const [selectedQty, setSelectedQty] = useState(weightOptions[0]);
+
+  useEffect(() => {
+    if (!weightOptions.includes(selectedQty)) {
+      setSelectedQty(weightOptions[0]);
+    }
+  }, [weightOptions, selectedQty]);
 
   const pricePerUnit = useMemo(() => Number(product.price_per_kg || product.pricePerKg || product.price) || 0, [product]);
   const discountPercent = useMemo(() => Number(product.discount) || 0, [product.discount]);
@@ -49,15 +61,32 @@ const ProductCard = React.memo(({ product, className = '', highlightFlash = fals
   }, [addToCart, product, productId, pricePerUnit, selectedQty, discountPercent, weightUnit]);
 
   const handleIncrease = useCallback(() => {
-    if (cartItem) updateItemQuantity(cartItem.id, parseFloat((cartQty + selectedQty).toFixed(2)));
-  }, [cartItem, cartQty, selectedQty, updateItemQuantity]);
+    if (!cartItem) return;
+    const tiers = getTierWeightsFromOverrides(cartItem.weight_price_overrides || product.weight_price_overrides || {});
+    if (tiers.length > 0) {
+      const nextTier = getAdjacentTierWeight(cartQty, tiers, 1);
+      updateItemQuantity(cartItem.id, parseFloat(nextTier.toFixed(2)));
+      return;
+    }
+    updateItemQuantity(cartItem.id, parseFloat((cartQty + selectedQty).toFixed(2)));
+  }, [cartItem, cartQty, product.weight_price_overrides, selectedQty, updateItemQuantity]);
 
   const handleDecrease = useCallback(() => {
     if (!cartItem) return;
+    const tiers = getTierWeightsFromOverrides(cartItem.weight_price_overrides || product.weight_price_overrides || {});
+    if (tiers.length > 0) {
+      const prevTier = getAdjacentTierWeight(cartQty, tiers, -1);
+      if (prevTier >= cartQty - 1e-6) {
+        removeFromCart(cartItem.id);
+      } else {
+        updateItemQuantity(cartItem.id, parseFloat(prevTier.toFixed(2)));
+      }
+      return;
+    }
     const newQty = parseFloat((cartQty - selectedQty).toFixed(2));
     if (newQty <= 0) removeFromCart(cartItem.id);
     else updateItemQuantity(cartItem.id, newQty);
-  }, [cartItem, cartQty, selectedQty, removeFromCart, updateItemQuantity]);
+  }, [cartItem, cartQty, product.weight_price_overrides, selectedQty, removeFromCart, updateItemQuantity]);
 
   const cartQtyLabel = isPerPiece
     ? `${cartQty} ${cartQty === 1 ? 'pc' : 'pcs'}`

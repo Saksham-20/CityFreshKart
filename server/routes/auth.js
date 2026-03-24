@@ -108,7 +108,7 @@ router.post('/google', authLimiter, async (req, res) => {
     const displayName = (decoded.name || '').trim() || (decoded.email || '').split('@')[0] || 'Customer';
     const syntheticPhone = `9${String(Math.abs([...decoded.uid].reduce((a, c) => a + c.charCodeAt(0), 0))).padStart(9, '0').slice(0, 9)}`;
 
-    // Prefer an existing account linked by Firebase UID, then by email (if column exists), else create.
+    // Explicit-link mode: only auto-login by linked Google UID; otherwise create separate account.
     let user;
     try {
       const byUid = await dbQuery(
@@ -118,18 +118,6 @@ router.post('/google', authLimiter, async (req, res) => {
       user = byUid.rows[0];
     } catch (_) {
       user = null;
-    }
-
-    if (!user && decoded.email) {
-      try {
-        const byEmail = await dbQuery(
-          'SELECT id, phone, name, is_admin FROM users WHERE email = $1 LIMIT 1',
-          [decoded.email],
-        );
-        user = byEmail.rows[0];
-      } catch (_) {
-        user = null;
-      }
     }
 
     if (!user) {
@@ -180,13 +168,91 @@ router.post('/google', authLimiter, async (req, res) => {
 
 router.get('/me', authenticateToken, async (req, res) => {
   try {
-    const userResult = await dbQuery('SELECT id, phone, name, is_admin, created_at, updated_at FROM users WHERE id = $1', [req.user.id]);
+    const userResult = await dbQuery(
+      'SELECT id, phone, name, is_admin, created_at, updated_at, email, google_uid FROM users WHERE id = $1',
+      [req.user.id],
+    );
     if (userResult.rows.length === 0) {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
-    res.json({ success: true, data: { user: userResult.rows[0] } });
+    const user = userResult.rows[0];
+    res.json({
+      success: true,
+      data: {
+        user: {
+          ...user,
+          google_linked: !!user.google_uid,
+        },
+      },
+    });
   } catch (error) {
     res.status(401).json({ success: false, message: 'Not authenticated' });
+  }
+});
+
+router.post('/link/google', authenticateToken, async (req, res) => {
+  try {
+    if (!isFirebaseAdminConfigured) {
+      return res.status(503).json({ success: false, message: 'Google sign-in is not configured yet' });
+    }
+    const { idToken } = req.body || {};
+    if (!idToken) {
+      return res.status(400).json({ success: false, message: 'Google ID token is required' });
+    }
+    const decoded = await verifyFirebaseIdToken(idToken);
+
+    const owner = await dbQuery(
+      'SELECT id FROM users WHERE google_uid = $1 LIMIT 1',
+      [decoded.uid],
+    );
+    if (owner.rows[0] && owner.rows[0].id !== req.user.id) {
+      return res.status(409).json({ success: false, message: 'This Google account is already linked to another user' });
+    }
+
+    await dbQuery(
+      `UPDATE users
+       SET google_uid = $1,
+           email = COALESCE(email, $2),
+           name = COALESCE(NULLIF(name, ''), NULLIF($3, ''), name),
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = $4`,
+      [decoded.uid, decoded.email || null, decoded.name || '', req.user.id],
+    );
+    const refreshed = await dbQuery(
+      'SELECT id, phone, name, is_admin, email, google_uid, created_at, updated_at FROM users WHERE id = $1',
+      [req.user.id],
+    );
+    const user = refreshed.rows[0];
+    return res.json({
+      success: true,
+      message: 'Google account linked successfully',
+      data: { user: { ...user, google_linked: !!user.google_uid } },
+    });
+  } catch (error) {
+    console.error('Link google error:', error);
+    return res.status(400).json({ success: false, message: 'Failed to link Google account' });
+  }
+});
+
+router.delete('/link/google', authenticateToken, async (req, res) => {
+  try {
+    await dbQuery(
+      'UPDATE users SET google_uid = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = $1',
+      [req.user.id],
+    );
+    const refreshed = await dbQuery(
+      'SELECT id, phone, name, is_admin, email, google_uid, created_at, updated_at FROM users WHERE id = $1',
+      [req.user.id],
+    );
+    const user = refreshed.rows[0];
+    return res.json({
+      success: true,
+      message: 'Google account unlinked successfully',
+      data: { user: { ...user, google_linked: !!user.google_uid } },
+    });
+  } catch (error) {
+    console.error('Unlink google error:', error);
+    return res.status(400).json({ success: false, message: 'Failed to unlink Google account' });
   }
 });
 

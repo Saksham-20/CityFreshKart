@@ -19,6 +19,20 @@ if (process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET) {
   console.warn('⚠️  Razorpay keys not configured. Payment routes will return errors.');
 }
 
+const mapRazorpayError = (error, fallbackMessage) => {
+  const status = Number(error?.statusCode || error?.status || 500);
+  const safeStatus = status >= 400 && status < 600 ? status : 500;
+  const providerMessage = error?.error?.description || error?.description || error?.message;
+  return {
+    status: safeStatus,
+    body: {
+      success: false,
+      message: providerMessage || fallbackMessage,
+      code: error?.error?.code || 'RAZORPAY_ERROR',
+    },
+  };
+};
+
 // @route   POST /api/razorpay/create-order
 // @desc    Create Razorpay order for checkout
 // @access  Private
@@ -63,12 +77,14 @@ router.post('/create-order', authenticateToken, [
       },
     });
   } catch (error) {
-    console.error('Create Razorpay order error:', error);
-    return res.status(500).json({
-      success: false,
-      message: 'Failed to create Razorpay order',
-      error: error.message,
+    console.error('Create Razorpay order error:', {
+      message: error?.message,
+      statusCode: error?.statusCode,
+      code: error?.error?.code,
+      description: error?.error?.description,
     });
+    const mapped = mapRazorpayError(error, 'Failed to create Razorpay order');
+    return res.status(mapped.status).json(mapped.body);
   }
 });
 
@@ -144,12 +160,14 @@ router.post('/payment-link', authenticateToken, [
     });
 
   } catch (error) {
-    console.error('Create payment link error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to create payment link',
-      error: error.message,
+    console.error('Create payment link error:', {
+      message: error?.message,
+      statusCode: error?.statusCode,
+      code: error?.error?.code,
+      description: error?.error?.description,
     });
+    const mapped = mapRazorpayError(error, 'Failed to create payment link');
+    res.status(mapped.status).json(mapped.body);
   }
 });
 
@@ -222,12 +240,14 @@ router.post('/verify-payment', authenticateToken, [
     }
 
   } catch (error) {
-    console.error('Verify payment error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to verify payment',
-      error: error.message,
+    console.error('Verify payment error:', {
+      message: error?.message,
+      statusCode: error?.statusCode,
+      code: error?.error?.code,
+      description: error?.error?.description,
     });
+    const mapped = mapRazorpayError(error, 'Failed to verify payment');
+    res.status(mapped.status).json(mapped.body);
   }
 });
 
@@ -300,12 +320,14 @@ router.get('/payment-status/:paymentId', authenticateToken, async (req, res) => 
     });
 
   } catch (error) {
-    console.error('Get payment status error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to fetch payment status',
-      error: error.message,
+    console.error('Get payment status error:', {
+      message: error?.message,
+      statusCode: error?.statusCode,
+      code: error?.error?.code,
+      description: error?.error?.description,
     });
+    const mapped = mapRazorpayError(error, 'Failed to fetch payment status');
+    res.status(mapped.status).json(mapped.body);
   }
 });
 

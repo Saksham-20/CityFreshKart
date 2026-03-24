@@ -22,9 +22,12 @@ const useAuthStore = create((set, get) => ({
           const response = await api.get('/auth/me', {
             headers: { Authorization: `Bearer ${token}` }
           });
-          if (!response.data.data) {
+          const meUser = response.data?.data?.user;
+          if (!meUser) {
             throw new Error('Invalid token');
           }
+          localStorage.setItem('user', JSON.stringify(meUser));
+          set({ user: meUser, token, isAuthenticated: true });
         } catch (error) {
           localStorage.removeItem('token');
           localStorage.removeItem('user');
@@ -33,6 +36,23 @@ const useAuthStore = create((set, get) => ({
       }
     } finally {
       set({ loading: false });
+    }
+  },
+
+  refreshCurrentUser: async () => {
+    try {
+      const token = get().token || localStorage.getItem('token');
+      if (!token) return { success: false };
+      const response = await api.get('/auth/me', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const user = response.data?.data?.user;
+      if (!user) return { success: false };
+      localStorage.setItem('user', JSON.stringify(user));
+      set({ user, isAuthenticated: true });
+      return { success: true, user };
+    } catch (error) {
+      return { success: false, message: error.response?.data?.message || error.message };
     }
   },
 
@@ -115,6 +135,42 @@ const useAuthStore = create((set, get) => ({
         return { success: true, user };
       }
       throw new Error(response.data.message || 'Google login failed');
+    } catch (error) {
+      const message = error.response?.data?.message || error.message;
+      set({ error: message, loading: false });
+      return { success: false, message };
+    }
+  },
+
+  linkGoogleAccount: async (idToken) => {
+    set({ loading: true, error: null });
+    try {
+      const response = await api.post('/auth/link/google', { idToken });
+      const user = response.data?.data?.user;
+      if (!response.data?.success || !user) {
+        throw new Error(response.data?.message || 'Failed to link Google account');
+      }
+      localStorage.setItem('user', JSON.stringify(user));
+      set({ user, loading: false, error: null });
+      return { success: true, user };
+    } catch (error) {
+      const message = error.response?.data?.message || error.message;
+      set({ error: message, loading: false });
+      return { success: false, message };
+    }
+  },
+
+  unlinkGoogleAccount: async () => {
+    set({ loading: true, error: null });
+    try {
+      const response = await api.delete('/auth/link/google');
+      const user = response.data?.data?.user;
+      if (!response.data?.success || !user) {
+        throw new Error(response.data?.message || 'Failed to unlink Google account');
+      }
+      localStorage.setItem('user', JSON.stringify(user));
+      set({ user, loading: false, error: null });
+      return { success: true, user };
     } catch (error) {
       const message = error.response?.data?.message || error.message;
       set({ error: message, loading: false });

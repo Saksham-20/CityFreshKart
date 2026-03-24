@@ -2,9 +2,9 @@ import React from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import useCart from '../hooks/useCart';
 import { getImageUrl, getPlaceholderImage, IMAGE_DIMS } from '../utils/imageUtils';
-import { formatCartQuantityLabel } from '../utils/weightSystem';
+import { formatCartQuantityLabel, getAdjacentTierWeight, getTierWeightsFromOverrides } from '../utils/weightSystem';
 
-const GRAM_STEP_KG = 0.05; // 50g steps for variable weight (e.g. watermelon)
+const GRAM_STEP_KG = 0.05; // fallback step when no explicit tiers
 const PIECE_STEP = 1;
 const FREE_DELIVERY_THRESHOLD = 300;
 
@@ -16,14 +16,37 @@ const CartPage = () => {
   const amountToFree = Math.max(FREE_DELIVERY_THRESHOLD - subtotal, 0);
   const deliveryProgress = Math.min((subtotal / FREE_DELIVERY_THRESHOLD) * 100, 100);
 
+  const tierOptionsFor = (item) => (
+    item.pricing_type === 'per_piece'
+      ? []
+      : getTierWeightsFromOverrides(item.weight_price_overrides || {})
+  );
+
   const stepFor = (item) => (item.pricing_type === 'per_piece' ? PIECE_STEP : GRAM_STEP_KG);
   const minQtyFor = (item) => (item.pricing_type === 'per_piece' ? PIECE_STEP : GRAM_STEP_KG);
 
   const handleIncrease = (item) => {
+    if (item.pricing_type !== 'per_piece') {
+      const tiers = tierOptionsFor(item);
+      if (tiers.length > 0) {
+        const nextTier = getAdjacentTierWeight(item.quantity, tiers, 1);
+        updateItemQuantity(item.id, parseFloat(nextTier.toFixed(2)));
+        return;
+      }
+    }
     const step = stepFor(item);
     updateItemQuantity(item.id, parseFloat((item.quantity + step).toFixed(2)));
   };
   const handleDecrease = (item) => {
+    if (item.pricing_type !== 'per_piece') {
+      const tiers = tierOptionsFor(item);
+      if (tiers.length > 0) {
+        const nextTier = getAdjacentTierWeight(item.quantity, tiers, -1);
+        if (nextTier >= item.quantity - 1e-6) removeFromCart(item.id);
+        else updateItemQuantity(item.id, parseFloat(nextTier.toFixed(2)));
+        return;
+      }
+    }
     const step = stepFor(item);
     const minQ = minQtyFor(item);
     const newQty = parseFloat((item.quantity - step).toFixed(2));
@@ -162,7 +185,9 @@ const CartPage = () => {
                         </button>
                       </div>
                       {!isPerPiece && (
-                        <span className="text-[10px] text-on-surface-variant">±50g · exact weight pricing</span>
+                        <span className="text-[10px] text-on-surface-variant">
+                          {tierOptionsFor(item).length > 0 ? 'Admin tier weights' : '±50g · exact weight pricing'}
+                        </span>
                       )}
                     </div>
                     <span className="text-sm font-bold text-on-surface">₹{lineTotal}</span>

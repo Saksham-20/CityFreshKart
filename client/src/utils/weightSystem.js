@@ -39,6 +39,27 @@ export const resolveBasePriceForWeight = (pricePerKg, weight, weightPriceOverrid
   return (Number(pricePerKg) || 0) * w;
 };
 
+export const getTierWeightsFromOverrides = (weightPriceOverrides = {}) => {
+  const weights = Object.keys(weightPriceOverrides || {})
+    .map((k) => parseFloat(k))
+    .filter((n) => Number.isFinite(n) && n > 0);
+  return [...new Set(weights)].sort((a, b) => a - b);
+};
+
+export const getAdjacentTierWeight = (currentWeight, tiers = [], direction = 1) => {
+  if (!Array.isArray(tiers) || tiers.length === 0) return currentWeight;
+  const current = Number(currentWeight) || tiers[0];
+  const normalized = [...tiers].sort((a, b) => a - b);
+  const idx = normalized.findIndex((v) => Math.abs(v - current) < 1e-6);
+  if (idx === -1) {
+    if (direction > 0) return normalized.find((v) => v > current) ?? normalized[normalized.length - 1];
+    return [...normalized].reverse().find((v) => v < current) ?? normalized[0];
+  }
+  const nextIdx = idx + (direction > 0 ? 1 : -1);
+  if (nextIdx < 0 || nextIdx >= normalized.length) return normalized[idx];
+  return normalized[nextIdx];
+};
+
 export const calculatePriceWithOverrides = (pricePerKg, weight, discount = 0, weightPriceOverrides = {}) => {
   const basePrice = resolveBasePriceForWeight(pricePerKg, weight, weightPriceOverrides);
   const disc = Number(discount) || 0;

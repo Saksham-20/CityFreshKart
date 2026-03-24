@@ -143,9 +143,13 @@ const CheckoutPage = () => {
     if (useNewAddress && saveNewAddress && address) {
       try {
         await addressService.addAddress({
+          firstName: (user?.name || '').trim().split(/\s+/)[0] || 'Customer',
           houseNumber: newAddressForm.houseNumber,
           floor: newAddressForm.floor,
           addressLine: newAddressForm.addressLine,
+          society: newAddressForm.society,
+          sector: newAddressForm.sector,
+          phone: orderPhone,
           isDefault: savedAddresses.length === 0,
         });
         toast.success('Address saved to your profile!');

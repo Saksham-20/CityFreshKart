@@ -180,6 +180,16 @@ router.post('/', authenticateToken, async (req, res) => {
       if (!Number.isFinite(qty) || qty <= 0) {
         return res.status(400).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Invalid item quantity' } });
       }
+      const hasTiers = productWeightRows.rows.some(r => r.product_id === product.id);
+      if (hasTiers) {
+        const tierKey = `${item.product_id}:${qty.toFixed(2)}`;
+        if (!weightOverrideMap.has(tierKey)) {
+          return res.status(400).json({
+            success: false,
+            error: { code: 'INVALID_TIER', message: `${product.name} must use admin-defined weight tiers` },
+          });
+        }
+      }
     }
 
     // Recalculate totals strictly from DB values for integrity

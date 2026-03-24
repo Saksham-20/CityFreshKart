@@ -33,7 +33,10 @@ router.post('/', authenticateToken, async (req, res) => {
       city, state, postalCode, postal_code, phone, isDefault, is_default,
     } = req.body;
 
-    const fname = firstName || first_name;
+    const profileResult = await query('SELECT name, phone FROM users WHERE id = $1 LIMIT 1', [req.user.id]);
+    const profile = profileResult.rows[0] || {};
+    const fallbackFirstName = String(profile.name || '').trim().split(/\s+/)[0] || 'Customer';
+    const fname = (firstName || first_name || fallbackFirstName || 'Customer').toString().trim();
     const lname = lastName || last_name || '';
     const line1 = addressLine || address_line;
     const houseNo = houseNumber || house_number;
@@ -43,7 +46,7 @@ router.post('/', authenticateToken, async (req, res) => {
     const sectorValue = sector || '';
     const deflt = isDefault !== undefined ? isDefault : (is_default || false);
 
-    if (!line1 || !houseNo) {
+    if (!line1 || !String(line1).trim() || !houseNo || !String(houseNo).trim()) {
       return res.status(400).json({
         success: false,
         error: { code: 'VALIDATION_ERROR', message: 'Address line and house number are required' },
@@ -79,13 +82,19 @@ router.post('/', authenticateToken, async (req, res) => {
       city || 'N/A',
       state || 'N/A',
       zip || '000000',
-      phone || '',
+      (phone || profile.phone || '').toString().trim(),
       deflt,
     ]);
 
     res.status(201).json({ success: true, data: { address: result.rows[0] } });
   } catch (error) {
     console.error('Add address error:', error);
+    if (error.code === '23502') {
+      return res.status(400).json({
+        success: false,
+        error: { code: 'VALIDATION_ERROR', message: 'Missing required address details. Please check your name/address fields.' },
+      });
+    }
     res.status(500).json({ success: false, error: { code: 'SERVER_ERROR', message: 'Internal server error' } });
   }
 });

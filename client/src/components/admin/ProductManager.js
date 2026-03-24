@@ -9,8 +9,6 @@ import toast from 'react-hot-toast';
 
 const emptyForm = () => ({
   name: '',
-  search_keywords: '',
-  price_per_kg: '',
   discount: '',
   category: '',
   stock_quantity: '',
@@ -29,6 +27,14 @@ const convertWeightRows = (rows = [], fromUnit = 'kg', toUnit = 'kg') => {
     const converted = fromUnit === 'g' ? (w / 1000) : (w * 1000);
     return { ...row, weight: String(Number(converted.toFixed(fromUnit === 'g' ? 3 : 0))) };
   });
+};
+
+const convertStockValue = (rawValue, fromUnit = 'kg', toUnit = 'kg') => {
+  if (fromUnit === toUnit) return rawValue;
+  const n = parseFloat(rawValue);
+  if (!Number.isFinite(n) || n < 0) return rawValue;
+  const converted = fromUnit === 'g' ? (n / 1000) : (n * 1000);
+  return String(Number(converted.toFixed(fromUnit === 'g' ? 3 : 0)));
 };
 
 const rowsToWeightOverrides = (rows = [], inputUnit = 'kg') => {
@@ -203,8 +209,10 @@ const ProductForm = ({
   handleImageChange,
   handleWeightUnitChange,
 }) => {
-  const priceLabel = formData.pricing_type === 'per_piece' ? 'Price per piece (Rs)' : 'Price per kg (Rs)';
-  const stockLabel = formData.pricing_type === 'per_piece' ? 'Stock (pieces)' : 'Stock (kg)';
+  const stockUnit = formData.weight_display_unit === 'g' ? 'g' : 'kg';
+  const stockLabel = formData.pricing_type === 'per_piece'
+    ? 'Stock (pieces)'
+    : `Stock (${stockUnit})`;
   const weightInputUnit = formData.weight_display_unit === 'g' ? 'g' : 'kg';
 
   return (
@@ -219,102 +227,90 @@ const ProductForm = ({
         />
       )}
 
-      <Input label="Product Name *" name="name" value={formData.name}
+      <Input label="Product Name" name="name" value={formData.name}
         onChange={handleInputChange} required className="w-full" />
 
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">Search keywords (optional)</label>
-        <textarea
-          name="search_keywords"
-          value={formData.search_keywords}
-          onChange={handleInputChange}
-          rows={2}
-          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-          placeholder="Synonyms: tomato, tamatar, टमाटर (comma-separated)"
-        />
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Input label={`${priceLabel} *`} name="price_per_kg" type="number"
-          step="0.01" min="0" value={formData.price_per_kg} onChange={handleInputChange}
-          required className="w-full" placeholder="0.00" />
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Input label="Discount (%)" name="discount" type="number" step="0.01" min="0" max="100"
           value={formData.discount} onChange={handleInputChange} className="w-full" placeholder="0" />
-        <Input label={`${stockLabel} *`} name="stock_quantity" type="number"
-          value={formData.stock_quantity} onChange={handleInputChange} required className="w-full" placeholder="0" />
+        <Input label={stockLabel} name="stock_quantity" type="number"
+          step={formData.pricing_type === 'per_piece' ? '1' : (stockUnit === 'g' ? '1' : '0.01')}
+          min="0"
+          value={formData.stock_quantity} onChange={handleInputChange} required className="w-full"
+          placeholder={stockUnit === 'g' ? 'e.g. 1000' : '0'} />
       </div>
-      {formData.pricing_type === 'per_kg' && (
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Custom weight tiers and prices (Rs)</label>
-          <div className="space-y-2">
-            {(formData.weight_price_rows || []).map((row, idx) => (
-              <div key={`weight-row-${idx}`} className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-end">
-                <div className="sm:col-span-5">
-                  <label className="block text-xs text-gray-500 mb-1">Weight ({weightInputUnit})</label>
-                  <input
-                    type="number"
-                    min={weightInputUnit === 'g' ? '1' : '0.01'}
-                    step={weightInputUnit === 'g' ? '1' : '0.01'}
-                    value={row.weight}
-                    onChange={(e) => {
-                      const next = [...(formData.weight_price_rows || [])];
-                      next[idx] = { ...next[idx], weight: e.target.value };
-                      handleInputChange({ target: { name: 'weight_price_rows', value: next, type: 'text' } });
-                    }}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                    placeholder={weightInputUnit === 'g' ? 'e.g. 750' : 'e.g. 0.75'}
-                  />
-                </div>
-                <div className="sm:col-span-5">
-                  <label className="block text-xs text-gray-500 mb-1">Price (Rs)</label>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={row.price}
-                    onChange={(e) => {
-                      const next = [...(formData.weight_price_rows || [])];
-                      next[idx] = { ...next[idx], price: e.target.value };
-                      handleInputChange({ target: { name: 'weight_price_rows', value: next, type: 'text' } });
-                    }}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                    placeholder="e.g. 59"
-                  />
-                </div>
-                <div className="sm:col-span-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => {
-                      const rows = formData.weight_price_rows || [];
-                      const next = rows.length <= 1 ? [{ weight: '', price: '' }] : rows.filter((_, i) => i !== idx);
-                      handleInputChange({ target: { name: 'weight_price_rows', value: next, type: 'text' } });
-                    }}
-                    className="w-full"
-                  >
-                    Remove
-                  </Button>
-                </div>
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">Custom weight tiers and prices (Rs)</label>
+        <div className="space-y-2">
+          {(formData.weight_price_rows || []).map((row, idx) => (
+            <div key={`weight-row-${idx}`} className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-end">
+              <div className="sm:col-span-5">
+                <label className="block text-xs text-gray-500 mb-1">
+                  {formData.pricing_type === 'per_piece' ? 'Pieces' : `Weight (${weightInputUnit})`}
+                </label>
+                <input
+                  type="number"
+                  min={formData.pricing_type === 'per_piece' ? '1' : (weightInputUnit === 'g' ? '1' : '0.01')}
+                  step={formData.pricing_type === 'per_piece' ? '1' : (weightInputUnit === 'g' ? '1' : '0.01')}
+                  value={row.weight}
+                  onChange={(e) => {
+                    const next = [...(formData.weight_price_rows || [])];
+                    next[idx] = { ...next[idx], weight: e.target.value };
+                    handleInputChange({ target: { name: 'weight_price_rows', value: next, type: 'text' } });
+                  }}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                  placeholder={formData.pricing_type === 'per_piece' ? 'e.g. 2' : (weightInputUnit === 'g' ? 'e.g. 750' : 'e.g. 0.75')}
+                />
               </div>
-            ))}
-          </div>
-          <div className="mt-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => {
-                const next = [...(formData.weight_price_rows || []), { weight: '', price: '' }];
-                handleInputChange({ target: { name: 'weight_price_rows', value: next, type: 'text' } });
-              }}
-            >
-              Add Weight Tier
-            </Button>
-          </div>
+              <div className="sm:col-span-5">
+                <label className="block text-xs text-gray-500 mb-1">Price (Rs)</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={row.price}
+                  onChange={(e) => {
+                    const next = [...(formData.weight_price_rows || [])];
+                    next[idx] = { ...next[idx], price: e.target.value };
+                    handleInputChange({ target: { name: 'weight_price_rows', value: next, type: 'text' } });
+                  }}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                  placeholder="e.g. 59"
+                />
+              </div>
+              <div className="sm:col-span-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    const rows = formData.weight_price_rows || [];
+                    const next = rows.length <= 1 ? [{ weight: '', price: '' }] : rows.filter((_, i) => i !== idx);
+                    handleInputChange({ target: { name: 'weight_price_rows', value: next, type: 'text' } });
+                  }}
+                  className="w-full"
+                >
+                  Remove
+                </Button>
+              </div>
+            </div>
+          ))}
         </div>
-      )}
+        <div className="mt-2">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => {
+              const next = [...(formData.weight_price_rows || []), { weight: '', price: '' }];
+              handleInputChange({ target: { name: 'weight_price_rows', value: next, type: 'text' } });
+            }}
+          >
+            Add Weight Tier
+          </Button>
+        </div>
+      </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">Category *</label>
+        <label className="block text-sm font-medium text-gray-700 mb-2">Category</label>
         <select name="category" value={formData.category} onChange={handleInputChange} required
           className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
           <option value="">Select Category</option>
@@ -409,7 +405,14 @@ const ProductManager = () => {
 
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
-    setFormData(prev => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
+    const nextValue = type === 'checkbox' ? checked : value;
+    setFormData((prev) => {
+      if (name === 'pricing_type') {
+        const nextType = nextValue === 'per_piece' ? 'per_piece' : 'per_kg';
+        return { ...prev, pricing_type: nextType, weight_display_unit: nextType === 'per_piece' ? 'kg' : prev.weight_display_unit };
+      }
+      return { ...prev, [name]: nextValue };
+    });
   };
 
   const handleWeightUnitChange = (nextUnit) => {
@@ -417,10 +420,12 @@ const ProductManager = () => {
       const currentUnit = prev.weight_display_unit === 'g' ? 'g' : 'kg';
       const targetUnit = nextUnit === 'g' ? 'g' : 'kg';
       const convertedRows = convertWeightRows(prev.weight_price_rows || [], currentUnit, targetUnit);
+      const convertedStock = convertStockValue(prev.stock_quantity, currentUnit, targetUnit);
       return {
         ...prev,
         weight_display_unit: targetUnit,
         weight_price_rows: convertedRows,
+        stock_quantity: convertedStock,
       };
     });
   };
@@ -453,13 +458,22 @@ const ProductManager = () => {
   const handleAddProduct = async (e) => {
     e.preventDefault();
     try {
+      const overrides = rowsToWeightOverrides(formData.weight_price_rows, formData.weight_display_unit);
+      if (Object.keys(overrides).length === 0) {
+        toast.error('Add at least one valid custom weight tier with price.');
+        return;
+      }
       setLoading(true);
       const fd = new FormData();
       Object.keys(formData).forEach((key) => {
         if (key === 'weight_price_rows') return;
+        if (key === 'price_per_kg') return;
         fd.append(key, formData[key]);
       });
-      fd.set('weight_price_overrides', JSON.stringify(rowsToWeightOverrides(formData.weight_price_rows, formData.weight_display_unit)));
+      if (formData.pricing_type !== 'per_piece') {
+        fd.set('stock_quantity', convertStockValue(formData.stock_quantity, formData.weight_display_unit, 'kg'));
+      }
+      fd.set('weight_price_overrides', JSON.stringify(overrides));
       selectedImages.slice(0, 6).forEach(img => fd.append('images', img));
       await api.post('/admin/products', fd);
       setShowAddModal(false);
@@ -476,13 +490,22 @@ const ProductManager = () => {
   const handleEditProduct = async (e) => {
     e.preventDefault();
     try {
+      const overrides = rowsToWeightOverrides(formData.weight_price_rows, formData.weight_display_unit);
+      if (Object.keys(overrides).length === 0) {
+        toast.error('Add at least one valid custom weight tier with price.');
+        return;
+      }
       setLoading(true);
       const fd = new FormData();
       Object.keys(formData).forEach(key => {
         if (key === 'weight_price_rows') return;
+        if (key === 'price_per_kg') return;
         if (formData[key] !== undefined && formData[key] !== null) fd.append(key, formData[key]);
       });
-      fd.set('weight_price_overrides', JSON.stringify(rowsToWeightOverrides(formData.weight_price_rows, formData.weight_display_unit)));
+      if (formData.pricing_type !== 'per_piece') {
+        fd.set('stock_quantity', convertStockValue(formData.stock_quantity, formData.weight_display_unit, 'kg'));
+      }
+      fd.set('weight_price_overrides', JSON.stringify(overrides));
       if (existingImages.length === 0 && selectedImages.length === 0) fd.set('image_url', '');
       if (selectedImages.length > 0) fd.append('images', selectedImages[0]);
       await api.put(`/admin/products/${selectedProduct.id}`, fd);
@@ -524,19 +547,20 @@ const ProductManager = () => {
   };
 
   const openEditModal = (product) => {
+    const displayUnit = product.weight_display_unit === 'g' ? 'g' : 'kg';
     setSelectedProduct(product);
     setFormData({
       name: product.name,
-      search_keywords: product.search_keywords || '',
-      price_per_kg: product.price_per_kg || '',
       discount: product.discount || '',
       category: product.category || '',
-      stock_quantity: product.quantity_available || '',
+      stock_quantity: product.pricing_type === 'per_piece'
+        ? (product.quantity_available || '')
+        : convertStockValue(product.quantity_available || '', 'kg', displayUnit),
       image_url: product.image_url || '',
       is_active: product.is_active,
       pricing_type: product.pricing_type || 'per_kg',
-      weight_display_unit: product.weight_display_unit === 'g' ? 'g' : 'kg',
-      weight_price_rows: weightOverridesToRows(product.weight_price_overrides || {}, product.weight_display_unit === 'g' ? 'g' : 'kg'),
+      weight_display_unit: displayUnit,
+      weight_price_rows: weightOverridesToRows(product.weight_price_overrides || {}, displayUnit),
     });
     setExistingImages(product.image_url ? [{ id: product.id, url: product.image_url }] : []);
     setImagePreview([]);
@@ -544,7 +568,24 @@ const ProductManager = () => {
     setShowEditModal(true);
   };
 
-  const priceDisplay = (p) => `₹${p.price_per_kg}/${p.pricing_type === 'per_piece' ? 'pc' : 'kg'}`;
+  const priceDisplay = (p) => {
+    const entries = Object.entries(p.weight_price_overrides || {})
+      .map(([weight, price]) => ({ w: parseFloat(weight), p: parseFloat(price) }))
+      .filter((row) => Number.isFinite(row.w) && row.w > 0 && Number.isFinite(row.p) && row.p >= 0)
+      .sort((a, b) => a.w - b.w);
+    const firstPrice = entries.length > 0 ? entries[0].p : 0;
+    return `₹${firstPrice}/${p.pricing_type === 'per_piece' ? 'pc' : 'kg'}`;
+  };
+  const getStockStep = (p) => {
+    if (p.pricing_type === 'per_piece') return 1;
+    return p.weight_display_unit === 'g' ? 0.05 : 1;
+  };
+  const formatStock = (p) => {
+    const qty = Number(p.quantity_available || 0);
+    if (p.pricing_type === 'per_piece') return `${qty} pc`;
+    if (p.weight_display_unit === 'g') return `${Math.round(qty * 1000)} g`;
+    return `${qty} kg`;
+  };
 
   if (loading && products.length === 0) return <Loading />;
 
@@ -577,7 +618,7 @@ const ProductManager = () => {
                 <p className="text-xs text-gray-500 mt-0.5">{product.category || 'Uncategorized'}</p>
                 <p className="text-xs font-medium text-gray-700 mt-1">{priceDisplay(product)}</p>
                 <p className="text-xs text-gray-500 mt-1">
-                  Stock: {product.quantity_available}{product.pricing_type === 'per_piece' ? ' pc' : ' kg'}
+                  Stock: {formatStock(product)}
                 </p>
               </div>
               <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${product.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
@@ -612,15 +653,21 @@ const ProductManager = () => {
                   Stock
                   <div className="mt-1 flex space-x-1">
                     <button onClick={() => {
-                      if (window.confirm('Add 10 to all products stock?')) {
-                        products.forEach(p => handleStockUpdate(p.id, (parseFloat(p.quantity_available) || 0) + 10));
+                      if (window.confirm('Add stock by configured unit step for all products?')) {
+                        products.forEach(p => {
+                          const step = getStockStep(p);
+                          handleStockUpdate(p.id, parseFloat(((parseFloat(p.quantity_available) || 0) + step).toFixed(2)));
+                        });
                       }
-                    }} className="text-xs bg-blue-100 hover:bg-blue-200 text-blue-600 px-2 py-0.5 rounded">+10 All</button>
+                    }} className="text-xs bg-blue-100 hover:bg-blue-200 text-blue-600 px-2 py-0.5 rounded">+1 Step All</button>
                     <button onClick={() => {
-                      if (window.confirm('Subtract 10 from all products stock?')) {
-                        products.forEach(p => handleStockUpdate(p.id, Math.max(0, (parseFloat(p.quantity_available) || 0) - 10)));
+                      if (window.confirm('Subtract stock by configured unit step for all products?')) {
+                        products.forEach(p => {
+                          const step = getStockStep(p);
+                          handleStockUpdate(p.id, Math.max(0, parseFloat(((parseFloat(p.quantity_available) || 0) - step).toFixed(2))));
+                        });
                       }
-                    }} className="text-xs bg-orange-100 hover:bg-orange-200 text-orange-600 px-2 py-0.5 rounded">-10 All</button>
+                    }} className="text-xs bg-orange-100 hover:bg-orange-200 text-orange-600 px-2 py-0.5 rounded">-1 Step All</button>
                   </div>
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
@@ -657,12 +704,12 @@ const ProductManager = () => {
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">{priceDisplay(product)}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm">
                     <div className="flex items-center space-x-1">
-                      <button onClick={() => handleStockUpdate(product.id, (parseFloat(product.quantity_available) || 0) + 1)}
+                      <button onClick={() => handleStockUpdate(product.id, parseFloat(((parseFloat(product.quantity_available) || 0) + getStockStep(product)).toFixed(2)))}
                         className="w-6 h-6 bg-green-100 hover:bg-green-200 text-green-700 rounded-full flex items-center justify-center text-xs font-bold">+</button>
                       <span className="font-medium min-w-[2.5rem] text-center">
-                        {product.quantity_available}{product.pricing_type === 'per_piece' ? ' pc' : ' kg'}
+                        {formatStock(product)}
                       </span>
-                      <button onClick={() => handleStockUpdate(product.id, Math.max(0, (parseFloat(product.quantity_available) || 0) - 1))}
+                      <button onClick={() => handleStockUpdate(product.id, Math.max(0, parseFloat(((parseFloat(product.quantity_available) || 0) - getStockStep(product)).toFixed(2))))}
                         className="w-6 h-6 bg-red-100 hover:bg-red-200 text-red-700 rounded-full flex items-center justify-center text-xs font-bold">−</button>
                     </div>
                   </td>

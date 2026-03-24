@@ -26,6 +26,13 @@ const { collectCspConnectOrigins } = require('./utils/cspOrigins');
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+if (process.env.NODE_ENV === 'production') {
+  const hasRazorpay = !!(process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET);
+  if (!hasRazorpay) {
+    console.warn('⚠️ Razorpay keys are missing in production. Online payment will be unavailable.');
+  }
+}
+
 // Behind Nginx / Cloudflare / ALB — required for correct client IP in rate limiting
 if (process.env.NODE_ENV === 'production') {
   const hops = parseInt(process.env.TRUST_PROXY_HOPS, 10);
@@ -41,7 +48,7 @@ if (process.env.NODE_ENV === 'production') {
         defaultSrc: ["'self'"],
         connectSrc,
         styleSrc: ["'self'", "'unsafe-inline'"],
-        scriptSrc: ["'self'"],
+        scriptSrc: ["'self'", 'https://checkout.razorpay.com'],
         imgSrc: ["'self'", 'data:', 'https:', 'http://localhost:5000', 'http://localhost:3000'],
       },
     },

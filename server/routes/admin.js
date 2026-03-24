@@ -63,6 +63,48 @@ const parseAndNormalizeWeightOverrides = (raw) => {
   return normalized;
 };
 
+const slugify = (value = '') => String(value)
+  .toLowerCase()
+  .trim()
+  .replace(/[^a-z0-9\s-]/g, '')
+  .replace(/\s+/g, '-')
+  .replace(/-+/g, '-')
+  .replace(/^-+|-+$/g, '');
+
+const generateUniqueProductSlug = async (client, name, excludeId = null) => {
+  const base = slugify(name) || `product-${Date.now()}`;
+  let next = base;
+  let suffix = 1;
+  while (true) {
+    const exists = await client.query(
+      excludeId
+        ? 'SELECT 1 FROM products WHERE slug = $1 AND id != $2 LIMIT 1'
+        : 'SELECT 1 FROM products WHERE slug = $1 LIMIT 1',
+      excludeId ? [next, excludeId] : [next],
+    );
+    if (exists.rows.length === 0) return next;
+    suffix += 1;
+    next = `${base}-${suffix}`;
+  }
+};
+
+const validateWeightOverridesForPricingType = (pricingType, overrides) => {
+  if (Object.keys(overrides || {}).length === 0) {
+    throw new Error(`At least one valid weight tier is required for ${pricingType}`);
+  }
+};
+
+const getFirstTierPrice = (overrides = {}) => {
+  const sortedKeys = Object.keys(overrides)
+    .map((k) => parseFloat(k))
+    .filter((n) => Number.isFinite(n) && n > 0)
+    .sort((a, b) => a - b);
+  if (sortedKeys.length === 0) return 0;
+  const firstKey = sortedKeys[0].toFixed(2);
+  const firstPrice = parseFloat(overrides[firstKey]);
+  return Number.isFinite(firstPrice) ? firstPrice : 0;
+};
+
 // Apply admin auth to all routes
 router.use(authenticateToken, requireAdmin);
 
@@ -240,14 +282,14 @@ router.get('/products', async (req, res) => {
 router.post('/products', upload.array('images', 10), handleUploadError, async (req, res) => {
   try {
     const {
-      name, description, price_per_kg, discount, category, stock_quantity, is_active, pricing_type,
+      name, description, discount, category, stock_quantity, is_active, pricing_type,
       search_keywords, weight_display_unit, weight_price_overrides,
     } = req.body;
 
     // Validate required fields
-    if (!name || !price_per_kg) {
+    if (!name) {
       return res.status(400).json({
-        message: 'Missing required fields: name, price_per_kg',
+        message: 'Missing required fields: name',
       });
     }
 
@@ -267,39 +309,52 @@ router.post('/products', upload.array('images', 10), handleUploadError, async (r
       ? 'kg'
       : (wduRaw === 'g' ? 'g' : 'kg');
 
-    // Create product
-    const newProduct = await pool.query(`
-      INSERT INTO products (
-        name, description, category, image_url, price_per_kg, discount,
-        quantity_available, is_active, pricing_type, search_keywords, weight_display_unit, created_at, updated_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW(), NOW())
-      RETURNING *
-    `, [
-      name, description || '', category || 'Uncategorized', imageUrl,
-      parseFloat(price_per_kg) || 0, parseFloat(discount) || 0,
-      parseFloat(stock_quantity) || 0,
-      is_active !== 'false' && is_active !== false,
-      validPricingType,
-      (search_keywords && String(search_keywords).trim()) || null,
-      weightDisplayUnit,
-    ]);
-
-    const product = newProduct.rows[0];
     let parsedOverrides;
     try {
       parsedOverrides = parseAndNormalizeWeightOverrides(weight_price_overrides);
+      validateWeightOverridesForPricingType(validPricingType, parsedOverrides);
     } catch (e) {
       return res.status(400).json({ message: e.message });
     }
-    for (const [weightKey, overridePrice] of Object.entries(parsedOverrides)) {
-      const weightVal = parseFloat(weightKey);
-      await pool.query(
-        `INSERT INTO product_weight_prices (product_id, weight_option, price_override)
-         VALUES ($1, $2, $3)
-         ON CONFLICT (product_id, weight_option) DO UPDATE
-         SET price_override = EXCLUDED.price_override, updated_at = CURRENT_TIMESTAMP`,
-        [product.id, weightVal, overridePrice],
-      );
+
+    const client = await pool.pool.connect();
+    let product;
+    try {
+      await client.query('BEGIN');
+      const firstTierPrice = getFirstTierPrice(parsedOverrides);
+      const newProduct = await client.query(`
+        INSERT INTO products (
+          name, slug, description, category, image, image_url, price_per_kg, discount,
+          quantity_available, is_active, pricing_type, search_keywords, weight_display_unit, created_at, updated_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW(), NOW())
+        RETURNING *
+      `, [
+        name, await generateUniqueProductSlug(client, name), description || '', category || 'Uncategorized', imageUrl, imageUrl,
+        firstTierPrice, parseFloat(discount) || 0,
+        parseFloat(stock_quantity) || 0,
+        is_active !== 'false' && is_active !== false,
+        validPricingType,
+        (search_keywords && String(search_keywords).trim()) || null,
+        weightDisplayUnit,
+      ]);
+      product = newProduct.rows[0];
+
+      for (const [weightKey, overridePrice] of Object.entries(parsedOverrides)) {
+        const weightVal = parseFloat(weightKey);
+        await client.query(
+          `INSERT INTO product_weight_prices (product_id, weight_option, price_override)
+           VALUES ($1, $2, $3)
+           ON CONFLICT (product_id, weight_option) DO UPDATE
+           SET price_override = EXCLUDED.price_override, updated_at = CURRENT_TIMESTAMP`,
+          [product.id, weightVal, overridePrice],
+        );
+      }
+      await client.query('COMMIT');
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
     }
 
     // Promo notifications: discounted and fresh item alerts
@@ -340,7 +395,6 @@ router.post('/products', upload.array('images', 10), handleUploadError, async (r
 // @access  Admin
 router.put('/products/:id', upload.array('images', 1), handleUploadError, [
   body('name').optional().trim().notEmpty().withMessage('Product name is required'),
-  body('price_per_kg').optional().isFloat({ min: 0 }).withMessage('Price per kg must be a positive number'),
   body('discount').optional().isFloat({ min: 0, max: 100 }).withMessage('Discount must be between 0 and 100'),
 ], async (req, res) => {
   try {
@@ -353,14 +407,18 @@ router.put('/products/:id', upload.array('images', 1), handleUploadError, [
     const updateData = req.body || {};
 
     // Check if product exists
-    const existingProduct = await pool.query('SELECT id, discount, name FROM products WHERE id = $1', [id]);
+    const existingProduct = await pool.query('SELECT id, discount, name, pricing_type FROM products WHERE id = $1', [id]);
     if (existingProduct.rows.length === 0) {
       return res.status(404).json({ message: 'Product not found' });
     }
     const previousDiscount = parseFloat(existingProduct.rows[0].discount || 0);
 
     // Handle new image if uploaded
-    if (req.files && req.files.length > 0) updateData.image_url = toPublicUploadPath(req.files[0]);
+    if (req.files && req.files.length > 0) {
+      const uploaded = toPublicUploadPath(req.files[0]);
+      updateData.image_url = uploaded;
+      updateData.image = uploaded;
+    }
 
     // Map stock_quantity form field to quantity_available column
     if (updateData.stock_quantity !== undefined) {
@@ -369,7 +427,7 @@ router.put('/products/:id', upload.array('images', 1), handleUploadError, [
     }
 
     // Columns that don't exist in the schema — skip them
-    const skipKeys = new Set(['id', 'slug', 'image', 'category_id', 'sku', 'weight',
+    const skipKeys = new Set(['id', 'slug', 'category_id', 'sku', 'weight',
       'is_featured', 'is_bestseller', 'is_new_arrival', 'images', 'remaining_image_ids']);
 
     // Build update query dynamically
@@ -379,6 +437,9 @@ router.put('/products/:id', upload.array('images', 1), handleUploadError, [
 
     const weightPriceOverridesRaw = updateData.weight_price_overrides;
     delete updateData.weight_price_overrides;
+    const nextPricingType = ['per_kg', 'per_piece'].includes(updateData.pricing_type)
+      ? updateData.pricing_type
+      : (existingProduct.rows[0].pricing_type || 'per_kg');
     Object.keys(updateData).forEach(key => {
       if (!skipKeys.has(key) && updateData[key] !== undefined && updateData[key] !== null) {
         paramCount++;
@@ -388,34 +449,75 @@ router.put('/products/:id', upload.array('images', 1), handleUploadError, [
     });
 
     updateFields.push('updated_at = CURRENT_TIMESTAMP');
-    updateValues.push(id);
-    paramCount++;
 
-    const updateQuery = `
-      UPDATE products 
-      SET ${updateFields.join(', ')}
-      WHERE id = $${paramCount}
-      RETURNING *
-    `;
-
-    const updatedProduct = await pool.query(updateQuery, updateValues);
-    const updated = updatedProduct.rows[0];
+    let parsedOverrides;
     if (weightPriceOverridesRaw !== undefined) {
-      let parsed;
       try {
-        parsed = parseAndNormalizeWeightOverrides(weightPriceOverridesRaw);
+        parsedOverrides = parseAndNormalizeWeightOverrides(weightPriceOverridesRaw);
       } catch (e) {
         return res.status(400).json({ message: e.message });
       }
-      await pool.query('DELETE FROM product_weight_prices WHERE product_id = $1', [id]);
-      for (const [weightKey, overridePrice] of Object.entries(parsed)) {
-        const weightVal = parseFloat(weightKey);
-        await pool.query(
-          `INSERT INTO product_weight_prices (product_id, weight_option, price_override)
-           VALUES ($1, $2, $3)`,
-          [id, weightVal, overridePrice],
-        );
+    }
+
+    const client = await pool.pool.connect();
+    let updated;
+    try {
+      await client.query('BEGIN');
+      const existingTiersResult = await client.query(
+        'SELECT weight_option, price_override FROM product_weight_prices WHERE product_id = $1',
+        [id],
+      );
+      const effectiveOverrides = parsedOverrides !== undefined
+        ? parsedOverrides
+        : existingTiersResult.rows.reduce((acc, row) => {
+          const key = Number(row.weight_option).toFixed(2);
+          acc[key] = parseFloat(row.price_override);
+          return acc;
+        }, {});
+      try {
+        validateWeightOverridesForPricingType(nextPricingType, effectiveOverrides);
+      } catch (e) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({ message: e.message });
       }
+      if (parsedOverrides !== undefined) {
+        const firstTierPrice = getFirstTierPrice(parsedOverrides);
+        const existingPriceIdx = updateFields.findIndex((f) => f.startsWith('price_per_kg = '));
+        if (existingPriceIdx >= 0) {
+          updateValues[existingPriceIdx] = firstTierPrice;
+        } else {
+          paramCount += 1;
+          updateFields.push(`price_per_kg = $${paramCount}`);
+          updateValues.push(firstTierPrice);
+        }
+      }
+      updateValues.push(id);
+      paramCount += 1;
+      const updateQuery = `
+        UPDATE products 
+        SET ${updateFields.join(', ')}
+        WHERE id = $${paramCount}
+        RETURNING *
+      `;
+      const updatedProduct = await client.query(updateQuery, updateValues);
+      updated = updatedProduct.rows[0];
+      if (weightPriceOverridesRaw !== undefined) {
+        await client.query('DELETE FROM product_weight_prices WHERE product_id = $1', [id]);
+        for (const [weightKey, overridePrice] of Object.entries(parsedOverrides || {})) {
+          const weightVal = parseFloat(weightKey);
+          await client.query(
+            `INSERT INTO product_weight_prices (product_id, weight_option, price_override)
+             VALUES ($1, $2, $3)`,
+            [id, weightVal, overridePrice],
+          );
+        }
+      }
+      await client.query('COMMIT');
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
     }
     const nextDiscount = parseFloat(updated.discount || 0);
 
@@ -608,6 +710,10 @@ router.post('/orders', async (req, res) => {
       const p = productsById.get(item.product_id);
       const qty = parseFloat(item.quantity_kg || 0);
       if (!p || !p.is_active || !Number.isFinite(qty) || qty <= 0) return res.status(400).json({ message: 'Invalid items in order' });
+      const hasTiers = productWeightRows.rows.some(r => r.product_id === p.id);
+      if (hasTiers && !overrideMap.has(`${p.id}:${qty.toFixed(2)}`)) {
+        return res.status(400).json({ message: `${p.name} must use admin-defined weight tiers` });
+      }
       const overrideKey = `${p.id}:${qty.toFixed(2)}`;
       const overridePrice = overrideMap.get(overrideKey);
       const basePrice = parseFloat(p.price_per_kg || 0);

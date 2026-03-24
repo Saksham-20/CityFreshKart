@@ -226,6 +226,33 @@ async function setupDatabase() {
         await pool.query(fs.readFileSync(googleWeightPath, 'utf8'));
         console.log('✅ google auth and weight override columns ensured');
       }
+
+      // Seed representative custom weight tiers for per-kg products
+      const tierSeed = {
+        Tomatoes: { '0.50': 22, '0.75': 31, '1.00': 40 },
+        Onions: { '0.50': 16, '1.00': 30, '2.00': 58 },
+        Potatoes: { '0.50': 14, '1.00': 24, '2.00': 46 },
+        Mangoes: { '0.50': 70, '1.00': 120, '1.50': 172 },
+      };
+      const names = Object.keys(tierSeed);
+      const productLookup = await pool.query(
+        'SELECT id, name FROM products WHERE name = ANY($1::text[])',
+        [names],
+      );
+      for (const p of productLookup.rows) {
+        const rows = tierSeed[p.name] || {};
+        await pool.query('DELETE FROM product_weight_prices WHERE product_id = $1', [p.id]);
+        for (const [weightStr, price] of Object.entries(rows)) {
+          await pool.query(
+            `INSERT INTO product_weight_prices (product_id, weight_option, price_override)
+             VALUES ($1, $2, $3)
+             ON CONFLICT (product_id, weight_option)
+             DO UPDATE SET price_override = EXCLUDED.price_override, updated_at = CURRENT_TIMESTAMP`,
+            [p.id, parseFloat(weightStr), price],
+          );
+        }
+      }
+      console.log('✅ Seeded product weight tiers for sample products');
     } catch (error) {
       console.error('❌ Sample products sync failed:', error.message);
       throw error;
