@@ -87,7 +87,7 @@ const Navigation = () => {
   return (
     <nav className="hidden lg:flex items-center space-x-8">
       <Link to="/" className="flex items-center">
-        <img src="/CityFreshKart.svg" alt="CityFreshKart" className="h-8 w-auto object-contain" />
+        <img src="/CityFreshKart.png" alt="CityFreshKart" className="h-8 w-auto object-contain" />
       </Link>
       {/* Main Navigation Items */}
       {navigationItems.map((item) => (

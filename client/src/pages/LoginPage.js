@@ -44,6 +44,7 @@ const LoginPage = () => {
         {/* Brand */}
         <div className="relative z-10">
           <div className="flex items-center gap-2 mb-3">
+            <img src="/CityFreshKart.png" alt="CityFreshKart" className="h-10 w-auto object-contain" />
             <span className="text-2xl font-headline font-extrabold tracking-tight">CityFreshKart</span>
           </div>
           <p className="text-on-primary/90 text-sm font-medium">India&apos;s freshest produce, delivered in 30 minutes.</p>

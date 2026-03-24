@@ -44,7 +44,7 @@ const AdminLayout = ({ children }) => {
               </button>
               <Link to="/admin" className="flex items-center">
                 <img
-                  src="/CityFreshKart.svg"
+                  src="/CityFreshKart.png"
                   alt="CityFreshKart"
                   className="h-7 sm:h-8 w-auto object-contain"
                 />
