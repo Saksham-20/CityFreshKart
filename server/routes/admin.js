@@ -113,6 +113,19 @@ const parseNonNegativeNumber = (value, fallback = 0) => {
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
 };
 
+const normalizeOptionalNumeric = (value) => {
+  if (value === undefined || value === null) return undefined;
+  if (typeof value === 'string' && value.trim() === '') return undefined;
+  const parsed = parseFloat(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
+};
+
+const firstValidationMessage = (errors) => {
+  const arr = errors && typeof errors.array === 'function' ? errors.array() : [];
+  if (!Array.isArray(arr) || arr.length === 0) return 'Invalid request';
+  return arr[0]?.msg || 'Invalid request';
+};
+
 const mapProductWriteError = (error) => {
   if (!error) return { status: 500, message: 'Server error' };
   if (error.status && error.message) return { status: error.status, message: error.message };
@@ -429,11 +442,17 @@ router.post('/products', upload.array('images', 10), handleUploadError, async (r
     });
 
   } catch (error) {
-    console.error('Create product error:', error);
+    console.error('Create product error:', {
+      requestId: req.id,
+      code: error?.code,
+      constraint: error?.constraint,
+      message: error?.message,
+    });
     const mapped = mapProductWriteError(error);
     res.status(mapped.status).json({
       success: false,
       message: mapped.message,
+      requestId: req.id,
       error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error',
     });
   }
@@ -444,12 +463,12 @@ router.post('/products', upload.array('images', 10), handleUploadError, async (r
 // @access  Admin
 router.put('/products/:id', upload.array('images', 1), handleUploadError, [
   body('name').optional().trim().notEmpty().withMessage('Product name is required'),
-  body('discount').optional().isFloat({ min: 0, max: 100 }).withMessage('Discount must be between 0 and 100'),
+  body('discount').optional({ values: 'falsy' }).isFloat({ min: 0, max: 100 }).withMessage('Discount must be between 0 and 100'),
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      return res.status(400).json({ errors: errors.array() });
+      return res.status(400).json({ message: firstValidationMessage(errors), errors: errors.array() });
     }
 
     const { id } = req.params;
@@ -474,6 +493,19 @@ router.put('/products/:id', upload.array('images', 1), handleUploadError, [
       updateData.quantity_available = parseFloat(updateData.stock_quantity) || 0;
       delete updateData.stock_quantity;
     }
+
+    // Normalize numeric inputs (multipart can send empty strings) to avoid PostgreSQL cast errors.
+    const discountNum = normalizeOptionalNumeric(updateData.discount);
+    if (discountNum !== undefined) updateData.discount = discountNum;
+    else if (updateData.discount === '') delete updateData.discount;
+
+    const qtyAvailNum = normalizeOptionalNumeric(updateData.quantity_available);
+    if (qtyAvailNum !== undefined) updateData.quantity_available = qtyAvailNum;
+    else if (updateData.quantity_available === '') delete updateData.quantity_available;
+
+    const priceNum = normalizeOptionalNumeric(updateData.price_per_kg);
+    if (priceNum !== undefined) updateData.price_per_kg = priceNum;
+    else if (updateData.price_per_kg === '') delete updateData.price_per_kg;
 
     // Columns that don't exist in the schema — skip them
     const skipKeys = new Set(['id', 'slug', 'category_id', 'sku', 'weight',
@@ -588,8 +620,15 @@ router.put('/products/:id', upload.array('images', 1), handleUploadError, [
     });
 
   } catch (error) {
-    console.error('Update product error:', error);
-    res.status(500).json({ success: false, message: 'Server error' });
+    console.error('Update product error:', {
+      requestId: req.id,
+      productId: req.params?.id,
+      code: error?.code,
+      constraint: error?.constraint,
+      message: error?.message,
+    });
+    const mapped = mapProductWriteError(error);
+    res.status(mapped.status).json({ success: false, message: mapped.message, requestId: req.id });
   }
 });
 
@@ -607,6 +646,8 @@ router.delete('/products/:id', async (req, res) => {
       await client.query('ROLLBACK');
       return res.status(404).json({ message: 'Product not found' });
     }
+    // Keep order history intact (order_items snapshots name/price), but unlink FK to allow catalog deletion.
+    await client.query('UPDATE order_items SET product_id = NULL WHERE product_id = $1', [id]);
     await client.query('DELETE FROM product_weight_prices WHERE product_id = $1', [id]);
     const result = await client.query('DELETE FROM products WHERE id = $1 RETURNING id, name', [id]);
     await client.query('COMMIT');
@@ -618,10 +659,16 @@ router.delete('/products/:id', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Delete product error:', error);
+    console.error('Delete product error:', {
+      requestId: req.id,
+      productId: req.params?.id,
+      code: error?.code,
+      constraint: error?.constraint,
+      message: error?.message,
+    });
     try { await client.query('ROLLBACK'); } catch (_) {}
     const mapped = mapProductWriteError(error);
-    res.status(mapped.status).json({ success: false, message: mapped.message });
+    res.status(mapped.status).json({ success: false, message: mapped.message, requestId: req.id });
   } finally {
     client.release();
   }

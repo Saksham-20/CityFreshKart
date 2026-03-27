@@ -501,7 +501,9 @@ const ProductManager = () => {
       fetchProducts();
       toast.success('Product created successfully!');
     } catch (error) {
-      toast.error(error.response?.data?.message || 'Failed to add product');
+      const msg = error.response?.data?.message || 'Failed to add product';
+      const rid = error.response?.data?.requestId;
+      toast.error(rid ? `${msg} (ref: ${rid})` : msg);
     } finally {
       setLoading(false);
     }
@@ -538,7 +540,9 @@ const ProductManager = () => {
       fetchProducts();
       toast.success('Product updated successfully!');
     } catch (error) {
-      toast.error(error.response?.data?.message || 'Failed to update product');
+      const msg = error.response?.data?.message || 'Failed to update product';
+      const rid = error.response?.data?.requestId;
+      toast.error(rid ? `${msg} (ref: ${rid})` : msg);
     } finally {
       setLoading(false);
     }
@@ -552,8 +556,10 @@ const ProductManager = () => {
       setSelectedProduct(null);
       fetchProducts();
       toast.success('Product permanently deleted.');
-    } catch {
-      toast.error('Failed to delete product.');
+    } catch (error) {
+      const msg = error.response?.data?.message || 'Failed to delete product.';
+      const rid = error.response?.data?.requestId;
+      toast.error(rid ? `${msg} (ref: ${rid})` : msg);
     } finally {
       setLoading(false);
     }

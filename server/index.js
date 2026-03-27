@@ -22,16 +22,11 @@ const addressRoutes = require('./routes/addresses');
 const notificationRoutes = require('./routes/notifications');
 const marketingRoutes = require('./routes/marketing');
 const { collectCspConnectOrigins } = require('./utils/cspOrigins');
+const { errorLogger, logger } = require('./utils/logger');
+const crypto = require('crypto');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
-
-if (process.env.NODE_ENV === 'production') {
-  const hasRazorpay = !!(process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET);
-  if (!hasRazorpay) {
-    console.warn('⚠️ Razorpay keys are missing in production. Online payment will be unavailable.');
-  }
-}
 
 // Behind Nginx / Cloudflare / ALB — required for correct client IP in rate limiting
 if (process.env.NODE_ENV === 'production') {
@@ -57,6 +52,13 @@ if (process.env.NODE_ENV === 'production') {
 
 // Middleware - order matters! CORS should be first
 app.use(compression());
+
+// Request correlation ID (also returned to clients for support)
+app.use((req, res, next) => {
+  req.id = crypto.randomUUID();
+  res.setHeader('x-request-id', req.id);
+  next();
+});
 
 // CORS configuration
 const corsOptions = {
@@ -136,9 +138,7 @@ app.use('/api/products', productRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/admin', adminRoutes);
-console.log('✅ Admin routes registered at /api/admin');
 app.use('/api/razorpay', razorpayRoutes);
-console.log('✅ Razorpay routes registered at /api/razorpay');
 app.use('/api/cart', cartRoutes);
 app.use('/api/addresses', addressRoutes);
 app.use('/api/notifications', notificationRoutes);
@@ -161,7 +161,10 @@ app.get('/api/settings', async (req, res) => {
     result.rows.forEach(row => { settings[row.key] = row.value; });
     res.json({ success: true, data: settings });
   } catch (error) {
-    console.error('GET /api/settings: database error, returning defaults', error.message);
+    logger.error('GET /api/settings database error; returning defaults', {
+      message: error.message,
+      stack: error.stack,
+    });
     res.json({ success: true, data: { free_delivery_threshold: '300', delivery_fee: '50', min_order_amount: '0' } });
   }
 });
@@ -179,13 +182,14 @@ if (process.env.NODE_ENV === 'production') {
 }
 
 // Error handling middleware
+app.use(errorLogger);
 app.use((err, req, res, next) => {
-  console.error(err.stack);
   res.status(err.status || 500).json({
     success: false,
     error: {
       code: err.code || 'SERVER_ERROR',
       message: process.env.NODE_ENV === 'development' ? err.message : 'Internal server error',
+      requestId: req.id,
     },
   });
 });
@@ -203,11 +207,9 @@ async function startServer() {
     await setupDatabase();
 
     // Start the server
-    app.listen(PORT, () => {
-      console.log(`🚀 CityFreshKart server running on port ${PORT} [${process.env.NODE_ENV || 'development'}]`);
-    });
+    app.listen(PORT);
   } catch (error) {
-    console.error('❌ Failed to start server:', error);
+    logger.error('Failed to start server', { message: error.message, stack: error.stack });
     process.exit(1);
   }
 }

@@ -1,7 +1,7 @@
 const winston = require('winston');
 const path = require('path');
 
-// Define log levels
+// Only errors (no http/info/warn noise). Override with LOG_LEVEL=error|warn|info if needed.
 const levels = {
   error: 0,
   warn: 1,
@@ -10,33 +10,11 @@ const levels = {
   debug: 4,
 };
 
-// Define colors for each level
-const colors = {
-  error: 'red',
-  warn: 'yellow',
-  info: 'green',
-  http: 'magenta',
-  debug: 'white',
+const resolveLevel = () => {
+  const fromEnv = (process.env.LOG_LEVEL || '').toLowerCase();
+  if (['error', 'warn', 'info', 'http', 'debug'].includes(fromEnv)) return fromEnv;
+  return 'error';
 };
-
-// Tell winston that you want to link the colors
-winston.addColors(colors);
-
-// Define which level to log based on environment
-const level = () => {
-  const env = process.env.NODE_ENV || 'development';
-  const isDevelopment = env === 'development';
-  return isDevelopment ? 'debug' : 'warn';
-};
-
-// Define different log formats
-const logFormat = winston.format.combine(
-  winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss:ms' }),
-  winston.format.colorize({ all: true }),
-  winston.format.printf(
-    (info) => `${info.timestamp} ${info.level}: ${info.message}`,
-  ),
-);
 
 const fileFormat = winston.format.combine(
   winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss:ms' }),
@@ -44,90 +22,58 @@ const fileFormat = winston.format.combine(
   winston.format.json(),
 );
 
-// Define transports
-const transports = [
-  // Console transport
-  new winston.transports.Console({
-    format: logFormat,
-  }),
+const consoleFormat = winston.format.combine(
+  winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss:ms' }),
+  winston.format.errors({ stack: true }),
+  winston.format.json(),
+);
 
-  // Error log file
+const transports = [
+  new winston.transports.Console({
+    level: resolveLevel(),
+    format: consoleFormat,
+  }),
   new winston.transports.File({
     filename: path.join('logs', 'error.log'),
     level: 'error',
     format: fileFormat,
-    maxsize: 5242880, // 5MB
-    maxFiles: 5,
-  }),
-
-  // Combined log file
-  new winston.transports.File({
-    filename: path.join('logs', 'combined.log'),
-    format: fileFormat,
-    maxsize: 5242880, // 5MB
+    maxsize: 5242880,
     maxFiles: 5,
   }),
 ];
 
-// Create the logger
 const logger = winston.createLogger({
-  level: level(),
+  level: resolveLevel(),
   levels,
   format: fileFormat,
   transports,
   exitOnError: false,
 });
 
-// Create logs directory if it doesn't exist
 const fs = require('fs');
 const logsDir = path.join(process.cwd(), 'logs');
 if (!fs.existsSync(logsDir)) {
   fs.mkdirSync(logsDir, { recursive: true });
 }
 
-// Add request logging middleware
-const requestLogger = (req, res, next) => {
-  const start = Date.now();
+/** No-op: per-request logging disabled (errors only). */
+const requestLogger = (req, res, next) => next();
 
-  res.on('finish', () => {
-    const duration = Date.now() - start;
-    const logData = {
-      method: req.method,
-      url: req.originalUrl,
-      status: res.statusCode,
-      duration: `${duration}ms`,
-      ip: req.ip || req.connection.remoteAddress,
-      userAgent: req.get('User-Agent'),
-      timestamp: new Date().toISOString(),
-    };
-
-    if (res.statusCode >= 400) {
-      logger.warn('HTTP Request', logData);
-    } else {
-      logger.http('HTTP Request', logData);
-    }
-  });
-
-  next();
-};
-
-// Add error logging middleware
 const errorLogger = (err, req, res, next) => {
-  const errorData = {
+  logger.error('Application Error', {
+    requestId: req.id,
     error: err.message,
     stack: err.stack,
+    code: err.code,
     method: req.method,
     url: req.originalUrl,
-    ip: req.ip || req.connection.remoteAddress,
+    ip: req.ip || req.connection?.remoteAddress,
     userAgent: req.get('User-Agent'),
     timestamp: new Date().toISOString(),
-  };
-
-  logger.error('Application Error', errorData);
+  });
   next(err);
 };
 
-// Log uncaught exceptions
 process.on('uncaughtException', (error) => {
   logger.error('Uncaught Exception', {
     error: error.message,
@@ -137,18 +83,14 @@ process.on('uncaughtException', (error) => {
   process.exit(1);
 });
 
-// Log unhandled promise rejections
 process.on('unhandledRejection', (reason, promise) => {
   logger.error('Unhandled Rejection', {
-    reason: reason?.message || reason,
+    reason: reason?.message || String(reason),
     stack: reason?.stack,
-    promise: promise.toString(),
+    promise: String(promise),
     timestamp: new Date().toISOString(),
   });
 });
-
-// Log application startup
-logger.info('Logger initialized successfully');
 
 module.exports = {
   logger,
