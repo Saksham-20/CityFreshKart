@@ -50,7 +50,9 @@ const MainLayout = ({ children }) => (
   <div className="app-shopper min-h-screen flex flex-col bg-surface">
     <Header />
     <main className="flex-1 pb-24 md:pb-0">{children}</main>
-    <Footer />
+    <div className="hidden sm:block">
+      <Footer />
+    </div>
     <MobileBottomNav />
   </div>
 );

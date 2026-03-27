@@ -75,17 +75,20 @@ const generateUniqueProductSlug = async (client, name, excludeId = null) => {
   const base = slugify(name) || `product-${Date.now()}`;
   let next = base;
   let suffix = 1;
-  while (true) {
+  let collisionFound = true;
+  while (collisionFound) {
     const exists = await client.query(
       excludeId
         ? 'SELECT 1 FROM products WHERE slug = $1 AND id != $2 LIMIT 1'
         : 'SELECT 1 FROM products WHERE slug = $1 LIMIT 1',
       excludeId ? [next, excludeId] : [next],
     );
-    if (exists.rows.length === 0) return next;
+    collisionFound = exists.rows.length > 0;
+    if (!collisionFound) return next;
     suffix += 1;
     next = `${base}-${suffix}`;
   }
+  return next;
 };
 
 const validateWeightOverridesForPricingType = (pricingType, overrides) => {
@@ -103,6 +106,32 @@ const getFirstTierPrice = (overrides = {}) => {
   const firstKey = sortedKeys[0].toFixed(2);
   const firstPrice = parseFloat(overrides[firstKey]);
   return Number.isFinite(firstPrice) ? firstPrice : 0;
+};
+
+const parseNonNegativeNumber = (value, fallback = 0) => {
+  const parsed = parseFloat(value);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
+};
+
+const mapProductWriteError = (error) => {
+  if (!error) return { status: 500, message: 'Server error' };
+  if (error.status && error.message) return { status: error.status, message: error.message };
+
+  if (error.code === '23505') {
+    if (error.constraint === 'products_slug_key') {
+      return { status: 409, message: 'Product slug already exists. Please retry.' };
+    }
+    if (error.constraint === 'products_name_unique_ci') {
+      return { status: 409, message: 'Product with this name already exists' };
+    }
+    return { status: 409, message: 'Product with this name already exists' };
+  }
+
+  if (error.code === '23503') {
+    return { status: 409, message: 'Product is linked to existing orders and cannot be deleted' };
+  }
+
+  return { status: 500, message: 'Server error' };
 };
 
 // Apply admin auth to all routes
@@ -240,7 +269,7 @@ router.get('/products', async (req, res) => {
     const products = await pool.query(query, queryParams);
 
     // Get total count
-    let countQuery = `SELECT COUNT(*) as total FROM products WHERE 1=1`;
+    let countQuery = 'SELECT COUNT(*) as total FROM products WHERE 1=1';
 
     const countParams = [];
     paramCount = 0;
@@ -293,12 +322,6 @@ router.post('/products', upload.array('images', 10), handleUploadError, async (r
       });
     }
 
-    // Check if product name already exists
-    const existingProduct = await pool.query('SELECT id FROM products WHERE LOWER(name) = LOWER($1)', [name]);
-    if (existingProduct.rows.length > 0) {
-      return res.status(400).json({ message: 'Product with this name already exists' });
-    }
-
     // Get image URL: prefer uploaded file, fall back to direct URL from form
     let imageUrl = req.body.image_url || '';
     if (req.files && req.files.length > 0) imageUrl = toPublicUploadPath(req.files[0]) || imageUrl;
@@ -322,22 +345,47 @@ router.post('/products', upload.array('images', 10), handleUploadError, async (r
     try {
       await client.query('BEGIN');
       const firstTierPrice = getFirstTierPrice(parsedOverrides);
-      const newProduct = await client.query(`
-        INSERT INTO products (
-          name, slug, description, category, image, image_url, price_per_kg, discount,
-          quantity_available, is_active, pricing_type, search_keywords, weight_display_unit, created_at, updated_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW(), NOW())
-        RETURNING *
-      `, [
-        name, await generateUniqueProductSlug(client, name), description || '', category || 'Uncategorized', imageUrl, imageUrl,
-        firstTierPrice, parseFloat(discount) || 0,
-        parseFloat(stock_quantity) || 0,
-        is_active !== 'false' && is_active !== false,
-        validPricingType,
-        (search_keywords && String(search_keywords).trim()) || null,
-        weightDisplayUnit,
-      ]);
-      product = newProduct.rows[0];
+      const normalizedName = String(name).trim();
+      const normalizedDescription = String(description || '').trim();
+      const normalizedCategory = String(category || 'Uncategorized').trim() || 'Uncategorized';
+      const normalizedDiscount = parseNonNegativeNumber(discount, 0);
+      const normalizedStock = parseNonNegativeNumber(stock_quantity, 0);
+      const normalizedIsActive = is_active !== 'false' && is_active !== false;
+      const normalizedKeywords = (search_keywords && String(search_keywords).trim()) || null;
+
+      // Race-safe slug generation: retry insert on unique slug collisions.
+      const maxSlugRetries = 5;
+      let lastInsertError = null;
+      for (let attempt = 0; attempt < maxSlugRetries; attempt += 1) {
+        try {
+          const slug = await generateUniqueProductSlug(client, normalizedName);
+          const newProduct = await client.query(`
+            INSERT INTO products (
+              name, slug, description, category, image, image_url, price_per_kg, discount,
+              quantity_available, is_active, pricing_type, search_keywords, weight_display_unit, created_at, updated_at
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW(), NOW())
+            RETURNING *
+          `, [
+            normalizedName, slug, normalizedDescription, normalizedCategory, imageUrl, imageUrl,
+            firstTierPrice, normalizedDiscount,
+            normalizedStock,
+            normalizedIsActive,
+            validPricingType,
+            normalizedKeywords,
+            weightDisplayUnit,
+          ]);
+          product = newProduct.rows[0];
+          lastInsertError = null;
+          break;
+        } catch (err) {
+          lastInsertError = err;
+          if (err?.code === '23505' && err?.constraint === 'products_slug_key') {
+            continue;
+          }
+          throw err;
+        }
+      }
+      if (!product && lastInsertError) throw lastInsertError;
 
       for (const [weightKey, overridePrice] of Object.entries(parsedOverrides)) {
         const weightVal = parseFloat(weightKey);
@@ -382,9 +430,10 @@ router.post('/products', upload.array('images', 10), handleUploadError, async (r
 
   } catch (error) {
     console.error('Create product error:', error);
-    res.status(500).json({
+    const mapped = mapProductWriteError(error);
+    res.status(mapped.status).json({
       success: false,
-      message: 'Server error',
+      message: mapped.message,
       error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error',
     });
   }
@@ -545,23 +594,22 @@ router.put('/products/:id', upload.array('images', 1), handleUploadError, [
 });
 
 // @route   DELETE /api/admin/products/:id
-// @desc    Soft delete product (set is_active = false)
+// @desc    Permanently delete product
 // @access  Admin
 router.delete('/products/:id', async (req, res) => {
+  const client = await pool.pool.connect();
   try {
     const { id } = req.params;
 
-    // Check if product exists
-    const existingProduct = await pool.query('SELECT id FROM products WHERE id = $1', [id]);
+    await client.query('BEGIN');
+    const existingProduct = await client.query('SELECT id FROM products WHERE id = $1', [id]);
     if (existingProduct.rows.length === 0) {
+      await client.query('ROLLBACK');
       return res.status(404).json({ message: 'Product not found' });
     }
-
-    // Soft delete - set is_active to false
-    const result = await pool.query(
-      'UPDATE products SET is_active = false, updated_at = CURRENT_TIMESTAMP WHERE id = $1 RETURNING *',
-      [id],
-    );
+    await client.query('DELETE FROM product_weight_prices WHERE product_id = $1', [id]);
+    const result = await client.query('DELETE FROM products WHERE id = $1 RETURNING id, name', [id]);
+    await client.query('COMMIT');
 
     res.json({
       success: true,
@@ -571,7 +619,11 @@ router.delete('/products/:id', async (req, res) => {
 
   } catch (error) {
     console.error('Delete product error:', error);
-    res.status(500).json({ success: false, message: 'Server error' });
+    try { await client.query('ROLLBACK'); } catch (_) {}
+    const mapped = mapProductWriteError(error);
+    res.status(mapped.status).json({ success: false, message: mapped.message });
+  } finally {
+    client.release();
   }
 });
 
@@ -1022,7 +1074,7 @@ router.put('/users/:id', [
 
     const updated = await pool.query(
       'SELECT id, phone, name, is_admin, created_at, updated_at FROM users WHERE id = $1',
-      [id]
+      [id],
     );
 
     res.json({ message: 'User updated successfully', user: updated.rows[0] });

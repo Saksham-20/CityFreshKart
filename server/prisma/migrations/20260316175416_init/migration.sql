@@ -174,6 +174,9 @@ CREATE UNIQUE INDEX "users_email_key" ON "users"("email");
 CREATE UNIQUE INDEX "products_slug_key" ON "products"("slug");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "products_name_unique_ci" ON "products"(LOWER("name"));
+
+-- CreateIndex
 CREATE INDEX "products_category_idx" ON "products"("category");
 
 -- CreateIndex

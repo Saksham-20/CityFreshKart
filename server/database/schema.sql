@@ -44,6 +44,8 @@ ALTER TABLE products ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZON
 
 ALTER TABLE products ADD COLUMN IF NOT EXISTS name_hindi TEXT;
 ALTER TABLE products ADD COLUMN IF NOT EXISTS search_keywords TEXT;
+CREATE UNIQUE INDEX IF NOT EXISTS products_slug_key ON products(slug) WHERE slug IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS products_name_unique_ci ON products (LOWER(name));
 
 
 -- Categories (normalized; optional FK on products.category_id for joins in cart/API)

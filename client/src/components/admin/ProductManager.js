@@ -551,9 +551,9 @@ const ProductManager = () => {
       setShowDeleteModal(false);
       setSelectedProduct(null);
       fetchProducts();
-      toast.success('Product hidden from store.');
+      toast.success('Product permanently deleted.');
     } catch {
-      toast.error('Failed to remove product.');
+      toast.error('Failed to delete product.');
     } finally {
       setLoading(false);
     }
@@ -678,7 +678,7 @@ const ProductManager = () => {
                 onClick={() => { setSelectedProduct(product); setShowDeleteModal(true); }}
                 className="bg-red-600 hover:bg-red-700"
               >
-                Remove
+                Delete
               </Button>
             </div>
           </div>
@@ -766,7 +766,7 @@ const ProductManager = () => {
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
                     <Button variant="outline" size="sm" onClick={() => openEditModal(product)}>Edit</Button>
                     <Button variant="danger" size="sm" onClick={() => { setSelectedProduct(product); setShowDeleteModal(true); }}
-                      className="bg-red-600 hover:bg-red-700">Remove</Button>
+                      className="bg-red-600 hover:bg-red-700">Delete</Button>
                   </td>
                 </tr>
               ))}
@@ -818,16 +818,16 @@ const ProductManager = () => {
       </Modal>
 
       {/* Delete Confirmation Modal */}
-      <Modal isOpen={showDeleteModal} onClose={() => setShowDeleteModal(false)} title="Deactivate Product">
+      <Modal isOpen={showDeleteModal} onClose={() => setShowDeleteModal(false)} title="Delete Product Permanently">
         <div className="space-y-4">
           <p className="text-gray-700">
-            This will hide <strong>"{selectedProduct?.name}"</strong> from the store. It can be re-activated later by editing the product.
+            This will permanently delete <strong>"{selectedProduct?.name}"</strong> and cannot be undone.
           </p>
           <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3">
             <Button variant="outline" onClick={() => setShowDeleteModal(false)} disabled={loading}>Cancel</Button>
             <Button variant="danger" onClick={handleDeleteProduct} disabled={loading}
               className="bg-red-600 hover:bg-red-700">
-              {loading ? 'Deactivating...' : 'Deactivate Product'}
+              {loading ? 'Deleting...' : 'Delete Product'}
             </Button>
           </div>
         </div>

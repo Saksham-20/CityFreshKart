@@ -15,6 +15,22 @@ CREATE TABLE IF NOT EXISTS product_weight_prices (
 
 CREATE INDEX IF NOT EXISTS idx_product_weight_prices_product ON product_weight_prices(product_id);
 
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_class WHERE relname = 'products_name_unique_ci') THEN
+    IF EXISTS (
+      SELECT LOWER(name)
+      FROM products
+      GROUP BY LOWER(name)
+      HAVING COUNT(*) > 1
+    ) THEN
+      RAISE NOTICE 'Skipping products_name_unique_ci due to duplicate product names';
+    ELSE
+      CREATE UNIQUE INDEX products_name_unique_ci ON products (LOWER(name));
+    END IF;
+  END IF;
+END $$;
+
 DROP TRIGGER IF EXISTS update_product_weight_prices_updated_at ON product_weight_prices;
 CREATE TRIGGER update_product_weight_prices_updated_at
 BEFORE UPDATE ON product_weight_prices
