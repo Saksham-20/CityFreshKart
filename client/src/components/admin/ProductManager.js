@@ -6,6 +6,7 @@ import Modal from '../ui/Modal';
 import Loading from '../ui/Loading';
 import { getImageUrl, getPlaceholderImage, IMAGE_DIMS } from '../../utils/imageUtils';
 import toast from 'react-hot-toast';
+import { formatApiErrorMessage } from '../../utils/apiErrorMessage';
 
 const emptyForm = () => ({
   name: '',
@@ -171,6 +172,7 @@ const ImageSection = ({
                 if (!f) return;
                 setSelectedImages([f]);
                 setImagePreview([URL.createObjectURL(f)]);
+                e.target.value = '';
               } : handleImageChange}
               className="hidden" />
             <label htmlFor={isEdit ? 'img-edit' : 'img-add'} className="cursor-pointer block text-sm text-gray-600">
@@ -400,7 +402,8 @@ const ProductManager = () => {
       const next = res.data?.data || [];
       setCategories(next);
     } catch (e) {
-      toast.error('Failed to load categories');
+      console.error('fetchCategories', e.response?.data || e.message);
+      toast.error(formatApiErrorMessage(e, 'Failed to load categories'));
       setCategories([]);
     } finally {
       setCategoriesLoading(false);
@@ -420,8 +423,8 @@ const ProductManager = () => {
         setProducts([]);
       }
     } catch (error) {
-      console.error('Failed to fetch products:', error);
-      toast.error('Failed to load products');
+      console.error('Failed to fetch products:', error.response?.data || error.message);
+      toast.error(formatApiErrorMessage(error, 'Failed to load products'));
       setProducts([]);
     } finally {
       setLoading(false);
@@ -460,10 +463,12 @@ const ProductManager = () => {
     const remainingSlots = 6 - currentCount;
     if (files.length > remainingSlots) {
       toast.error(`You can only upload ${remainingSlots} more image(s).`);
+      e.target.value = '';
       return;
     }
     if (currentCount >= 6) {
       toast.error('Maximum 6 images per product.');
+      e.target.value = '';
       return;
     }
     const uniqueFiles = files.filter(newFile =>
@@ -471,6 +476,7 @@ const ProductManager = () => {
     );
     setSelectedImages([...selectedImages, ...uniqueFiles]);
     setImagePreview([...imagePreview, ...uniqueFiles.map(f => URL.createObjectURL(f))]);
+    e.target.value = '';
   };
 
   const handleAddProduct = async (e) => {
@@ -501,9 +507,8 @@ const ProductManager = () => {
       fetchProducts();
       toast.success('Product created successfully!');
     } catch (error) {
-      const msg = error.response?.data?.message || 'Failed to add product';
-      const rid = error.response?.data?.requestId;
-      toast.error(rid ? `${msg} (ref: ${rid})` : msg);
+      console.error('handleAddProduct', error.response?.data || error.message);
+      toast.error(formatApiErrorMessage(error, 'Failed to add product'));
     } finally {
       setLoading(false);
     }
@@ -540,9 +545,8 @@ const ProductManager = () => {
       fetchProducts();
       toast.success('Product updated successfully!');
     } catch (error) {
-      const msg = error.response?.data?.message || 'Failed to update product';
-      const rid = error.response?.data?.requestId;
-      toast.error(rid ? `${msg} (ref: ${rid})` : msg);
+      console.error('handleEditProduct', error.response?.data || error.message);
+      toast.error(formatApiErrorMessage(error, 'Failed to update product'));
     } finally {
       setLoading(false);
     }
@@ -557,9 +561,8 @@ const ProductManager = () => {
       fetchProducts();
       toast.success('Product permanently deleted.');
     } catch (error) {
-      const msg = error.response?.data?.message || 'Failed to delete product.';
-      const rid = error.response?.data?.requestId;
-      toast.error(rid ? `${msg} (ref: ${rid})` : msg);
+      console.error('handleDeleteProduct', error.response?.data || error.message);
+      toast.error(formatApiErrorMessage(error, 'Failed to delete product.'));
     } finally {
       setLoading(false);
     }
@@ -569,8 +572,9 @@ const ProductManager = () => {
     try {
       await api.put(`/admin/products/${productId}/stock`, { quantity: newQuantity });
       setProducts(prev => prev.map(p => p.id === productId ? { ...p, quantity_available: newQuantity } : p));
-    } catch {
-      toast.error('Failed to update stock.');
+    } catch (error) {
+      console.error('handleStockUpdate', error.response?.data || error.message);
+      toast.error(formatApiErrorMessage(error, 'Failed to update stock.'));
     }
   };
 

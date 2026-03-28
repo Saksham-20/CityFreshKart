@@ -2,8 +2,42 @@ const express = require('express');
 const { query, pool } = require('../database/config');
 const { authenticateToken } = require('../middleware/auth');
 const webPushService = require('../services/webPushService');
+const { getStoreOrderSettings } = require('../services/storeSettingsService');
+const { normalizeIdempotencyKey } = require('../services/cachePublic');
+const { jsonClientError, logApiError } = require('../utils/apiErrors');
+const { checkoutLimiter } = require('../middleware/rateLimit');
 
 const router = express.Router();
+
+const MAX_ORDER_ITEMS = parseInt(process.env.MAX_ORDER_ITEMS, 10) || 100;
+const MAX_ADDRESS_LEN = parseInt(process.env.MAX_DELIVERY_ADDRESS_LEN, 10) || 5000;
+const MAX_NOTES_LEN = parseInt(process.env.MAX_ORDER_NOTES_LEN, 10) || 2000;
+
+async function respondIdempotentOrder(res, req, orderId, userId) {
+  const orderResult = await query(
+    'SELECT * FROM orders WHERE id = $1 AND user_id = $2',
+    [orderId, userId],
+  );
+  if (orderResult.rows.length === 0) {
+    return jsonClientError(res, req, 500, {
+      message: 'Order replay failed',
+      errorCode: 'ORDER_REPLAY_FAILED',
+    });
+  }
+  const order = orderResult.rows[0];
+  return res.status(200).json({
+    success: true,
+    ref: req.requestId,
+    data: {
+      order,
+      orderNumber: order.order_number,
+      subtotal: parseFloat(order.subtotal),
+      deliveryFee: parseFloat(order.delivery_fee),
+      total: parseFloat(order.total_price),
+      idempotentReplay: true,
+    },
+  });
+}
 
 // @route   GET /api/orders
 // @desc    Get user's order history
@@ -48,8 +82,12 @@ router.get('/', authenticateToken, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Get orders error:', error);
-    res.status(500).json({ success: false, error: { code: 'SERVER_ERROR', message: 'Server error' } });
+    logApiError(req, 'orders_list_failed', error);
+    return jsonClientError(res, req, 500, {
+      message: 'Failed to load orders',
+      errorCode: 'ORDERS_LIST_FAILED',
+      error: { code: 'SERVER_ERROR', message: 'Server error' },
+    });
   }
 });
 
@@ -67,7 +105,11 @@ router.get('/:id', authenticateToken, async (req, res) => {
     );
 
     if (orderResult.rows.length === 0) {
-      return res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Order not found' } });
+      return res.status(404).json({
+        success: false,
+        ref: req.requestId,
+        error: { code: 'NOT_FOUND', message: 'Order not found' },
+      });
     }
 
     // Get order items
@@ -91,38 +133,19 @@ router.get('/:id', authenticateToken, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Get order error:', error);
-    res.status(500).json({ success: false, error: { code: 'SERVER_ERROR', message: 'Server error' } });
+    logApiError(req, 'order_detail_failed', error);
+    return jsonClientError(res, req, 500, {
+      message: 'Failed to load order',
+      errorCode: 'ORDER_DETAIL_FAILED',
+      error: { code: 'SERVER_ERROR', message: 'Server error' },
+    });
   }
 });
-
-// Batch load order-related store settings (single round-trip)
-async function getStoreOrderSettings() {
-  const out = {
-    free_delivery_threshold: 300,
-    delivery_fee: 50,
-    min_order_amount: 0,
-  };
-  try {
-    const result = await query(
-      `SELECT key, value FROM store_settings WHERE key = ANY($1::text[])`,
-      [['free_delivery_threshold', 'delivery_fee', 'min_order_amount']],
-    );
-    for (const row of result.rows) {
-      const v = parseFloat(row.value);
-      if (!Number.isFinite(v)) continue;
-      if (row.key === 'free_delivery_threshold') out.free_delivery_threshold = v;
-      else if (row.key === 'delivery_fee') out.delivery_fee = v;
-      else if (row.key === 'min_order_amount') out.min_order_amount = v;
-    }
-  } catch (_) { /* table may not exist yet on first run */ }
-  return out;
-}
 
 // @route   POST /api/orders
 // @desc    Create a new order
 // @access  Private
-router.post('/', authenticateToken, async (req, res) => {
+router.post('/', authenticateToken, checkoutLimiter, async (req, res) => {
   try {
     const {
       items, delivery_address, notes,
@@ -131,12 +154,36 @@ router.post('/', authenticateToken, async (req, res) => {
       phone,
     } = req.body;
 
+    const rawIdem = req.headers['idempotency-key'] || req.body?.idempotency_key;
+    const idemKey = rawIdem ? normalizeIdempotencyKey(String(rawIdem).slice(0, 256)) : '';
+
     if (!items || !Array.isArray(items) || items.length === 0) {
-      return res.status(400).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Items are required' } });
+      return res.status(400).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Items are required' }, ref: req.requestId });
+    }
+    if (items.length > MAX_ORDER_ITEMS) {
+      return res.status(400).json({
+        success: false,
+        ref: req.requestId,
+        error: { code: 'VALIDATION_ERROR', message: `Maximum ${MAX_ORDER_ITEMS} line items per order` },
+      });
     }
 
     if (!delivery_address || !delivery_address.trim()) {
-      return res.status(400).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Delivery address is required' } });
+      return res.status(400).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Delivery address is required' }, ref: req.requestId });
+    }
+    if (delivery_address.length > MAX_ADDRESS_LEN) {
+      return res.status(400).json({
+        success: false,
+        ref: req.requestId,
+        error: { code: 'VALIDATION_ERROR', message: 'Delivery address is too long' },
+      });
+    }
+    if (notes && String(notes).length > MAX_NOTES_LEN) {
+      return res.status(400).json({
+        success: false,
+        ref: req.requestId,
+        error: { code: 'VALIDATION_ERROR', message: 'Notes are too long' },
+      });
     }
     const normalizedPhone = String(phone || req.user.phone || '').replace(/\D/g, '').slice(-10);
     if (!/^\d{10}$/.test(normalizedPhone)) {
@@ -222,6 +269,19 @@ router.post('/', authenticateToken, async (req, res) => {
     try {
       await client.query('BEGIN');
 
+      if (idemKey) {
+        await client.query('SELECT pg_advisory_xact_lock(hashtext($1::text))', [`orderidem:${req.user.id}:${idemKey}`]);
+        const prev = await client.query(
+          'SELECT order_id FROM order_idempotency WHERE user_id = $1::uuid AND idempotency_key = $2',
+          [req.user.id, idemKey],
+        );
+        if (prev.rows.length > 0) {
+          await client.query('ROLLBACK');
+          client.release();
+          return respondIdempotentOrder(res, req, prev.rows[0].order_id, req.user.id);
+        }
+      }
+
       // Insert order — includes notes and optional razorpay fields
       const orderResult = await client.query(`
         INSERT INTO orders (order_number, user_id, phone, delivery_address, notes, subtotal, delivery_fee, total_price, payment_method, razorpay_payment_id, razorpay_order_id, status)
@@ -286,6 +346,17 @@ router.post('/', authenticateToken, async (req, res) => {
       // Clear user's cart
       await client.query('DELETE FROM cart WHERE user_id = $1', [req.user.id]);
 
+      if (idemKey) {
+        try {
+          await client.query(
+            'INSERT INTO order_idempotency (user_id, idempotency_key, order_id) VALUES ($1::uuid, $2, $3::uuid)',
+            [req.user.id, idemKey, order.id],
+          );
+        } catch (e) {
+          if (e.code !== '42P01') throw e;
+        }
+      }
+
       await client.query('COMMIT');
 
       // Fire push notifications after successful commit (non-blocking)
@@ -308,6 +379,7 @@ router.post('/', authenticateToken, async (req, res) => {
 
       res.status(201).json({
         success: true,
+        ref: req.requestId,
         data: {
           order,
           orderNumber: order.order_number,
@@ -325,8 +397,19 @@ router.post('/', authenticateToken, async (req, res) => {
     }
 
   } catch (error) {
-    console.error('Create order error:', error);
-    res.status(500).json({ success: false, error: { code: 'SERVER_ERROR', message: 'Server error' } });
+    logApiError(req, 'create_order_failed', error);
+    if (error.message && String(error.message).includes('Insufficient stock')) {
+      return res.status(409).json({
+        success: false,
+        ref: req.requestId,
+        error: { code: 'INSUFFICIENT_STOCK', message: error.message },
+      });
+    }
+    return jsonClientError(res, req, 500, {
+      message: 'Failed to create order',
+      errorCode: 'ORDER_CREATE_FAILED',
+      error: { code: 'SERVER_ERROR', message: 'Server error' },
+    });
   }
 });
 
@@ -392,8 +475,11 @@ router.post('/:id/cancel', authenticateToken, async (req, res) => {
     }
 
   } catch (error) {
-    console.error('Cancel order error:', error);
-    res.status(500).json({ message: 'Server error' });
+    logApiError(req, 'order_cancel_failed', error);
+    return jsonClientError(res, req, 500, {
+      message: 'Failed to cancel order',
+      errorCode: 'ORDER_CANCEL_FAILED',
+    });
   }
 });
 
@@ -428,8 +514,11 @@ router.put('/:id', authenticateToken, async (req, res) => {
     res.json({ success: true, data: { order: result.rows[0] } });
 
   } catch (error) {
-    console.error('Update order error:', error);
-    res.status(500).json({ message: 'Server error' });
+    logApiError(req, 'order_admin_update_failed', error);
+    return jsonClientError(res, req, 500, {
+      message: 'Failed to update order',
+      errorCode: 'ORDER_ADMIN_UPDATE_FAILED',
+    });
   }
 });
 

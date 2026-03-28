@@ -1,5 +1,9 @@
 const express = require('express');
 const { query } = require('../database/config');
+const {
+  getCachedProductCategoriesJson,
+  setCachedProductCategoriesJson,
+} = require('../services/cachePublic');
 
 const router = express.Router();
 
@@ -18,24 +22,36 @@ const DEFAULT_PRODUCT_CATEGORIES = [
 // @access  Public
 router.get('/categories', async (req, res) => {
   try {
+    const cached = await getCachedProductCategoriesJson();
+    if (cached) {
+      try {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.every((v) => typeof v === 'string' && v.trim())) {
+          return res.json({ success: true, data: parsed });
+        }
+      } catch (_) { /* miss cache */ }
+    }
+
     const { pool } = require('../database/config');
     const result = await pool.query(
       'SELECT value FROM store_settings WHERE key = $1',
       ['product_categories'],
     );
 
+    let data = DEFAULT_PRODUCT_CATEGORIES;
     if (result.rows.length > 0) {
       try {
         const parsed = JSON.parse(result.rows[0].value);
-        if (Array.isArray(parsed) && parsed.every(v => typeof v === 'string' && v.trim())) {
-          return res.json({ success: true, data: parsed });
+        if (Array.isArray(parsed) && parsed.every((v) => typeof v === 'string' && v.trim())) {
+          data = parsed;
         }
       } catch (_) {
         // ignore JSON parsing errors and fall back to defaults
       }
     }
 
-    return res.json({ success: true, data: DEFAULT_PRODUCT_CATEGORIES });
+    await setCachedProductCategoriesJson(JSON.stringify(data));
+    return res.json({ success: true, data });
   } catch (error) {
     console.error('Get categories error:', error);
     return res.json({ success: true, data: DEFAULT_PRODUCT_CATEGORIES });
@@ -164,7 +180,7 @@ router.get('/search', async (req, res) => {
 
     const raw = q.trim();
     const pattern = `%${raw}%`;
-    const lim = parseInt(limit || 20, 10);
+    const lim = Math.min(100, Math.max(1, parseInt(limit || 20, 10) || 20));
 
     const fullSearchSql = `
       SELECT

@@ -29,9 +29,20 @@ const CategoryManager = () => {
     fetchCategories();
   }, []);
 
+  const pickErrorMessage = (e, fallback) => {
+    const d = e.response?.data;
+    if (d?.message) return d.message;
+    const first = d?.errors?.[0];
+    if (first?.msg) return first.msg;
+    return fallback;
+  };
+
   const handleAdd = async () => {
     const name = newCategory.trim();
-    if (!name) return;
+    if (!name) {
+      setError('Enter a category name, then click Add.');
+      return;
+    }
     setSaving(true);
     setError('');
     try {
@@ -40,7 +51,7 @@ const CategoryManager = () => {
       setCategories(updated);
       setNewCategory('');
     } catch (e) {
-      setError(e.response?.data?.message || 'Failed to add category');
+      setError(pickErrorMessage(e, 'Failed to add category'));
     } finally {
       setSaving(false);
     }
@@ -57,7 +68,7 @@ const CategoryManager = () => {
       const updated = res.data?.data?.categories || [];
       setCategories(updated);
     } catch (e) {
-      setError(e.response?.data?.message || 'Failed to delete category');
+      setError(pickErrorMessage(e, 'Failed to delete category'));
     } finally {
       setSaving(false);
     }
@@ -76,7 +87,7 @@ const CategoryManager = () => {
       const updated = res.data?.data?.categories || [];
       setCategories(updated);
     } catch (e) {
-      setError(e.response?.data?.message || 'Failed to rename category');
+      setError(pickErrorMessage(e, 'Failed to rename category'));
     } finally {
       setSaving(false);
     }
@@ -108,12 +119,15 @@ const CategoryManager = () => {
         <input
           type="text"
           value={newCategory}
-          onChange={(e) => setNewCategory(e.target.value)}
-          placeholder="New category name (e.g. Vegetables)"
+          onChange={(e) => {
+            setNewCategory(e.target.value);
+            setError('');
+          }}
+          placeholder="New category name (e.g. Green Vegetables)"
           className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-fresh-green focus:border-transparent outline-none"
           disabled={saving}
         />
-        <Button onClick={handleAdd} disabled={saving || !newCategory.trim()}>
+        <Button className="sm:self-start" onClick={handleAdd} disabled={saving}>
           {saving ? 'Saving...' : 'Add'}
         </Button>
       </div>

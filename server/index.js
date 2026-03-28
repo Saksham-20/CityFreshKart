@@ -3,7 +3,6 @@ const cors = require('cors');
 const cookieParser = require('cookie-parser');
 const helmet = require('helmet');
 const compression = require('compression');
-const rateLimit = require('express-rate-limit');
 const path = require('path');
 const fs = require('fs');
 require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
@@ -23,7 +22,14 @@ const notificationRoutes = require('./routes/notifications');
 const marketingRoutes = require('./routes/marketing');
 const { collectCspConnectOrigins } = require('./utils/cspOrigins');
 const { errorLogger, logger } = require('./utils/logger');
-const crypto = require('crypto');
+const { attachRequestId, logStructured } = require('./utils/requestContext');
+const {
+  primeGlobalApiLimiter,
+  globalApiLimiterMiddleware,
+  fallbackGlobalLimiterToMemory,
+} = require('./middleware/rateLimit');
+const redisClient = require('./services/redisClient');
+redisClient.registerRedisDisabledHandler(() => fallbackGlobalLimiterToMemory());
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -53,13 +59,6 @@ if (process.env.NODE_ENV === 'production') {
 // Middleware - order matters! CORS should be first
 app.use(compression());
 
-// Request correlation ID (also returned to clients for support)
-app.use((req, res, next) => {
-  req.id = crypto.randomUUID();
-  res.setHeader('x-request-id', req.id);
-  next();
-});
-
 // CORS configuration
 const corsOptions = {
   origin: process.env.NODE_ENV === 'production'
@@ -67,7 +66,8 @@ const corsOptions = {
     : true,
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-Id', 'Idempotency-Key'],
+  exposedHeaders: ['X-Request-Id'],
   optionsSuccessStatus: 200,
 };
 
@@ -77,27 +77,11 @@ app.use(cors(corsOptions));
 // Cookie parser - for accessing httpOnly cookies
 app.use(cookieParser());
 
-// Rate limiting - applied after CORS (relaxed in development for automated testing)
-// Skip cheap/public routes and /api/auth (auth routes use authLimiter separately).
-const parsedWindow = parseInt(process.env.RATE_LIMIT_WINDOW_MS, 10);
-const parsedMax = parseInt(process.env.RATE_LIMIT_MAX_REQUESTS, 10);
-const limiter = rateLimit({
-  windowMs: Number.isFinite(parsedWindow) && parsedWindow > 0 ? parsedWindow : 15 * 60 * 1000,
-  max: Number.isFinite(parsedMax) && parsedMax > 0
-    ? parsedMax
-    : (process.env.NODE_ENV === 'production' ? 500 : 10000),
-  message: 'Too many requests from this IP, please try again later.',
-  standardHeaders: true,
-  legacyHeaders: false,
-  skip: (req) => {
-    const url = req.originalUrl || req.url || '';
-    if (req.method === 'GET' && (url === '/api/health' || url.startsWith('/api/health?'))) return true;
-    if (req.method === 'GET' && (url === '/api/settings' || url.startsWith('/api/settings?'))) return true;
-    if (url.startsWith('/api/auth')) return true;
-    return false;
-  },
-});
-app.use('/api/', limiter);
+// Correlate logs and client errors (X-Request-Id)
+app.use('/api', attachRequestId);
+
+// Global API rate limit (Redis-backed when REDIS_URL is set — primed in startServer)
+app.use('/api/', globalApiLimiterMiddleware);
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
@@ -122,14 +106,29 @@ app.get('/health', (req, res) => {
   });
 });
 
-// API health check
-app.get('/api/health', (req, res) => {
-  res.status(200).json({
+// API health check (optional DB ping for load balancers)
+app.get('/api/health', async (req, res) => {
+  const base = {
     status: 'OK',
     message: 'API is running',
     environment: process.env.NODE_ENV,
     timestamp: new Date().toISOString(),
-  });
+  };
+  if (process.env.ENABLE_DEEP_HEALTH === '1') {
+    try {
+      const { pool } = require('./database/config');
+      await pool.query('SELECT 1');
+      return res.status(200).json({ ...base, database: 'ok' });
+    } catch (e) {
+      return res.status(503).json({
+        ...base,
+        status: 'DEGRADED',
+        database: 'error',
+        ref: req.requestId,
+      });
+    }
+  }
+  res.status(200).json(base);
 });
 
 // API Routes
@@ -161,9 +160,11 @@ app.get('/api/settings', async (req, res) => {
     result.rows.forEach(row => { settings[row.key] = row.value; });
     res.json({ success: true, data: settings });
   } catch (error) {
-    logger.error('GET /api/settings database error; returning defaults', {
+    logStructured('error', {
+      requestId: req.requestId,
+      event: 'public_settings_db_error',
       message: error.message,
-      stack: error.stack,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined,
     });
     res.json({ success: true, data: { free_delivery_threshold: '300', delivery_fee: '50', min_order_amount: '0' } });
   }
@@ -184,30 +185,55 @@ if (process.env.NODE_ENV === 'production') {
 // Error handling middleware
 app.use(errorLogger);
 app.use((err, req, res, next) => {
+  const ref = req.requestId || 'unknown';
+  logStructured('error', {
+    requestId: ref,
+    event: 'unhandled_error',
+    method: req.method,
+    path: req.originalUrl || req.url,
+    status: err.status || 500,
+    errCode: err.code,
+    message: err.message,
+    stack: process.env.NODE_ENV === 'development' ? err.stack : undefined,
+  });
   res.status(err.status || 500).json({
     success: false,
+    ref,
+    message: process.env.NODE_ENV === 'development' ? err.message : 'Internal server error',
     error: {
       code: err.code || 'SERVER_ERROR',
       message: process.env.NODE_ENV === 'development' ? err.message : 'Internal server error',
-      requestId: req.id,
+      requestId: ref,
     },
   });
 });
 
 // 404 handler for API routes only
 app.use('/api/*', (req, res) => {
-  res.status(404).json({ message: 'API route not found' });
+  logStructured('warn', {
+    requestId: req.requestId,
+    event: 'api_404',
+    method: req.method,
+    path: req.originalUrl || req.url,
+  });
+  res.status(404).json({
+    success: false,
+    message: 'API route not found',
+    ref: req.requestId,
+    errorCode: 'NOT_FOUND',
+  });
 });
 
 // Initialize database and start server
 async function startServer() {
   try {
-    // Run database setup
     const setupDatabase = require('./database/setup');
     await setupDatabase();
+    await primeGlobalApiLimiter();
 
-    // Start the server
-    app.listen(PORT);
+    app.listen(PORT, () => {
+      console.log(`🚀 CityFreshKart server running on port ${PORT} [${process.env.NODE_ENV || 'development'}]`);
+    });
   } catch (error) {
     logger.error('Failed to start server', { message: error.message, stack: error.stack });
     process.exit(1);

@@ -38,14 +38,29 @@ const diskStorage = multer.diskStorage({
   },
 });
 
-// File filter function
+const IMAGE_EXT = /\.(jpe?g|png|gif|webp)$/i;
+
+// File filter function (Android often sends application/octet-stream or empty MIME for gallery/camera)
 const fileFilter = (req, file, cb) => {
-  // Allow only images
-  if (file.mimetype.startsWith('image/')) {
+  const mime = String(file.mimetype || '').toLowerCase();
+  if (mime.startsWith('image/')) {
     cb(null, true);
-  } else {
-    cb(new Error('Only image files are allowed!'), false);
+    return;
   }
+  const allowByExt = !mime || mime === 'application/octet-stream';
+  if (allowByExt && IMAGE_EXT.test(String(file.originalname || ''))) {
+    cb(null, true);
+    return;
+  }
+  console.warn(JSON.stringify({
+    ts: new Date().toISOString(),
+    event: 'upload_rejected_type',
+    requestId: req.requestId,
+    mimetype: file.mimetype,
+    originalname: file.originalname,
+    fieldname: file.fieldname,
+  }));
+  cb(new Error('Only image files are allowed!'), false);
 };
 
 // Configure multer
@@ -59,36 +74,58 @@ const upload = multer({
 
 // Error handling middleware
 const handleUploadError = (error, req, res, next) => {
+  const ref = req.requestId;
+  const route = `${req.method} ${req.baseUrl}${req.path}`;
   if (error instanceof multer.MulterError) {
-    console.error('Upload middleware error:', {
+    console.error(JSON.stringify({
+      ts: new Date().toISOString(),
+      event: 'upload_multer_error',
+      requestId: ref,
+      route,
       code: error.code,
       field: error.field,
-      route: `${req.method} ${req.baseUrl}${req.path}`,
-    });
+      message: error.message,
+    }));
 
     if (error.code === 'LIMIT_FILE_SIZE') {
       return res.status(400).json({
+        success: false,
+        ref,
+        errorCode: 'FILE_TOO_LARGE',
         message: `File too large. Maximum size is ${formatFileSize(maxFileSizeBytes)}.`,
       });
     }
 
     if (error.code === 'LIMIT_UNEXPECTED_FILE') {
       return res.status(400).json({
+        success: false,
+        ref,
+        errorCode: 'UNEXPECTED_FILE_FIELD',
         message: `Unexpected file field "${error.field || 'unknown'}". Use "images".`,
       });
     }
 
     return res.status(400).json({
+      success: false,
+      ref,
+      errorCode: 'MULTER_ERROR',
       message: `Upload error: ${error.message}`,
     });
   } else if (error.message === 'Only image files are allowed!') {
-    console.error('Upload validation error:', {
+    console.error(JSON.stringify({
+      ts: new Date().toISOString(),
+      event: 'upload_validation_error',
+      requestId: ref,
+      route,
       message: error.message,
-      route: `${req.method} ${req.baseUrl}${req.path}`,
-    });
+    }));
 
     return res.status(400).json({
-      message: error.message,
+      success: false,
+      ref,
+      errorCode: 'INVALID_FILE_TYPE',
+      message:
+        'Only image files are allowed (e.g. JPEG, PNG, WebP, GIF). On Android, pick a photo with a clear file name ending in .jpg or .png.',
     });
   }
 

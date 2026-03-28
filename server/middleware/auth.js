@@ -1,6 +1,7 @@
 const jwt = require('jsonwebtoken');
 const { query } = require('../database/config');
 const { getJwtSecret } = require('../config/jwt');
+const { jsonClientError, logApiError } = require('../utils/apiErrors');
 
 // Middleware to verify JWT token
 const authenticateToken = async (req, res, next) => {
@@ -55,10 +56,10 @@ const authenticateToken = async (req, res, next) => {
       });
     }
 
-    console.error('Auth middleware error:', error);
-    return res.status(500).json({
-      success: false,
+    logApiError(req, 'auth_middleware_error', error);
+    return jsonClientError(res, req, 500, {
       message: 'Internal server error',
+      errorCode: 'AUTH_MIDDLEWARE_ERROR',
     });
   }
 };

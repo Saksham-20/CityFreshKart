@@ -4,6 +4,10 @@ const { authenticateToken, requireAdmin } = require('../middleware/auth');
 const { body, validationResult } = require('express-validator');
 const { upload, handleUploadError } = require('../middleware/upload');
 const webPushService = require('../services/webPushService');
+const { getStoreOrderSettings } = require('../services/storeSettingsService');
+const { invalidateProductCategories, invalidateStoreSettingsOrder } = require('../services/cachePublic');
+const { uploadLimiter, adminProductWriteLimiter } = require('../middleware/rateLimit');
+const { logStructured } = require('../utils/requestContext');
 
 const router = express.Router();
 
@@ -126,47 +130,80 @@ const firstValidationMessage = (errors) => {
   return arr[0]?.msg || 'Invalid request';
 };
 
+function logAdminProductEvent(req, level, event, meta = {}) {
+  logStructured(level, {
+    requestId: req.requestId,
+    method: req.method,
+    path: req.originalUrl || req.url,
+    event,
+    ...meta,
+  });
+}
+
+function jsonClientError(res, req, status, payload) {
+  return res.status(status).json({
+    success: false,
+    ref: req.requestId,
+    ...payload,
+  });
+}
+
+function sendMappedProductError(res, req, mapped, rawError) {
+  const body = {
+    success: false,
+    message: mapped.message,
+    ref: req.requestId,
+    errorCode: mapped.errorCode,
+  };
+  if (process.env.NODE_ENV === 'development' && rawError) {
+    body.error = rawError.message;
+    body.pg = { code: rawError.code, constraint: rawError.constraint, detail: rawError.detail };
+  }
+  res.status(mapped.status).json(body);
+}
+
 const mapProductWriteError = (error) => {
-  if (!error) return { status: 500, message: 'Server error' };
-  if (error.status && error.message) return { status: error.status, message: error.message };
+  if (!error) return { status: 500, message: 'Server error', errorCode: 'UNKNOWN' };
+  if (error.status && error.message) {
+    return { status: error.status, message: error.message, errorCode: error.errorCode || 'CLIENT' };
+  }
 
   if (error.code === '23505') {
     if (error.constraint === 'products_slug_key') {
-      return { status: 409, message: 'Product slug already exists. Please retry.' };
+      return { status: 409, message: 'Product slug already exists. Please retry.', errorCode: 'DUPLICATE_SLUG' };
     }
     if (error.constraint === 'products_name_unique_ci') {
-      return { status: 409, message: 'Product with this name already exists' };
+      return { status: 409, message: 'Product with this name already exists', errorCode: 'DUPLICATE_NAME' };
     }
-    return { status: 409, message: 'Product with this name already exists' };
+    return { status: 409, message: 'A unique value conflict occurred', errorCode: 'UNIQUE_VIOLATION' };
   }
 
   if (error.code === '23503') {
-    return { status: 409, message: 'Product is linked to existing orders and cannot be deleted' };
+    return { status: 409, message: 'Product is linked to existing orders and cannot be deleted', errorCode: 'FK_VIOLATION' };
   }
 
-  return { status: 500, message: 'Server error' };
+  if (error.code === '23514' && error.constraint === 'products_category_check') {
+    return {
+      status: 400,
+      message:
+        'This category is not allowed by the database. Run migration 007_drop_products_category_check.sql on the server, or use a category from Admin → Categories.',
+      errorCode: 'DB_CATEGORY_CHECK',
+    };
+  }
+
+  if (error.code === '23514') {
+    return {
+      status: 400,
+      message: `Database validation failed${error.constraint ? ` (${error.constraint})` : ''}. If this persists, contact support with the request reference.`,
+      errorCode: 'DB_CHECK_VIOLATION',
+    };
+  }
+
+  return { status: 500, message: 'Server error', errorCode: 'INTERNAL' };
 };
 
 // Apply admin auth to all routes
 router.use(authenticateToken, requireAdmin);
-
-async function getStoreOrderSettings() {
-  const out = { free_delivery_threshold: 300, delivery_fee: 50, min_order_amount: 0 };
-  try {
-    const result = await pool.query(
-      'SELECT key, value FROM store_settings WHERE key = ANY($1::text[])',
-      [['free_delivery_threshold', 'delivery_fee', 'min_order_amount']],
-    );
-    for (const row of result.rows) {
-      const v = parseFloat(row.value);
-      if (!Number.isFinite(v)) continue;
-      if (row.key === 'free_delivery_threshold') out.free_delivery_threshold = v;
-      else if (row.key === 'delivery_fee') out.delivery_fee = v;
-      else if (row.key === 'min_order_amount') out.min_order_amount = v;
-    }
-  } catch (_) {}
-  return out;
-}
 
 // @route   GET /api/admin/dashboard
 // @desc    Get admin dashboard stats
@@ -313,15 +350,23 @@ router.get('/products', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Get admin products error:', error);
-    res.status(500).json({ message: 'Server error' });
+    logStructured('error', {
+      requestId: req.requestId,
+      event: 'admin_list_products_failed',
+      message: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined,
+    });
+    return jsonClientError(res, req, 500, {
+      message: 'Failed to load products',
+      errorCode: 'LIST_PRODUCTS_FAILED',
+    });
   }
 });
 
 // @route   POST /api/admin/products
 // @desc    Create new product with image upload
 // @access  Admin
-router.post('/products', upload.array('images', 10), handleUploadError, async (req, res) => {
+router.post('/products', adminProductWriteLimiter, uploadLimiter, upload.array('images', 10), handleUploadError, async (req, res) => {
   try {
     const {
       name, description, discount, category, stock_quantity, is_active, pricing_type,
@@ -330,8 +375,10 @@ router.post('/products', upload.array('images', 10), handleUploadError, async (r
 
     // Validate required fields
     if (!name) {
-      return res.status(400).json({
+      logAdminProductEvent(req, 'warn', 'admin_product_create_validation', { reason: 'missing_name' });
+      return jsonClientError(res, req, 400, {
         message: 'Missing required fields: name',
+        errorCode: 'MISSING_NAME',
       });
     }
 
@@ -350,7 +397,24 @@ router.post('/products', upload.array('images', 10), handleUploadError, async (r
       parsedOverrides = parseAndNormalizeWeightOverrides(weight_price_overrides);
       validateWeightOverridesForPricingType(validPricingType, parsedOverrides);
     } catch (e) {
-      return res.status(400).json({ message: e.message });
+      logAdminProductEvent(req, 'warn', 'admin_product_create_weight_invalid', { reason: e.message });
+      return jsonClientError(res, req, 400, { message: e.message, errorCode: 'INVALID_WEIGHT_OVERRIDES' });
+    }
+
+    const normalizedCategory = String(category || 'Uncategorized').trim() || 'Uncategorized';
+    const allowedCategories = await getProductCategories();
+    const categoryOk = allowedCategories.some(
+      (c) => c.toLowerCase() === normalizedCategory.toLowerCase(),
+    );
+    if (!categoryOk) {
+      logAdminProductEvent(req, 'warn', 'admin_product_create_category_invalid', {
+        category: normalizedCategory,
+        allowedCategoryCount: allowedCategories.length,
+      });
+      return jsonClientError(res, req, 400, {
+        message: 'Unknown category. Add it under Admin → Categories first, or pick an existing category.',
+        errorCode: 'UNKNOWN_CATEGORY',
+      });
     }
 
     const client = await pool.pool.connect();
@@ -360,7 +424,6 @@ router.post('/products', upload.array('images', 10), handleUploadError, async (r
       const firstTierPrice = getFirstTierPrice(parsedOverrides);
       const normalizedName = String(name).trim();
       const normalizedDescription = String(description || '').trim();
-      const normalizedCategory = String(category || 'Uncategorized').trim() || 'Uncategorized';
       const normalizedDiscount = parseNonNegativeNumber(discount, 0);
       const normalizedStock = parseNonNegativeNumber(stock_quantity, 0);
       const normalizedIsActive = is_active !== 'false' && is_active !== false;
@@ -442,33 +505,37 @@ router.post('/products', upload.array('images', 10), handleUploadError, async (r
     });
 
   } catch (error) {
-    console.error('Create product error:', {
-      requestId: req.id,
-      code: error?.code,
-      constraint: error?.constraint,
-      message: error?.message,
+    logStructured('error', {
+      requestId: req.requestId,
+      event: 'admin_create_product_failed',
+      pgCode: error.code,
+      constraint: error.constraint,
+      detail: error.detail,
+      message: error.message,
     });
     const mapped = mapProductWriteError(error);
-    res.status(mapped.status).json({
-      success: false,
-      message: mapped.message,
-      requestId: req.id,
-      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error',
-    });
+    sendMappedProductError(res, req, mapped, error);
   }
 });
 
 // @route   PUT /api/admin/products/:id
 // @desc    Update product
 // @access  Admin
-router.put('/products/:id', upload.array('images', 1), handleUploadError, [
+router.put('/products/:id', adminProductWriteLimiter, uploadLimiter, upload.array('images', 1), handleUploadError, [
   body('name').optional().trim().notEmpty().withMessage('Product name is required'),
   body('discount').optional({ values: 'falsy' }).isFloat({ min: 0, max: 100 }).withMessage('Discount must be between 0 and 100'),
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      return res.status(400).json({ message: firstValidationMessage(errors), errors: errors.array() });
+      logAdminProductEvent(req, 'warn', 'admin_product_update_validation', {
+        errors: errors.array(),
+      });
+      return jsonClientError(res, req, 400, {
+        message: firstValidationMessage(errors),
+        errors: errors.array(),
+        errorCode: 'VALIDATION_ERROR',
+      });
     }
 
     const { id } = req.params;
@@ -477,7 +544,8 @@ router.put('/products/:id', upload.array('images', 1), handleUploadError, [
     // Check if product exists
     const existingProduct = await pool.query('SELECT id, discount, name, pricing_type FROM products WHERE id = $1', [id]);
     if (existingProduct.rows.length === 0) {
-      return res.status(404).json({ message: 'Product not found' });
+      logAdminProductEvent(req, 'warn', 'admin_product_update_not_found', { productId: id });
+      return jsonClientError(res, req, 404, { message: 'Product not found', errorCode: 'PRODUCT_NOT_FOUND' });
     }
     const previousDiscount = parseFloat(existingProduct.rows[0].discount || 0);
 
@@ -506,6 +574,26 @@ router.put('/products/:id', upload.array('images', 1), handleUploadError, [
     const priceNum = normalizeOptionalNumeric(updateData.price_per_kg);
     if (priceNum !== undefined) updateData.price_per_kg = priceNum;
     else if (updateData.price_per_kg === '') delete updateData.price_per_kg;
+
+    if (Object.prototype.hasOwnProperty.call(updateData, 'category')) {
+      const normalizedCat = String(updateData.category || '').trim() || 'Uncategorized';
+      const allowedCategories = await getProductCategories();
+      const categoryOk = allowedCategories.some(
+        (c) => c.toLowerCase() === normalizedCat.toLowerCase(),
+      );
+      if (!categoryOk) {
+        logAdminProductEvent(req, 'warn', 'admin_product_update_category_invalid', {
+          productId: id,
+          category: normalizedCat,
+          allowedCategoryCount: allowedCategories.length,
+        });
+        return jsonClientError(res, req, 400, {
+          message: 'Unknown category. Add it under Admin → Categories first, or pick an existing category.',
+          errorCode: 'UNKNOWN_CATEGORY',
+        });
+      }
+      updateData.category = normalizedCat;
+    }
 
     // Columns that don't exist in the schema — skip them
     const skipKeys = new Set(['id', 'slug', 'category_id', 'sku', 'weight',
@@ -536,7 +624,8 @@ router.put('/products/:id', upload.array('images', 1), handleUploadError, [
       try {
         parsedOverrides = parseAndNormalizeWeightOverrides(weightPriceOverridesRaw);
       } catch (e) {
-        return res.status(400).json({ message: e.message });
+        logAdminProductEvent(req, 'warn', 'admin_product_update_weight_invalid', { productId: id, reason: e.message });
+        return jsonClientError(res, req, 400, { message: e.message, errorCode: 'INVALID_WEIGHT_OVERRIDES' });
       }
     }
 
@@ -559,7 +648,8 @@ router.put('/products/:id', upload.array('images', 1), handleUploadError, [
         validateWeightOverridesForPricingType(nextPricingType, effectiveOverrides);
       } catch (e) {
         await client.query('ROLLBACK');
-        return res.status(400).json({ message: e.message });
+        logAdminProductEvent(req, 'warn', 'admin_product_update_tiers_invalid', { productId: id, reason: e.message });
+        return jsonClientError(res, req, 400, { message: e.message, errorCode: 'INVALID_WEIGHT_TIERS' });
       }
       if (parsedOverrides !== undefined) {
         const firstTierPrice = getFirstTierPrice(parsedOverrides);
@@ -620,15 +710,17 @@ router.put('/products/:id', upload.array('images', 1), handleUploadError, [
     });
 
   } catch (error) {
-    console.error('Update product error:', {
-      requestId: req.id,
-      productId: req.params?.id,
-      code: error?.code,
-      constraint: error?.constraint,
-      message: error?.message,
+    logStructured('error', {
+      requestId: req.requestId,
+      event: 'admin_update_product_failed',
+      productId: req.params.id,
+      pgCode: error.code,
+      constraint: error.constraint,
+      detail: error.detail,
+      message: error.message,
     });
     const mapped = mapProductWriteError(error);
-    res.status(mapped.status).json({ success: false, message: mapped.message, requestId: req.id });
+    sendMappedProductError(res, req, mapped, error);
   }
 });
 
@@ -644,7 +736,8 @@ router.delete('/products/:id', async (req, res) => {
     const existingProduct = await client.query('SELECT id FROM products WHERE id = $1', [id]);
     if (existingProduct.rows.length === 0) {
       await client.query('ROLLBACK');
-      return res.status(404).json({ message: 'Product not found' });
+      logAdminProductEvent(req, 'warn', 'admin_product_delete_not_found', { productId: id });
+      return jsonClientError(res, req, 404, { message: 'Product not found', errorCode: 'PRODUCT_NOT_FOUND' });
     }
     // Keep order history intact (order_items snapshots name/price), but unlink FK to allow catalog deletion.
     await client.query('UPDATE order_items SET product_id = NULL WHERE product_id = $1', [id]);
@@ -659,16 +752,18 @@ router.delete('/products/:id', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Delete product error:', {
-      requestId: req.id,
-      productId: req.params?.id,
-      code: error?.code,
-      constraint: error?.constraint,
-      message: error?.message,
+    logStructured('error', {
+      requestId: req.requestId,
+      event: 'admin_delete_product_failed',
+      productId: req.params.id,
+      pgCode: error.code,
+      constraint: error.constraint,
+      detail: error.detail,
+      message: error.message,
     });
     try { await client.query('ROLLBACK'); } catch (_) {}
     const mapped = mapProductWriteError(error);
-    res.status(mapped.status).json({ success: false, message: mapped.message, requestId: req.id });
+    sendMappedProductError(res, req, mapped, error);
   } finally {
     client.release();
   }
@@ -1386,6 +1481,8 @@ router.put('/settings', async (req, res) => {
       );
     }
 
+    if (updates.length > 0) await invalidateStoreSettingsOrder();
+
     res.json({ success: true, message: 'Settings saved successfully' });
   } catch (error) {
     console.error('Update settings error:', error);
@@ -1425,6 +1522,7 @@ async function setProductCategories(categories) {
     'INSERT INTO store_settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value = $2, updated_at = CURRENT_TIMESTAMP',
     [PRODUCT_CATEGORIES_KEY, jsonValue],
   );
+  await invalidateProductCategories();
 }
 
 // @route   GET /api/admin/categories
@@ -1595,7 +1693,7 @@ router.put(
 );
 
 // @route   POST /api/admin/marketing-banners
-router.post('/marketing-banners', optionalSingleImageUpload, handleUploadError, async (req, res) => {
+router.post('/marketing-banners', uploadLimiter, optionalSingleImageUpload, handleUploadError, async (req, res) => {
   try {
     const { title, subtitle, link_url, sort_order, is_active, image_url } = req.body;
     let finalImage = String(image_url || '').trim();

@@ -2,6 +2,7 @@ const express = require('express');
 const { query } = require('../database/config');
 const { authenticateToken, optionalAuth } = require('../middleware/auth');
 const { validateUUID } = require('../middleware/validation');
+const { jsonClientError, logApiError } = require('../utils/apiErrors');
 
 const router = express.Router();
 
@@ -89,10 +90,10 @@ router.get('/', authenticateToken, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Get cart error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Internal server error',
+    logApiError(req, 'cart_get_failed', error);
+    return jsonClientError(res, req, 500, {
+      message: 'Failed to load cart',
+      errorCode: 'CART_GET_FAILED',
     });
   }
 });
@@ -216,10 +217,10 @@ router.post('/add', authenticateToken, async (req, res) => {
     }
 
   } catch (error) {
-    console.error('Add to cart error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Internal server error',
+    logApiError(req, 'cart_add_failed', error);
+    return jsonClientError(res, req, 500, {
+      message: 'Failed to add to cart',
+      errorCode: 'CART_ADD_FAILED',
     });
   }
 });
@@ -303,10 +304,10 @@ router.put('/:item_id', authenticateToken, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Update cart item error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Internal server error',
+    logApiError(req, 'cart_update_failed', error);
+    return jsonClientError(res, req, 500, {
+      message: 'Failed to update cart item',
+      errorCode: 'CART_UPDATE_FAILED',
     });
   }
 });
@@ -342,10 +343,10 @@ router.delete('/:item_id', authenticateToken, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Remove cart item error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Internal server error',
+    logApiError(req, 'cart_remove_failed', error);
+    return jsonClientError(res, req, 500, {
+      message: 'Failed to remove cart item',
+      errorCode: 'CART_REMOVE_FAILED',
     });
   }
 });
@@ -369,10 +370,10 @@ router.delete('/', authenticateToken, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Clear cart error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Internal server error',
+    logApiError(req, 'cart_clear_failed', error);
+    return jsonClientError(res, req, 500, {
+      message: 'Failed to clear cart',
+      errorCode: 'CART_CLEAR_FAILED',
     });
   }
 });
@@ -400,10 +401,10 @@ router.get('/count', authenticateToken, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Get cart count error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Internal server error',
+    logApiError(req, 'cart_count_failed', error);
+    return jsonClientError(res, req, 500, {
+      message: 'Failed to load cart count',
+      errorCode: 'CART_COUNT_FAILED',
     });
   }
 });
@@ -498,10 +499,10 @@ router.post('/merge', authenticateToken, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Merge cart error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Internal server error',
+    logApiError(req, 'cart_merge_failed', error);
+    return jsonClientError(res, req, 500, {
+      message: 'Failed to merge cart',
+      errorCode: 'CART_MERGE_FAILED',
     });
   }
 });
@@ -510,9 +511,10 @@ router.post('/merge', authenticateToken, async (req, res) => {
 // @desc    Validate and apply a coupon code to the cart
 // @access  Private
 router.post('/coupon', authenticateToken, async (req, res) => {
-  return res.status(503).json({
-    success: false,
+  return jsonClientError(res, req, 503, {
     error: { code: 'FEATURE_UNAVAILABLE', message: 'Coupon system not available' },
+    errorCode: 'FEATURE_UNAVAILABLE',
+    message: 'Coupon system not available',
   });
 });
 

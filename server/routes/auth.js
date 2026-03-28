@@ -5,6 +5,7 @@ const jwt = require('jsonwebtoken');
 const { authenticateToken } = require('../middleware/auth');
 const { authLimiter } = require('../middleware/rateLimit');
 const { getJwtSecret } = require('../config/jwt');
+const { jsonClientError, logApiError } = require('../utils/apiErrors');
 const { isFirebaseAdminConfigured, verifyFirebaseIdToken } = require('../services/firebaseAdmin');
 
 // Safe db query accessor
@@ -56,8 +57,11 @@ router.post('/register', authLimiter, async (req, res) => {
     setAuthCookie(res, token);
     res.status(201).json({ success: true, message: 'Registered successfully', data: { user, token } });
   } catch (error) {
-    console.error('Register error:', error);
-    res.status(500).json({ success: false, message: 'Server error' });
+    logApiError(req, 'auth_register_failed', error);
+    return jsonClientError(res, req, 500, {
+      message: 'Server error',
+      errorCode: 'AUTH_REGISTER_FAILED',
+    });
   }
 });
 
@@ -88,8 +92,11 @@ router.post('/login', authLimiter, async (req, res) => {
     setAuthCookie(res, token);
     res.json({ success: true, message: 'Logged in successfully', data: { user: { id: user.id, phone: user.phone, name: user.name, is_admin: user.is_admin }, token } });
   } catch (error) {
-    console.error('Login error:', error);
-    res.status(500).json({ success: false, message: 'Server error' });
+    logApiError(req, 'auth_login_failed', error);
+    return jsonClientError(res, req, 500, {
+      message: 'Server error',
+      errorCode: 'AUTH_LOGIN_FAILED',
+    });
   }
 });
 
@@ -161,8 +168,11 @@ router.post('/google', authLimiter, async (req, res) => {
     setAuthCookie(res, token);
     res.json({ success: true, message: 'Google sign-in successful', data: { user, token } });
   } catch (error) {
-    console.error('Google auth error:', error);
-    res.status(401).json({ success: false, message: 'Google authentication failed' });
+    logApiError(req, 'auth_google_failed', error);
+    return jsonClientError(res, req, 401, {
+      message: 'Google authentication failed',
+      errorCode: 'AUTH_GOOGLE_FAILED',
+    });
   }
 });
 
@@ -186,7 +196,11 @@ router.get('/me', authenticateToken, async (req, res) => {
       },
     });
   } catch (error) {
-    res.status(401).json({ success: false, message: 'Not authenticated' });
+    logApiError(req, 'auth_me_failed', error);
+    return jsonClientError(res, req, 401, {
+      message: 'Not authenticated',
+      errorCode: 'AUTH_ME_FAILED',
+    });
   }
 });
 
@@ -229,8 +243,11 @@ router.post('/link/google', authenticateToken, async (req, res) => {
       data: { user: { ...user, google_linked: !!user.google_uid } },
     });
   } catch (error) {
-    console.error('Link google error:', error);
-    return res.status(400).json({ success: false, message: 'Failed to link Google account' });
+    logApiError(req, 'auth_link_google_failed', error);
+    return jsonClientError(res, req, 400, {
+      message: 'Failed to link Google account',
+      errorCode: 'AUTH_LINK_GOOGLE_FAILED',
+    });
   }
 });
 
@@ -251,8 +268,11 @@ router.delete('/link/google', authenticateToken, async (req, res) => {
       data: { user: { ...user, google_linked: !!user.google_uid } },
     });
   } catch (error) {
-    console.error('Unlink google error:', error);
-    return res.status(400).json({ success: false, message: 'Failed to unlink Google account' });
+    logApiError(req, 'auth_unlink_google_failed', error);
+    return jsonClientError(res, req, 400, {
+      message: 'Failed to unlink Google account',
+      errorCode: 'AUTH_UNLINK_GOOGLE_FAILED',
+    });
   }
 });
 
@@ -266,7 +286,11 @@ router.put('/profile', authenticateToken, async (req, res) => {
     if (result.rows.length === 0) return res.status(404).json({ success: false, message: 'User not found' });
     res.json({ success: true, message: 'Profile updated', data: { user: result.rows[0] } });
   } catch (error) {
-    res.status(500).json({ success: false, message: 'Server error' });
+    logApiError(req, 'auth_profile_update_failed', error);
+    return jsonClientError(res, req, 500, {
+      message: 'Server error',
+      errorCode: 'AUTH_PROFILE_UPDATE_FAILED',
+    });
   }
 });
 

@@ -3,7 +3,9 @@ const Razorpay = require('razorpay');
 const crypto = require('crypto');
 const { authenticateToken } = require('../middleware/auth');
 const { body, validationResult } = require('express-validator');
-const pool = require('../database/config');
+const { pool } = require('../database/config');
+const { checkoutLimiter } = require('../middleware/rateLimit');
+const { jsonClientError, logApiError } = require('../utils/apiErrors');
 
 const router = express.Router();
 
@@ -36,7 +38,7 @@ const mapRazorpayError = (error, fallbackMessage) => {
 // @route   POST /api/razorpay/create-order
 // @desc    Create Razorpay order for checkout
 // @access  Private
-router.post('/create-order', authenticateToken, [
+router.post('/create-order', authenticateToken, checkoutLimiter, [
   body('amount').notEmpty().withMessage('Amount is required').bail()
     .isFloat({ min: 1 }).withMessage('Amount must be at least ₹1'),
   body('currency').optional().isString().withMessage('Currency must be a string'),
@@ -91,7 +93,7 @@ router.post('/create-order', authenticateToken, [
 // @route   POST /api/razorpay/payment-link
 // @desc    Create Razorpay payment link for order
 // @access  Private
-router.post('/payment-link', authenticateToken, [
+router.post('/payment-link', authenticateToken, checkoutLimiter, [
   body('orderId').notEmpty().withMessage('Order ID is required'),
   body('amount').isFloat({ min: 1 }).withMessage('Amount must be at least ₹1'),
   body('userPhone').notEmpty().withMessage('Phone number is required'),
@@ -174,7 +176,7 @@ router.post('/payment-link', authenticateToken, [
 // @route   POST /api/razorpay/verify-payment
 // @desc    Verify Razorpay payment
 // @access  Private
-router.post('/verify-payment', authenticateToken, [
+router.post('/verify-payment', authenticateToken, checkoutLimiter, [
   body('paymentId').notEmpty().withMessage('Payment ID is required'),
   body('orderId').notEmpty().withMessage('Order ID is required'),
   body('signature').notEmpty().withMessage('Signature is required'),
@@ -206,15 +208,34 @@ router.post('/verify-payment', authenticateToken, [
     if (!isSignatureValid) {
       return res.status(400).json({
         success: false,
+        ref: req.requestId,
         message: 'Invalid payment signature',
       });
     }
 
-    // Fetch payment details from Razorpay
     const payment = await razorpay.payments.fetch(paymentId);
 
-    if (payment.status === 'captured') {
+    if (payment.status !== 'captured') {
+      return res.status(400).json({
+        success: false,
+        ref: req.requestId,
+        message: 'Payment not captured',
+      });
+    }
+
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      let ins;
       try {
+        ins = await client.query(
+          `INSERT INTO razorpay_payment_processed (payment_id, user_id) VALUES ($1, $2::uuid)
+           ON CONFLICT (payment_id) DO NOTHING RETURNING payment_id`,
+          [paymentId, req.user.id],
+        );
+      } catch (insErr) {
+        if (insErr.code !== '42P01') throw insErr;
+        await client.query('ROLLBACK');
         await pool.query(
           `UPDATE orders
            SET razorpay_payment_id = $1,
@@ -223,38 +244,66 @@ router.post('/verify-payment', authenticateToken, [
            WHERE razorpay_order_id = $2 AND user_id = $3`,
           [paymentId, orderId, req.user.id],
         );
-      } catch (dbErr) {
-        console.error('verify-payment: order update skipped', dbErr.message);
+        return res.json({
+          success: true,
+          message: 'Payment verified successfully (captured)',
+          paymentStatus: 'paid',
+          ref: req.requestId,
+        });
       }
 
-      res.json({
-        success: true,
-        message: 'Payment verified successfully (captured)',
-        paymentStatus: 'paid',
+      if (ins.rows.length === 0) {
+        await client.query('COMMIT');
+        return res.json({
+          success: true,
+          message: 'Payment already processed',
+          paymentStatus: 'paid',
+          idempotentReplay: true,
+          ref: req.requestId,
+        });
+      }
+
+      await client.query(
+        `UPDATE orders
+         SET razorpay_payment_id = $1,
+             updated_at = CURRENT_TIMESTAMP,
+             status = CASE WHEN status = 'pending' THEN 'confirmed' ELSE status END
+         WHERE razorpay_order_id = $2 AND user_id = $3`,
+        [paymentId, orderId, req.user.id],
+      );
+      await client.query('COMMIT');
+    } catch (dbErr) {
+      try {
+        await client.query('ROLLBACK');
+      } catch (_) { /* ignore */ }
+      logApiError(req, 'razorpay_verify_db_error', dbErr);
+      return jsonClientError(res, req, 500, {
+        message: 'Failed to record payment',
+        errorCode: 'RAZORPAY_VERIFY_DB_ERROR',
       });
-    } else {
-      res.status(400).json({
-        success: false,
-        message: 'Payment not captured',
-      });
+    } finally {
+      client.release();
     }
 
-  } catch (error) {
-    console.error('Verify payment error:', {
-      message: error?.message,
-      statusCode: error?.statusCode,
-      code: error?.error?.code,
-      description: error?.error?.description,
+    return res.json({
+      success: true,
+      message: 'Payment verified successfully (captured)',
+      paymentStatus: 'paid',
+      ref: req.requestId,
     });
+
+  } catch (error) {
+    logApiError(req, 'razorpay_verify_failed', error);
     const mapped = mapRazorpayError(error, 'Failed to verify payment');
-    res.status(mapped.status).json(mapped.body);
+    const body = { ...mapped.body, ref: req.requestId };
+    return res.status(mapped.status).json(body);
   }
 });
 
 // @route   POST /api/razorpay/cod-order
 // @desc    Create cash-on-delivery order (no payment)
 // @access  Private
-router.post('/cod-order', authenticateToken, [
+router.post('/cod-order', authenticateToken, checkoutLimiter, [
   body('orderId').notEmpty().withMessage('Order ID is required'),
 ], async (req, res) => {
   try {

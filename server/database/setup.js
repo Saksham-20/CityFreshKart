@@ -117,6 +117,21 @@ async function setupDatabase() {
       throw error;
     }
 
+    const migrationFiles = [
+      '005_weight_display_unit.sql',
+      '006_google_and_weight_overrides.sql',
+      '007_drop_products_category_check.sql',
+      '008_idempotency_and_payment_dedup.sql',
+      '009_hot_query_indexes.sql',
+    ];
+    for (const name of migrationFiles) {
+      const migrationPath = path.join(__dirname, 'migrations', name);
+      if (fs.existsSync(migrationPath)) {
+        await pool.query(fs.readFileSync(migrationPath, 'utf8'));
+        console.log(`✅ Migration applied: ${name}`);
+      }
+    }
+
     // Create users
     const bcrypt = require('bcryptjs');
     
@@ -215,17 +230,6 @@ async function setupDatabase() {
         }
       }
       console.log(`✅ Products synced — ${inserted} inserted, ${updated} updated with images & categories`);
-
-      const weightUnitPath = path.join(__dirname, 'migrations', '005_weight_display_unit.sql');
-      if (fs.existsSync(weightUnitPath)) {
-        await pool.query(fs.readFileSync(weightUnitPath, 'utf8'));
-        console.log('✅ weight_display_unit columns ensured');
-      }
-      const googleWeightPath = path.join(__dirname, 'migrations', '006_google_and_weight_overrides.sql');
-      if (fs.existsSync(googleWeightPath)) {
-        await pool.query(fs.readFileSync(googleWeightPath, 'utf8'));
-        console.log('✅ google auth and weight override columns ensured');
-      }
 
       // Seed representative custom weight tiers for per-kg products
       const tierSeed = {
