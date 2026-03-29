@@ -4,6 +4,7 @@ const useCart = () => {
   const {
     items,
     addToCart,
+    adjustPackCount,
     updateItemQuantity,
     removeFromCart,
     clearCart,
@@ -15,6 +16,7 @@ const useCart = () => {
   return {
     items,
     addToCart,
+    adjustPackCount,
     updateItemQuantity,
     removeFromCart,
     clearCart,

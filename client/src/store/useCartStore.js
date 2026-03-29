@@ -17,21 +17,38 @@ const normalizeQuantityForItem = (item, quantity) => {
   return parseFloat(q.toFixed(2));
 };
 
+/** Match cart row by stable line id (legacy: lineId was omitted, use product id). */
+const rowMatches = (item, lineKey) => {
+  if (item.lineId != null && item.lineId !== '') {
+    return item.lineId === lineKey;
+  }
+  return item.id === lineKey;
+};
+
+const migrateCartItems = (rawItems) => {
+  if (!Array.isArray(rawItems)) return [];
+  return rawItems.map((i, idx) => {
+    const packCount = Math.max(1, parseInt(i.packCount, 10) || 1);
+    const lineId = i.lineId || i.id || `legacy-${idx}`;
+    return { ...i, lineId, packCount };
+  });
+};
+
+const persist = (items) => {
+  localStorage.setItem('cart', JSON.stringify(items));
+};
+
 const useCartStore = create((set, get) => ({
-  // State
   items: [],
   loading: false,
   error: null,
 
-  // Dynamic settings (loaded from /api/settings on app init)
   freeDeliveryThreshold: 300,
   deliveryFeeAmount: 50,
   minOrderAmount: 0,
 
-  // Load store settings from the public API endpoint
   loadSettings: async () => {
     try {
-      // Prefer configured API base (axios instance), then fall back to common dev ports.
       let json;
       try {
         const res = await api.get('/settings');
@@ -57,7 +74,6 @@ const useCartStore = create((set, get) => ({
     }
   },
 
-  // Calculate cart summary using dynamic settings
   calculateSummary: () => {
     const { items, freeDeliveryThreshold, deliveryFeeAmount } = get();
 
@@ -73,83 +89,133 @@ const useCartStore = create((set, get) => ({
     };
   },
 
-  // Initialize cart from localStorage
   initialize: async () => {
     const savedCart = localStorage.getItem('cart');
     if (savedCart) {
       try {
-        set({ items: JSON.parse(savedCart) });
+        const parsed = JSON.parse(savedCart);
+        const items = migrateCartItems(parsed);
+        set({ items });
+        persist(items);
       } catch (error) {
         console.error('Error loading cart from localStorage:', error);
       }
     }
   },
 
-  // Add item to cart
   addToCart: (product, quantity = 1) => {
     const items = get().items;
-    const existingItem = items.find(i => i.id === product.id);
+    const productOverrides = product.weight_price_overrides || {};
+    const tiers = getTierWeightsFromOverrides(productOverrides);
+    const stub = {
+      ...product,
+      weight_price_overrides: productOverrides,
+      pricing_type: product.pricing_type || 'per_kg',
+    };
+    const normalizedQty = normalizeQuantityForItem(stub, quantity);
 
-    if (existingItem) {
-      const mergedQty = normalizeQuantityForItem(existingItem, existingItem.quantity + quantity);
-      const updated = items.map(i =>
-        i.id === product.id
-          ? { ...i, quantity: mergedQty }
-          : i,
-      );
-      set({ items: updated });
-      localStorage.setItem('cart', JSON.stringify(updated));
+    if (tiers.length > 0) {
+      const existingItem = items.find((i) => {
+        if (i.id !== product.id) return false;
+        const nEq = normalizeQuantityForItem(i, i.quantity);
+        return Math.abs(nEq - normalizedQty) < 1e-6;
+      });
+      if (existingItem) {
+        const key = existingItem.lineId || existingItem.id;
+        const updated = items.map((i) =>
+          rowMatches(i, key)
+            ? { ...i, packCount: (i.packCount || 1) + 1 }
+            : i,
+        );
+        set({ items: updated });
+        persist(updated);
+        return;
+      }
     } else {
-      const newItem = {
-        id: product.id,
-        name: product.name,
-        price_per_kg: product.price_per_kg,
-        discount: product.discount || 0,
-        image_url: product.image_url || '',
-        pricing_type: product.pricing_type || 'per_kg',
-        weight_display_unit: product.pricing_type === 'per_piece'
-          ? 'kg'
-          : (product.weight_display_unit === 'g' ? 'g' : 'kg'),
-        weight_price_overrides: product.weight_price_overrides || {},
-        quantity: normalizeQuantityForItem(product, quantity),
-      };
-      const updated = [...items, newItem];
-      set({ items: updated });
-      localStorage.setItem('cart', JSON.stringify(updated));
+      const existingItem = items.find((i) => i.id === product.id);
+      if (existingItem) {
+        const key = existingItem.lineId || existingItem.id;
+        const mergedQty = normalizeQuantityForItem(
+          existingItem,
+          existingItem.quantity + quantity,
+        );
+        const updated = items.map((i) =>
+          rowMatches(i, key) ? { ...i, quantity: mergedQty } : i,
+        );
+        set({ items: updated });
+        persist(updated);
+        return;
+      }
     }
+
+    const newItem = {
+      lineId: crypto.randomUUID(),
+      id: product.id,
+      name: product.name,
+      price_per_kg: product.price_per_kg,
+      discount: product.discount || 0,
+      image_url: product.image_url || '',
+      pricing_type: product.pricing_type || 'per_kg',
+      weight_display_unit: product.pricing_type === 'per_piece'
+        ? 'kg'
+        : (product.weight_display_unit === 'g' ? 'g' : 'kg'),
+      weight_price_overrides: productOverrides,
+      quantity: normalizedQty,
+      packCount: 1,
+    };
+    const updated = [...items, newItem];
+    set({ items: updated });
+    persist(updated);
   },
 
-  // Update item quantity
-  updateItemQuantity: (productId, quantity) => {
-    if (quantity <= 0) {
-      get().removeFromCart(productId);
+  adjustPackCount: (lineKey, delta) => {
+    const items = get().items;
+    const item = items.find((i) => rowMatches(i, lineKey));
+    if (!item) return;
+    const next = (item.packCount || 1) + delta;
+    if (next < 1) {
+      get().removeFromCart(lineKey);
       return;
     }
-    const items = get().items.map(i => (
-      i.id === productId ? { ...i, quantity: normalizeQuantityForItem(i, quantity) } : i
-    ));
-    set({ items });
-    localStorage.setItem('cart', JSON.stringify(items));
+    const updated = items.map((i) =>
+      rowMatches(i, lineKey) ? { ...i, packCount: next } : i,
+    );
+    set({ items: updated });
+    persist(updated);
   },
 
-  // Remove item from cart
-  removeFromCart: (productId) => {
-    const items = get().items.filter(i => i.id !== productId);
+  updateItemQuantity: (lineKey, quantity) => {
+    if (quantity <= 0) {
+      get().removeFromCart(lineKey);
+      return;
+    }
+    const items = get().items.map((i) =>
+      rowMatches(i, lineKey)
+        ? { ...i, quantity: normalizeQuantityForItem(i, quantity) }
+        : i,
+    );
     set({ items });
-    localStorage.setItem('cart', JSON.stringify(items));
+    persist(items);
   },
 
-  // Clear entire cart
+  removeFromCart: (lineKey) => {
+    const items = get().items.filter((i) => !rowMatches(i, lineKey));
+    set({ items });
+    persist(items);
+  },
+
   clearCart: () => {
     set({ items: [] });
     localStorage.removeItem('cart');
   },
 
-  // Check if product is in cart
-  isItemInCart: (productId) => get().items.some(i => i.id === productId),
+  isItemInCart: (productId) => get().items.some((i) => i.id === productId),
 
-  // Get cart item count
-  getCartItemCount: () => get().items.reduce((sum, item) => sum + item.quantity, 0),
+  getCartItemCount: () => get().items.reduce((sum, item) => {
+    const packs = item.packCount || 1;
+    const q = Number(item.quantity) || 0;
+    return sum + q * packs;
+  }, 0),
 }));
 
 export { useCartStore };

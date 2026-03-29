@@ -4,7 +4,8 @@ import { motion } from 'framer-motion';
 /**
  * QuantitySelector — reusable ± stepper used on ProductCard, CartItem, ProductDetail.
  * Props:
- *   quantity (number) — current quantity
+ *   quantity (number) — current quantity (used for min/max disable rules unless overridden)
+ *   displayLabel (string, optional) — shown instead of quantity in the center
  *   onIncrease (fn) — called when + is clicked
  *   onDecrease (fn) — called when - is clicked; component does NOT decrement below min
  *   min (number, default 1) — minimum allowed value
@@ -14,6 +15,7 @@ import { motion } from 'framer-motion';
  */
 const QuantitySelector = ({
   quantity,
+  displayLabel,
   onIncrease,
   onDecrease,
   min = 1,
@@ -43,8 +45,8 @@ const QuantitySelector = ({
         </svg>
       </motion.button>
 
-      <span className={`${s.text} font-semibold text-gray-900 text-center select-none`}>
-        {quantity}
+      <span className={`${s.text} font-semibold text-gray-900 text-center select-none min-w-0 px-0.5 truncate`}>
+        {displayLabel != null ? displayLabel : quantity}
       </span>
 
       <motion.button

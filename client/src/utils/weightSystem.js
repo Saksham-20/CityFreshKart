@@ -46,6 +46,23 @@ export const getTierWeightsFromOverrides = (weightPriceOverrides = {}) => {
   return [...new Set(weights)].sort((a, b) => a - b);
 };
 
+/**
+ * Cart line for a product on the shop grid: with admin tiers, pick the row whose pack weight matches selectedTierQty; else first line for that product.
+ */
+export const findCartLineForProduct = (items, productId, selectedTierQty, weightPriceOverrides = {}) => {
+  if (!Array.isArray(items) || items.length === 0 || productId == null) return undefined;
+  const lines = items.filter((i) => {
+    const pid = i.product_id ?? i.id;
+    return pid === productId || String(pid) === String(productId);
+  });
+  if (lines.length === 0) return undefined;
+  const tiers = getTierWeightsFromOverrides(weightPriceOverrides);
+  if (tiers.length === 0) return lines[0];
+  const w = Number(selectedTierQty);
+  if (!Number.isFinite(w)) return lines[0];
+  return lines.find((i) => Math.abs(Number(i.quantity) - w) < 1e-6);
+};
+
 export const getAdjacentTierWeight = (currentWeight, tiers = [], direction = 1) => {
   if (!Array.isArray(tiers) || tiers.length === 0) return currentWeight;
   const current = Number(currentWeight) || tiers[0];
@@ -73,7 +90,7 @@ export const calculatePriceWithOverrides = (pricePerKg, weight, discount = 0, we
   };
 };
 
-/** Single cart row: tier override + discount (matches useCartStore.calculateSummary). */
+/** Single cart row: tier override + discount × packCount (matches useCartStore.calculateSummary). */
 export const getCartLineTotal = (item) => {
   const { finalPrice } = calculatePriceWithOverrides(
     item.price_per_kg || 0,
@@ -81,7 +98,8 @@ export const getCartLineTotal = (item) => {
     item.discount || 0,
     item.weight_price_overrides || {},
   );
-  return finalPrice;
+  const packs = Math.max(1, parseInt(item.packCount, 10) || 1);
+  return Math.round(finalPrice * packs * 100) / 100;
 };
 
 /** Cart line breakdown for UI (line total + whether admin tiers apply). */
@@ -94,7 +112,13 @@ export const getCartLinePricing = (item) => {
     item.discount || 0,
     overrides,
   );
-  return { ...breakdown, hasTiers };
+  const packs = Math.max(1, parseInt(item.packCount, 10) || 1);
+  return {
+    ...breakdown,
+    basePrice: Math.round(breakdown.basePrice * packs * 100) / 100,
+    finalPrice: Math.round(breakdown.finalPrice * packs * 100) / 100,
+    hasTiers,
+  };
 };
 
 /**
@@ -155,12 +179,15 @@ export const formatWeightDisplay = (weightKg, unit = 'g') => {
 
 /** Cart/checkout: human-readable total weight or piece count */
 export const formatCartQuantityLabel = (item) => {
+  const packs = Math.max(1, parseInt(item.packCount, 10) || 1);
   if (item.pricing_type === 'per_piece') {
     const q = Number(item.quantity) || 0;
-    return `${q} ${q === 1 ? 'pc' : 'pcs'}`;
+    const unit = `${q} ${q === 1 ? 'pc' : 'pcs'}`;
+    return packs > 1 ? `${packs} × ${unit}` : unit;
   }
   const u = item.weight_display_unit === 'g' ? 'g' : 'kg';
-  return formatWeightDisplay(item.quantity, u);
+  const w = formatWeightDisplay(item.quantity, u);
+  return packs > 1 ? `${packs} × ${w}` : w;
 };
 
 /** Order line quantity (order items use quantity_kg + optional weight_display_unit) */

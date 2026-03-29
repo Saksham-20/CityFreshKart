@@ -95,13 +95,17 @@ const CheckoutPage = () => {
   };
 
   const placeOrder = async (paymentData = {}) => {
-    const orderItems = items.map(item => ({
-      product_id: item.id,
-      product_name: item.name,
-      quantity_kg: item.quantity,
-      price_per_kg: item.price_per_kg,
-      discount: item.discount || 0,
-    }));
+    const orderItems = items.flatMap((item) => {
+      const packs = Math.max(1, parseInt(item.packCount, 10) || 1);
+      const line = {
+        product_id: item.id,
+        product_name: item.name,
+        quantity_kg: item.quantity,
+        price_per_kg: item.price_per_kg,
+        discount: item.discount || 0,
+      };
+      return Array.from({ length: packs }, () => ({ ...line }));
+    });
 
     const response = await api.post('/orders', {
       items: orderItems,
@@ -236,7 +240,7 @@ const CheckoutPage = () => {
             {items.map(item => {
               const itemPrice = getCartLineTotal(item);
               return (
-                <div key={item.id} className="flex justify-between text-sm text-on-surface-variant">
+                <div key={item.lineId || item.id} className="flex justify-between text-sm text-on-surface-variant">
                   <span className="flex-1 pr-2">{item.name} × {formatCartQuantityLabel(item)}</span>
                   <span className="font-medium text-on-surface">₹{itemPrice.toFixed(2)}</span>
                 </div>

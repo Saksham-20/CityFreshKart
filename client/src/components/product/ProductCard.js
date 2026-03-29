@@ -1,13 +1,19 @@
 import React, { useMemo, useCallback, useState, useEffect } from 'react';
 import useCart from '../../hooks/useCart';
 import { getImageUrl, IMAGE_DIMS } from '../../utils/imageUtils';
-import { formatWeightDisplay, resolveBasePriceForWeight, getTierWeightsFromOverrides, getAdjacentTierWeight } from '../../utils/weightSystem';
+import {
+  formatWeightDisplay,
+  formatCartQuantityLabel,
+  resolveBasePriceForWeight,
+  getTierWeightsFromOverrides,
+  findCartLineForProduct,
+} from '../../utils/weightSystem';
 
 const KG_OPTIONS = [0.5, 1];
 const PIECE_OPTIONS = [1, 2, 3, 4];
 
 const ProductCard = React.memo(({ product, className = '', highlightFlash = false }) => {
-  const { addToCart, removeFromCart, items: cartItems, updateItemQuantity } = useCart();
+  const { addToCart, removeFromCart, items: cartItems, updateItemQuantity, adjustPackCount } = useCart();
 
   const isPerPiece = product.pricing_type === 'per_piece';
   const weightUnit = isPerPiece ? 'kg' : (product.weight_display_unit === 'g' ? 'g' : 'kg');
@@ -41,7 +47,15 @@ const ProductCard = React.memo(({ product, className = '', highlightFlash = fals
   );
 
   const productId = product.product_id || product.id;
-  const cartItem = useMemo(() => cartItems?.find(i => (i.product_id || i.id) === productId), [cartItems, productId]);
+  const cartItem = useMemo(
+    () => findCartLineForProduct(
+      cartItems,
+      productId,
+      selectedQty,
+      product.weight_price_overrides || {},
+    ),
+    [cartItems, productId, selectedQty, product.weight_price_overrides],
+  );
   const isInCart = !!cartItem;
   const cartQty = cartItem?.quantity || 0;
   const outOfStock = (product.quantity_available !== undefined && parseFloat(product.quantity_available) <= 0) ||
@@ -60,37 +74,35 @@ const ProductCard = React.memo(({ product, className = '', highlightFlash = fals
     }, selectedQty);
   }, [addToCart, product, productId, pricePerUnit, selectedQty, discountPercent, weightUnit]);
 
+  const lineKey = cartItem ? (cartItem.lineId || cartItem.id) : null;
+
   const handleIncrease = useCallback(() => {
-    if (!cartItem) return;
+    if (!cartItem || !lineKey) return;
     const tiers = getTierWeightsFromOverrides(cartItem.weight_price_overrides || product.weight_price_overrides || {});
     if (tiers.length > 0) {
-      const nextTier = getAdjacentTierWeight(cartQty, tiers, 1);
-      updateItemQuantity(cartItem.id, parseFloat(nextTier.toFixed(2)));
+      adjustPackCount(lineKey, 1);
       return;
     }
-    updateItemQuantity(cartItem.id, parseFloat((cartQty + selectedQty).toFixed(2)));
-  }, [cartItem, cartQty, product.weight_price_overrides, selectedQty, updateItemQuantity]);
+    updateItemQuantity(lineKey, parseFloat((cartQty + selectedQty).toFixed(2)));
+  }, [cartItem, cartQty, lineKey, product.weight_price_overrides, selectedQty, adjustPackCount, updateItemQuantity]);
 
   const handleDecrease = useCallback(() => {
-    if (!cartItem) return;
+    if (!cartItem || !lineKey) return;
     const tiers = getTierWeightsFromOverrides(cartItem.weight_price_overrides || product.weight_price_overrides || {});
     if (tiers.length > 0) {
-      const prevTier = getAdjacentTierWeight(cartQty, tiers, -1);
-      if (prevTier >= cartQty - 1e-6) {
-        removeFromCart(cartItem.id);
+      if ((cartItem.packCount || 1) > 1) {
+        adjustPackCount(lineKey, -1);
       } else {
-        updateItemQuantity(cartItem.id, parseFloat(prevTier.toFixed(2)));
+        removeFromCart(lineKey);
       }
       return;
     }
     const newQty = parseFloat((cartQty - selectedQty).toFixed(2));
-    if (newQty <= 0) removeFromCart(cartItem.id);
-    else updateItemQuantity(cartItem.id, newQty);
-  }, [cartItem, cartQty, product.weight_price_overrides, selectedQty, removeFromCart, updateItemQuantity]);
+    if (newQty <= 0) removeFromCart(lineKey);
+    else updateItemQuantity(lineKey, newQty);
+  }, [cartItem, cartQty, lineKey, product.weight_price_overrides, selectedQty, adjustPackCount, removeFromCart, updateItemQuantity]);
 
-  const cartQtyLabel = isPerPiece
-    ? `${cartQty} ${cartQty === 1 ? 'pc' : 'pcs'}`
-    : formatWeightDisplay(cartQty, weightUnit);
+  const cartQtyLabel = cartItem ? formatCartQuantityLabel(cartItem) : '';
 
   const unitLabel = isPerPiece ? '/pc' : `/${formatWeightDisplay(selectedQty, weightUnit)}`;
 

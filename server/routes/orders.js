@@ -197,9 +197,6 @@ router.post('/', authenticateToken, checkoutLimiter, async (req, res) => {
     } = await getStoreOrderSettings();
 
     const uniqueProductIds = [...new Set(items.map(item => item.product_id).filter(Boolean))];
-    if (uniqueProductIds.length !== items.length) {
-      return res.status(400).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Each order item must reference a valid unique product' } });
-    }
 
     const productsResult = await query(
       `SELECT id, name, price_per_kg, discount, pricing_type, is_active,

@@ -4,8 +4,8 @@ import useCart from '../hooks/useCart';
 import { getImageUrl, getPlaceholderImage, IMAGE_DIMS } from '../utils/imageUtils';
 import {
   formatCartQuantityLabel,
-  getAdjacentTierWeight,
   getCartLinePricing,
+  getCartLineTotal,
   getTierWeightsFromOverrides,
 } from '../utils/weightSystem';
 
@@ -15,7 +15,7 @@ const FREE_DELIVERY_THRESHOLD = 300;
 
 const CartPage = () => {
   const navigate = useNavigate();
-  const { items, removeFromCart, updateItemQuantity, calculateSummary } = useCart();
+  const { items, removeFromCart, updateItemQuantity, adjustPackCount, calculateSummary } = useCart();
   const { subtotal, deliveryFee, total } = calculateSummary();
 
   const amountToFree = Math.max(FREE_DELIVERY_THRESHOLD - subtotal, 0);
@@ -30,33 +30,38 @@ const CartPage = () => {
   const stepFor = (item) => (item.pricing_type === 'per_piece' ? PIECE_STEP : GRAM_STEP_KG);
   const minQtyFor = (item) => (item.pricing_type === 'per_piece' ? PIECE_STEP : GRAM_STEP_KG);
 
+  const lineKeyFor = (item) => item.lineId || item.id;
+
   const handleIncrease = (item) => {
+    const lk = lineKeyFor(item);
     if (item.pricing_type !== 'per_piece') {
       const tiers = tierOptionsFor(item);
       if (tiers.length > 0) {
-        const nextTier = getAdjacentTierWeight(item.quantity, tiers, 1);
-        updateItemQuantity(item.id, parseFloat(nextTier.toFixed(2)));
+        adjustPackCount(lk, 1);
         return;
       }
     }
     const step = stepFor(item);
-    updateItemQuantity(item.id, parseFloat((item.quantity + step).toFixed(2)));
+    updateItemQuantity(lk, parseFloat((item.quantity + step).toFixed(2)));
   };
   const handleDecrease = (item) => {
+    const lk = lineKeyFor(item);
     if (item.pricing_type !== 'per_piece') {
       const tiers = tierOptionsFor(item);
       if (tiers.length > 0) {
-        const nextTier = getAdjacentTierWeight(item.quantity, tiers, -1);
-        if (nextTier >= item.quantity - 1e-6) removeFromCart(item.id);
-        else updateItemQuantity(item.id, parseFloat(nextTier.toFixed(2)));
+        if ((item.packCount || 1) > 1) {
+          adjustPackCount(lk, -1);
+        } else {
+          removeFromCart(lk);
+        }
         return;
       }
     }
     const step = stepFor(item);
     const minQ = minQtyFor(item);
     const newQty = parseFloat((item.quantity - step).toFixed(2));
-    if (newQty < minQ - 1e-6) removeFromCart(item.id);
-    else updateItemQuantity(item.id, newQty);
+    if (newQty < minQ - 1e-6) removeFromCart(lk);
+    else updateItemQuantity(lk, newQty);
   };
 
   if (items.length === 0) {
@@ -128,7 +133,7 @@ const CartPage = () => {
             const isPerPiece = item.pricing_type === 'per_piece';
             const pricePerKg = item.price_per_kg || 0;
             const pricing = getCartLinePricing(item);
-            const lineTotal = pricing.finalPrice.toFixed(2);
+            const lineTotal = getCartLineTotal(item).toFixed(2);
             const unitLabel = isPerPiece ? '/pc' : '/kg';
             const priceMeta = pricing.hasTiers
               ? `₹${Number.isInteger(pricing.basePrice) ? pricing.basePrice : pricing.basePrice.toFixed(2)} for ${formatCartQuantityLabel(item)}`
@@ -136,7 +141,7 @@ const CartPage = () => {
             const discountSuffix = item.discount > 0 ? ` · ${item.discount}% off` : '';
 
             return (
-              <div key={item.id} className="flex items-center gap-3 px-4 py-3">
+              <div key={item.lineId || item.id} className="flex items-center gap-3 px-4 py-3">
                 {/* Image */}
                 <div className="flex-shrink-0 w-14 h-14 rounded-xl overflow-hidden bg-surface-container-low outline outline-1 outline-outline-variant/10">
                   <img
@@ -157,7 +162,7 @@ const CartPage = () => {
                     <h3 className="text-sm font-semibold text-on-surface truncate pr-1">{item.name}</h3>
                     <button
                       type="button"
-                      onClick={() => removeFromCart(item.id)}
+                      onClick={() => removeFromCart(lineKeyFor(item))}
                       className="flex-shrink-0 text-on-surface-variant hover:text-error transition-colors p-0.5 -mt-0.5"
                     >
                       <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

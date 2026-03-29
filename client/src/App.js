@@ -79,6 +79,7 @@ function App() {
   // Initialize auth and store settings on app load
   useEffect(() => {
     initialize();
+    useCartStore.getState().initialize();
     useCartStore.getState().loadSettings();
   }, [initialize]);
 

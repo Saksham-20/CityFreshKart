@@ -1,24 +1,55 @@
 import React from 'react';
 import useCart from '../../hooks/useCart';
 import { getImageUrl, getPlaceholderImage, IMAGE_DIMS } from '../../utils/imageUtils';
-import { formatCartQuantityLabel, getCartLinePricing, getCartLineTotal } from '../../utils/weightSystem';
+import {
+  formatCartQuantityLabel,
+  getCartLinePricing,
+  getCartLineTotal,
+  getTierWeightsFromOverrides,
+} from '../../utils/weightSystem';
 import QuantitySelector from '../ui/QuantitySelector';
 
-const WEIGHT_STEP = 0.5;
+const GRAM_STEP_KG = 0.05;
+const PIECE_STEP = 1;
+const MIN_KG = GRAM_STEP_KG;
 
 const CartItem = ({ item }) => {
-  const { updateItemQuantity, removeFromCart } = useCart();
+  const { updateItemQuantity, removeFromCart, adjustPackCount } = useCart();
+  const lineKey = item.lineId || item.id;
 
-  const handleIncrease = () => updateItemQuantity(item.id, parseFloat((item.quantity + WEIGHT_STEP).toFixed(2)));
+  const tierOptions = item.pricing_type === 'per_piece'
+    ? []
+    : getTierWeightsFromOverrides(item.weight_price_overrides || {});
+
+  const handleIncrease = () => {
+    if (item.pricing_type !== 'per_piece' && tierOptions.length > 0) {
+      adjustPackCount(lineKey, 1);
+      return;
+    }
+    const step = item.pricing_type === 'per_piece' ? PIECE_STEP : GRAM_STEP_KG;
+    updateItemQuantity(lineKey, parseFloat((item.quantity + step).toFixed(2)));
+  };
+
   const handleDecrease = () => {
-    const newQty = parseFloat((item.quantity - WEIGHT_STEP).toFixed(2));
-    if (newQty <= 0) {
-      removeFromCart(item.id);
+    if (item.pricing_type !== 'per_piece' && tierOptions.length > 0) {
+      if ((item.packCount || 1) > 1) {
+        adjustPackCount(lineKey, -1);
+      } else {
+        removeFromCart(lineKey);
+      }
+      return;
+    }
+    const step = item.pricing_type === 'per_piece' ? PIECE_STEP : GRAM_STEP_KG;
+    const minQ = item.pricing_type === 'per_piece' ? PIECE_STEP : MIN_KG;
+    const newQty = parseFloat((item.quantity - step).toFixed(2));
+    if (newQty < minQ - 1e-6) {
+      removeFromCart(lineKey);
     } else {
-      updateItemQuantity(item.id, newQty);
+      updateItemQuantity(lineKey, newQty);
     }
   };
-  const handleRemove = () => removeFromCart(item.id);
+
+  const handleRemove = () => removeFromCart(lineKey);
 
   const pricePerKg = item.price_per_kg || 0;
   const pricing = getCartLinePricing(item);
@@ -34,7 +65,6 @@ const CartItem = ({ item }) => {
 
   return (
     <div className="flex items-start gap-3 sm:gap-4 p-4 hover:bg-gray-50 transition-colors duration-150">
-      {/* Image */}
       <div className="flex-shrink-0">
         <img
           src={getImageUrl(item.image_url)}
@@ -48,7 +78,6 @@ const CartItem = ({ item }) => {
         />
       </div>
 
-      {/* Name + Qty + Price */}
       <div className="flex-1 min-w-0">
         <div className="flex items-start justify-between gap-2">
           <h3 className="text-sm font-semibold text-gray-900 line-clamp-2 leading-snug">
@@ -72,13 +101,14 @@ const CartItem = ({ item }) => {
         <div className="flex items-center justify-between mt-2 gap-2">
           <QuantitySelector
             quantity={item.quantity}
+            displayLabel={formatCartQuantityLabel(item)}
             onIncrease={handleIncrease}
             onDecrease={handleDecrease}
+            min={0}
             size="sm"
           />
           <div className="text-right flex-shrink-0">
             <div className="text-sm font-bold text-gray-900">₹{lineTotal}</div>
-            <div className="text-[10px] text-gray-400">{formatCartQuantityLabel(item)}</div>
           </div>
         </div>
       </div>

@@ -62,7 +62,7 @@ const CartDrawer = ({ isOpen, onClose }) => {
             ) : (
               <div className="space-y-4">
                 {cart.map((item) => (
-                  <CartItem key={`${item.id}-${item.weight || 'default'}`} item={item} />
+                  <CartItem key={item.lineId || item.id} item={item} />
                 ))}
               </div>
             )}

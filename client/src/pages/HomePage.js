@@ -26,11 +26,12 @@ const FeaturedProductCard = ({ product }) => {
     });
   };
 
-  const handleIncrease = () => cartItem && updateItemQuantity(cartItem.id, qty + 1);
+  const lineKey = cartItem ? (cartItem.lineId || cartItem.id) : null;
+  const handleIncrease = () => cartItem && lineKey && updateItemQuantity(lineKey, qty + 1);
   const handleDecrease = () => {
-    if (!cartItem) return;
-    if (qty <= 1) removeFromCart(cartItem.id);
-    else updateItemQuantity(cartItem.id, qty - 1);
+    if (!cartItem || !lineKey) return;
+    if (qty <= 1) removeFromCart(lineKey);
+    else updateItemQuantity(lineKey, qty - 1);
   };
 
   return (
