@@ -148,6 +148,17 @@ function jsonClientError(res, req, status, payload) {
   });
 }
 
+/** Consistent 500 for admin routes — always includes ref for support. */
+function adminServerError(req, res, message, errorCode = 'INTERNAL', extra = {}) {
+  return res.status(500).json({
+    success: false,
+    message,
+    errorCode,
+    ref: req.requestId,
+    ...extra,
+  });
+}
+
 function sendMappedProductError(res, req, mapped, rawError) {
   const body = {
     success: false,
@@ -162,10 +173,30 @@ function sendMappedProductError(res, req, mapped, rawError) {
   res.status(mapped.status).json(body);
 }
 
+const PRODUCT_SAVE_FAIL =
+  'Could not save the product. Please try again. If it keeps happening, contact support with the request reference.';
+
 const mapProductWriteError = (error) => {
-  if (!error) return { status: 500, message: 'Server error', errorCode: 'UNKNOWN' };
+  if (!error) return { status: 500, message: PRODUCT_SAVE_FAIL, errorCode: 'UNKNOWN' };
   if (error.status && error.message) {
     return { status: error.status, message: error.message, errorCode: error.errorCode || 'CLIENT' };
+  }
+
+  if (error.code === '23502') {
+    return {
+      status: 400,
+      message:
+        'A required field is missing. Check product name, category, weight tiers, and stock, then try again.',
+      errorCode: 'DB_NOT_NULL',
+    };
+  }
+
+  if (error.code === '22P02') {
+    return {
+      status: 400,
+      message: 'Invalid data format (for example a bad product ID). Refresh the page and try again.',
+      errorCode: 'DB_INVALID_INPUT',
+    };
   }
 
   if (error.code === '23505') {
@@ -199,7 +230,7 @@ const mapProductWriteError = (error) => {
     };
   }
 
-  return { status: 500, message: 'Server error', errorCode: 'INTERNAL' };
+  return { status: 500, message: PRODUCT_SAVE_FAIL, errorCode: 'INTERNAL' };
 };
 
 // Apply admin auth to all routes
@@ -269,11 +300,7 @@ router.get('/dashboard', async (req, res) => {
 
   } catch (error) {
     console.error('Dashboard error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Server error',
-      error: error.message,
-    });
+    return adminServerError(req, res, 'Could not load dashboard statistics. Try again shortly.', 'DASHBOARD_FAILED');
   }
 });
 
@@ -863,7 +890,7 @@ router.get('/orders', async (req, res) => {
 
   } catch (error) {
     console.error('Get admin orders error:', error);
-    res.status(500).json({ message: 'Server error' });
+    return adminServerError(req, res, 'Could not complete the request. Try again; contact support with the reference if it continues.', 'INTERNAL');
   }
 });
 
@@ -960,7 +987,13 @@ router.post('/orders', async (req, res) => {
     }
   } catch (error) {
     console.error('Create admin order error:', error);
-    res.status(500).json({ message: 'Server error' });
+    if (String(error.message || '').includes('Insufficient stock')) {
+      return jsonClientError(res, req, 400, {
+        message: error.message,
+        errorCode: 'INSUFFICIENT_STOCK',
+      });
+    }
+    return adminServerError(req, res, 'Could not create the order. Try again; contact support with the reference if it continues.', 'ADMIN_ORDER_CREATE_FAILED');
   }
 });
 
@@ -1032,7 +1065,7 @@ router.put('/orders/:id/status', [
 
   } catch (error) {
     console.error('Update order status error:', error);
-    res.status(500).json({ message: 'Server error' });
+    return adminServerError(req, res, 'Could not complete the request. Try again; contact support with the reference if it continues.', 'INTERNAL');
   }
 });
 
@@ -1075,7 +1108,7 @@ router.post('/users', [
 
   } catch (error) {
     console.error('Create admin user error:', error);
-    res.status(500).json({ message: 'Server error' });
+    return adminServerError(req, res, 'Could not complete the request. Try again; contact support with the reference if it continues.', 'INTERNAL');
   }
 });
 
@@ -1154,7 +1187,7 @@ router.get('/users', async (req, res) => {
 
   } catch (error) {
     console.error('Get admin users error:', error);
-    res.status(500).json({ message: 'Server error' });
+    return adminServerError(req, res, 'Could not complete the request. Try again; contact support with the reference if it continues.', 'INTERNAL');
   }
 });
 
@@ -1180,7 +1213,7 @@ router.get('/users/:id', async (req, res) => {
 
   } catch (error) {
     console.error('Get admin user error:', error);
-    res.status(500).json({ message: 'Server error' });
+    return adminServerError(req, res, 'Could not complete the request. Try again; contact support with the reference if it continues.', 'INTERNAL');
   }
 });
 
@@ -1223,7 +1256,7 @@ router.put('/users/:id', [
 
   } catch (error) {
     console.error('Update admin user error:', error);
-    res.status(500).json({ message: 'Server error' });
+    return adminServerError(req, res, 'Could not complete the request. Try again; contact support with the reference if it continues.', 'INTERNAL');
   }
 });
 
@@ -1257,7 +1290,7 @@ router.delete('/users/:id', async (req, res) => {
 
   } catch (error) {
     console.error('Delete admin user error:', error);
-    res.status(500).json({ message: 'Server error' });
+    return adminServerError(req, res, 'Could not complete the request. Try again; contact support with the reference if it continues.', 'INTERNAL');
   }
 });
 
@@ -1295,7 +1328,7 @@ router.put('/products/:id/stock', [
 
   } catch (error) {
     console.error('Update stock error:', error);
-    res.status(500).json({ message: 'Server error' });
+    return adminServerError(req, res, 'Could not complete the request. Try again; contact support with the reference if it continues.', 'INTERNAL');
   }
 });
 
@@ -1435,7 +1468,7 @@ router.get('/analytics', async (req, res) => {
 
   } catch (error) {
     console.error('Get analytics error:', error);
-    res.status(500).json({ message: 'Server error' });
+    return adminServerError(req, res, 'Could not load analytics. Try again; contact support with the reference if it continues.', 'ANALYTICS_FAILED');
   }
 });
 
@@ -1452,7 +1485,7 @@ router.get('/settings', async (req, res) => {
     res.json({ success: true, data: settings });
   } catch (error) {
     console.error('Get settings error:', error);
-    res.status(500).json({ message: 'Server error' });
+    return adminServerError(req, res, 'Could not load store settings. Try again; contact support with the reference if it continues.', 'SETTINGS_LOAD_FAILED');
   }
 });
 
@@ -1486,7 +1519,7 @@ router.put('/settings', async (req, res) => {
     res.json({ success: true, message: 'Settings saved successfully' });
   } catch (error) {
     console.error('Update settings error:', error);
-    res.status(500).json({ message: 'Server error' });
+    return adminServerError(req, res, 'Could not save store settings. Try again; contact support with the reference if it continues.', 'SETTINGS_SAVE_FAILED');
   }
 });
 
@@ -1533,7 +1566,8 @@ router.get('/categories', async (req, res) => {
     const categories = await getProductCategories();
     res.json({ success: true, data: { categories } });
   } catch (error) {
-    res.status(500).json({ success: false, message: 'Failed to load categories' });
+    console.error('List categories error:', error);
+    return adminServerError(req, res, 'Failed to load categories. Try again; use the request reference if you need support.', 'CATEGORIES_LOAD_FAILED');
   }
 });
 
@@ -1563,7 +1597,7 @@ router.post(
       res.json({ success: true, data: { categories } });
     } catch (error) {
       console.error('Add category error:', error);
-      res.status(500).json({ success: false, message: 'Failed to add category' });
+      return adminServerError(req, res, 'Failed to add category. Try again; use the request reference if you need support.', 'CATEGORY_ADD_FAILED');
     }
   },
 );
@@ -1602,7 +1636,7 @@ router.put(
       res.json({ success: true, data: { categories } });
     } catch (error) {
       console.error('Rename category error:', error);
-      res.status(500).json({ success: false, message: 'Failed to rename category' });
+      return adminServerError(req, res, 'Failed to rename category. Try again; use the request reference if you need support.', 'CATEGORY_RENAME_FAILED');
     }
   },
 );
@@ -1626,7 +1660,7 @@ router.delete('/categories/:name', async (req, res) => {
     res.json({ success: true, data: { categories: filtered } });
   } catch (error) {
     console.error('Delete category error:', error);
-    res.status(500).json({ success: false, message: 'Failed to delete category' });
+    return adminServerError(req, res, 'Failed to delete category. Try again; use the request reference if you need support.', 'CATEGORY_DELETE_FAILED');
   }
 });
 
@@ -1643,7 +1677,7 @@ router.get('/marketing-banners', async (req, res) => {
     res.json({ success: true, data: { banners: result.rows } });
   } catch (error) {
     console.error('Admin list marketing banners:', error);
-    res.status(500).json({ success: false, message: 'Failed to load banners' });
+    return adminServerError(req, res, 'Failed to load banners. Try again; use the request reference if you need support.', 'BANNERS_LOAD_FAILED');
   }
 });
 
@@ -1687,7 +1721,7 @@ router.put(
       res.json({ success: true, data: { banners: result.rows } });
     } catch (error) {
       console.error('Reorder marketing banners:', error);
-      res.status(500).json({ success: false, message: 'Failed to reorder banners' });
+      return adminServerError(req, res, 'Failed to reorder banners. Try again; use the request reference if you need support.', 'BANNERS_REORDER_FAILED');
     }
   },
 );
@@ -1721,7 +1755,7 @@ router.post('/marketing-banners', uploadLimiter, optionalSingleImageUpload, hand
     res.status(201).json({ success: true, data: { banner: result.rows[0] } });
   } catch (error) {
     console.error('Create marketing banner:', error);
-    res.status(500).json({ success: false, message: 'Failed to create banner' });
+    return adminServerError(req, res, 'Failed to create banner. Try again; use the request reference if you need support.', 'BANNER_CREATE_FAILED');
   }
 });
 
@@ -1773,7 +1807,7 @@ router.put(
       res.json({ success: true, data: { banner: result.rows[0] } });
     } catch (error) {
       console.error('Update marketing banner:', error);
-      res.status(500).json({ success: false, message: 'Failed to update banner' });
+      return adminServerError(req, res, 'Failed to update banner. Try again; use the request reference if you need support.', 'BANNER_UPDATE_FAILED');
     }
   },
 );
@@ -1789,7 +1823,7 @@ router.delete('/marketing-banners/:id', async (req, res) => {
     res.json({ success: true, data: { id } });
   } catch (error) {
     console.error('Delete marketing banner:', error);
-    res.status(500).json({ success: false, message: 'Failed to delete banner' });
+    return adminServerError(req, res, 'Failed to delete banner. Try again; use the request reference if you need support.', 'BANNER_DELETE_FAILED');
   }
 });
 

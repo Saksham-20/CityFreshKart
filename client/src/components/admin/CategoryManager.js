@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import api from '../../services/api';
 import Button from '../ui/Button';
+import { formatApiErrorMessage } from '../../utils/apiErrorMessage';
 
 const DEFAULT_NEW_CATEGORY = '';
 
@@ -18,7 +19,7 @@ const CategoryManager = () => {
       const res = await api.get('/admin/categories');
       setCategories(res.data?.data?.categories || []);
     } catch (e) {
-      setError('Failed to load categories');
+      setError(formatApiErrorMessage(e, 'Failed to load categories'));
       setCategories([]);
     } finally {
       setLoading(false);
@@ -28,14 +29,6 @@ const CategoryManager = () => {
   useEffect(() => {
     fetchCategories();
   }, []);
-
-  const pickErrorMessage = (e, fallback) => {
-    const d = e.response?.data;
-    if (d?.message) return d.message;
-    const first = d?.errors?.[0];
-    if (first?.msg) return first.msg;
-    return fallback;
-  };
 
   const handleAdd = async () => {
     const name = newCategory.trim();
@@ -51,7 +44,7 @@ const CategoryManager = () => {
       setCategories(updated);
       setNewCategory('');
     } catch (e) {
-      setError(pickErrorMessage(e, 'Failed to add category'));
+      setError(formatApiErrorMessage(e, 'Failed to add category'));
     } finally {
       setSaving(false);
     }
@@ -68,7 +61,7 @@ const CategoryManager = () => {
       const updated = res.data?.data?.categories || [];
       setCategories(updated);
     } catch (e) {
-      setError(pickErrorMessage(e, 'Failed to delete category'));
+      setError(formatApiErrorMessage(e, 'Failed to delete category'));
     } finally {
       setSaving(false);
     }
@@ -87,7 +80,7 @@ const CategoryManager = () => {
       const updated = res.data?.data?.categories || [];
       setCategories(updated);
     } catch (e) {
-      setError(pickErrorMessage(e, 'Failed to rename category'));
+      setError(formatApiErrorMessage(e, 'Failed to rename category'));
     } finally {
       setSaving(false);
     }

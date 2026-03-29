@@ -5,8 +5,10 @@ import Modal from '../ui/Modal';
 import Loading from '../ui/Loading';
 import api from '../../services/api';
 import toast from 'react-hot-toast';
+import { formatApiErrorMessage } from '../../utils/apiErrorMessage';
 
 const emptyForm = { name: '', phone: '', password: '', isAdmin: false };
+const ADMIN_ERR_TOAST = { duration: 6000 };
 
 const UserManager = () => {
   const [users, setUsers] = useState([]);
@@ -38,7 +40,7 @@ const UserManager = () => {
       setTotalPages(response.data.pagination.totalPages);
     } catch (error) {
       console.error('Error fetching users:', error);
-      toast.error('Failed to load users');
+      toast.error(formatApiErrorMessage(error, 'Failed to load users'), ADMIN_ERR_TOAST);
     } finally {
       setLoading(false);
     }
@@ -60,7 +62,7 @@ const UserManager = () => {
       toast.success('User added successfully');
       fetchUsers();
     } catch (error) {
-      setFormError(error.response?.data?.message || 'Failed to add user');
+      setFormError(formatApiErrorMessage(error, 'Failed to add user'));
     } finally {
       setLoading(false);
     }
@@ -80,7 +82,7 @@ const UserManager = () => {
       toast.success('User updated successfully');
       fetchUsers();
     } catch (error) {
-      setFormError(error.response?.data?.message || 'Failed to update user');
+      setFormError(formatApiErrorMessage(error, 'Failed to update user'));
     } finally {
       setLoading(false);
     }
@@ -95,8 +97,8 @@ const UserManager = () => {
       toast.success('User deleted successfully');
       fetchUsers();
     } catch (error) {
-      const message = error.response?.data?.message || 'Failed to delete user';
-      toast.error(message);
+      const message = formatApiErrorMessage(error, 'Failed to delete user');
+      toast.error(message, ADMIN_ERR_TOAST);
       console.error('Error deleting user:', message);
     } finally {
       setLoading(false);

@@ -4,11 +4,13 @@ import Loading from '../ui/Loading';
 import useAuth from '../../hooks/useAuth';
 import api from '../../services/api';
 import { getImageUrl, IMAGE_DIMS } from '../../utils/imageUtils';
+import { formatApiErrorMessage } from '../../utils/apiErrorMessage';
 
 const Dashboard = () => {
   const { user } = useAuth();
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
   const [recentOrders, setRecentOrders] = useState([]);
   const [recentProducts, setRecentProducts] = useState([]);
   const [topProducts, setTopProducts] = useState([]);
@@ -36,11 +38,14 @@ const Dashboard = () => {
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
+      setLoadError('');
 
       const [dashboardResponse, analyticsResponse] = await Promise.allSettled([
         api.get('/admin/dashboard'),
         api.get('/admin/analytics', { params: { period: '30d' } }),
       ]);
+
+      const errParts = [];
 
       if (dashboardResponse.status === 'fulfilled') {
         const data = dashboardResponse.value.data;
@@ -53,6 +58,7 @@ const Dashboard = () => {
         setStats({});
         setRecentOrders([]);
         setRecentProducts([]);
+        errParts.push(formatApiErrorMessage(dashboardResponse.reason, 'Dashboard statistics could not load.'));
       }
 
       if (analyticsResponse.status === 'fulfilled') {
@@ -62,9 +68,13 @@ const Dashboard = () => {
       } else {
         console.error('Failed to fetch analytics data:', analyticsResponse.reason);
         setTopProducts([]);
+        errParts.push(formatApiErrorMessage(analyticsResponse.reason, 'Analytics could not load.'));
       }
+
+      if (errParts.length) setLoadError(errParts.filter(Boolean).join(' '));
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
+      setLoadError(formatApiErrorMessage(error, 'Dashboard data could not load.'));
       setStats({});
       setRecentOrders([]);
       setRecentProducts([]);
@@ -78,6 +88,21 @@ const Dashboard = () => {
 
   return (
     <div>
+      {loadError && (
+        <div
+          className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950"
+          role="alert"
+        >
+          <span>{loadError}</span>
+          <button
+            type="button"
+            className="ml-3 font-semibold text-amber-900 underline hover:no-underline"
+            onClick={() => fetchDashboardData()}
+          >
+            Retry
+          </button>
+        </div>
+      )}
       <div className="mb-8">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>

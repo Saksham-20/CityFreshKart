@@ -9,6 +9,8 @@ import toast from 'react-hot-toast';
 import { formatApiErrorMessage } from '../../utils/apiErrorMessage';
 import { APP_CONSTANTS } from '../../utils/constants';
 
+const ADMIN_API_ERROR_TOAST = { duration: 6000 };
+
 const maxAdminImageMb = Math.max(1, Math.round(APP_CONSTANTS.MAX_FILE_SIZE / (1024 * 1024)));
 
 const emptyForm = () => ({
@@ -411,7 +413,7 @@ const ProductManager = () => {
       setCategories(next);
     } catch (e) {
       console.error('fetchCategories', e.response?.data || e.message);
-      toast.error(formatApiErrorMessage(e, 'Failed to load categories'));
+      toast.error(formatApiErrorMessage(e, 'Failed to load categories'), ADMIN_API_ERROR_TOAST);
       setCategories([]);
     } finally {
       setCategoriesLoading(false);
@@ -432,7 +434,7 @@ const ProductManager = () => {
       }
     } catch (error) {
       console.error('Failed to fetch products:', error.response?.data || error.message);
-      toast.error(formatApiErrorMessage(error, 'Failed to load products'));
+      toast.error(formatApiErrorMessage(error, 'Failed to load products'), ADMIN_API_ERROR_TOAST);
       setProducts([]);
     } finally {
       setLoading(false);
@@ -523,7 +525,7 @@ const ProductManager = () => {
       toast.success('Product created successfully!');
     } catch (error) {
       console.error('handleAddProduct', error.response?.data || error.message);
-      toast.error(formatApiErrorMessage(error, 'Failed to add product'));
+      toast.error(formatApiErrorMessage(error, 'Failed to add product'), ADMIN_API_ERROR_TOAST);
     } finally {
       setLoading(false);
     }
@@ -561,7 +563,7 @@ const ProductManager = () => {
       toast.success('Product updated successfully!');
     } catch (error) {
       console.error('handleEditProduct', error.response?.data || error.message);
-      toast.error(formatApiErrorMessage(error, 'Failed to update product'));
+      toast.error(formatApiErrorMessage(error, 'Failed to update product'), ADMIN_API_ERROR_TOAST);
     } finally {
       setLoading(false);
     }
@@ -577,7 +579,7 @@ const ProductManager = () => {
       toast.success('Product permanently deleted.');
     } catch (error) {
       console.error('handleDeleteProduct', error.response?.data || error.message);
-      toast.error(formatApiErrorMessage(error, 'Failed to delete product.'));
+      toast.error(formatApiErrorMessage(error, 'Failed to delete product.'), ADMIN_API_ERROR_TOAST);
     } finally {
       setLoading(false);
     }
@@ -589,7 +591,7 @@ const ProductManager = () => {
       setProducts(prev => prev.map(p => p.id === productId ? { ...p, quantity_available: newQuantity } : p));
     } catch (error) {
       console.error('handleStockUpdate', error.response?.data || error.message);
-      toast.error(formatApiErrorMessage(error, 'Failed to update stock.'));
+      toast.error(formatApiErrorMessage(error, 'Failed to update stock.'), ADMIN_API_ERROR_TOAST);
     }
   };
 
