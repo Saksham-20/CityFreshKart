@@ -73,6 +73,30 @@ export const calculatePriceWithOverrides = (pricePerKg, weight, discount = 0, we
   };
 };
 
+/** Single cart row: tier override + discount (matches useCartStore.calculateSummary). */
+export const getCartLineTotal = (item) => {
+  const { finalPrice } = calculatePriceWithOverrides(
+    item.price_per_kg || 0,
+    item.quantity || 0,
+    item.discount || 0,
+    item.weight_price_overrides || {},
+  );
+  return finalPrice;
+};
+
+/** Cart line breakdown for UI (line total + whether admin tiers apply). */
+export const getCartLinePricing = (item) => {
+  const overrides = item.weight_price_overrides || {};
+  const hasTiers = getTierWeightsFromOverrides(overrides).length > 0;
+  const breakdown = calculatePriceWithOverrides(
+    item.price_per_kg || 0,
+    item.quantity || 0,
+    item.discount || 0,
+    overrides,
+  );
+  return { ...breakdown, hasTiers };
+};
+
 /**
  * Calculate delivery fee based on order total
  * @param {number} subtotal - Order subtotal

@@ -2,7 +2,12 @@ import React from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import useCart from '../hooks/useCart';
 import { getImageUrl, getPlaceholderImage, IMAGE_DIMS } from '../utils/imageUtils';
-import { formatCartQuantityLabel, getAdjacentTierWeight, getTierWeightsFromOverrides } from '../utils/weightSystem';
+import {
+  formatCartQuantityLabel,
+  getAdjacentTierWeight,
+  getCartLinePricing,
+  getTierWeightsFromOverrides,
+} from '../utils/weightSystem';
 
 const GRAM_STEP_KG = 0.05; // fallback step when no explicit tiers
 const PIECE_STEP = 1;
@@ -122,9 +127,13 @@ const CartPage = () => {
           {items.map((item) => {
             const isPerPiece = item.pricing_type === 'per_piece';
             const pricePerKg = item.price_per_kg || 0;
-            const discountedPricePerKg = item.discount ? pricePerKg * (1 - item.discount / 100) : pricePerKg;
-            const lineTotal = (discountedPricePerKg * item.quantity).toFixed(2);
+            const pricing = getCartLinePricing(item);
+            const lineTotal = pricing.finalPrice.toFixed(2);
             const unitLabel = isPerPiece ? '/pc' : '/kg';
+            const priceMeta = pricing.hasTiers
+              ? `₹${Number.isInteger(pricing.basePrice) ? pricing.basePrice : pricing.basePrice.toFixed(2)} for ${formatCartQuantityLabel(item)}`
+              : `₹${pricePerKg}${unitLabel}`;
+            const discountSuffix = item.discount > 0 ? ` · ${item.discount}% off` : '';
 
             return (
               <div key={item.id} className="flex items-center gap-3 px-4 py-3">
@@ -157,7 +166,7 @@ const CartPage = () => {
                     </button>
                   </div>
                   <p className="text-xs text-on-surface-variant mt-0.5">
-                    ₹{pricePerKg}{unitLabel}{item.discount > 0 ? ` · ${item.discount}% off` : ''}
+                    {priceMeta}{discountSuffix}
                   </p>
 
                   <div className="flex items-center justify-between mt-1.5">

@@ -54,12 +54,13 @@ class ImageService {
       }
     };
 
+    const fileSize = parseInt(process.env.MAX_FILE_SIZE, 10) || 5 * 1024 * 1024;
     return multer({
       storage,
       fileFilter,
       limits: {
-        fileSize: 5 * 1024 * 1024, // 5MB limit
-        files: 10, // Maximum 10 files
+        fileSize,
+        files: 10,
       },
     });
   }

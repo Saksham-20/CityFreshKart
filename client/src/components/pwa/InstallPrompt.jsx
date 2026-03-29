@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { X, Download, Smartphone } from 'lucide-react';
 import {
   handleInstallClick,
@@ -17,6 +18,8 @@ const CURRENT_BANNER_VERSION = '2';
  * Install prompt: Android/Chrome uses beforeinstallprompt; iOS shows Add to Home Screen steps.
  */
 const InstallPrompt = () => {
+  const { pathname } = useLocation();
+  const isCart = pathname === '/cart';
   const [isVisible, setIsVisible] = useState(false);
   const [isInstalled, setIsInstalled] = useState(false);
   const [hasAndroidPrompt, setHasAndroidPrompt] = useState(false);
@@ -79,13 +82,15 @@ const InstallPrompt = () => {
         className={cn(
           'fixed left-3 right-3 sm:left-auto sm:right-6 sm:w-[22rem]',
           'bg-gradient-to-r from-primary to-primary-container text-on-primary rounded-2xl shadow-primary-glow',
-          'p-4 pt-3 flex flex-col gap-3 z-[35]',
+          'p-4 pt-3 flex flex-col gap-3 z-[60]',
           'max-h-[calc(100vh-7rem)] overflow-y-auto',
           'outline outline-1 outline-on-primary/20',
         )}
         style={{
-          // Keep above bottom nav / FAB while staying within viewport.
-          bottom: 'calc(env(safe-area-inset-bottom) + 5.25rem)',
+          // Default: above MobileBottomNav. Cart: no nav but sticky checkout bar — lift clear of it.
+          bottom: isCart
+            ? 'calc(env(safe-area-inset-bottom) + 9.5rem)'
+            : 'calc(env(safe-area-inset-bottom) + 5.25rem)',
         }}
       >
         <button
@@ -160,7 +165,7 @@ const InstallPrompt = () => {
 
       {iosModalOpen && (
         <div
-          className="fixed inset-0 z-40 flex items-center justify-center p-4 bg-black/50"
+          className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/50"
           role="dialog"
           aria-modal="true"
           aria-labelledby="ios-install-title"

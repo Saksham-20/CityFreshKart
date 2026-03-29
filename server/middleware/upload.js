@@ -2,6 +2,7 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const uploadRoot = path.join(__dirname, '..', 'uploads');
+/** Default 5MB; override with MAX_FILE_SIZE (bytes). Nginx must allow ≥ this or uploads return 413. */
 const maxFileSizeBytes = parseInt(process.env.MAX_FILE_SIZE, 10) || 5 * 1024 * 1024;
 
 const formatFileSize = (bytes) => {

@@ -7,6 +7,9 @@ import Loading from '../ui/Loading';
 import { getImageUrl, getPlaceholderImage, IMAGE_DIMS } from '../../utils/imageUtils';
 import toast from 'react-hot-toast';
 import { formatApiErrorMessage } from '../../utils/apiErrorMessage';
+import { APP_CONSTANTS } from '../../utils/constants';
+
+const maxAdminImageMb = Math.max(1, Math.round(APP_CONSTANTS.MAX_FILE_SIZE / (1024 * 1024)));
 
 const emptyForm = () => ({
   name: '',
@@ -170,13 +173,18 @@ const ImageSection = ({
               onChange={isEdit ? (e) => {
                 const f = e.target.files[0];
                 if (!f) return;
+                if (f.size > APP_CONSTANTS.MAX_FILE_SIZE) {
+                  toast.error(`Image must be ${maxAdminImageMb}MB or smaller (or use an image URL).`);
+                  e.target.value = '';
+                  return;
+                }
                 setSelectedImages([f]);
                 setImagePreview([URL.createObjectURL(f)]);
                 e.target.value = '';
               } : handleImageChange}
               className="hidden" />
             <label htmlFor={isEdit ? 'img-edit' : 'img-add'} className="cursor-pointer block text-sm text-gray-600">
-              Click to upload · PNG, JPG up to 5MB
+              {`Click to upload · PNG, JPG up to ${maxAdminImageMb}MB`}
             </label>
           </div>
         ) : (
@@ -459,6 +467,13 @@ const ProductManager = () => {
 
   const handleImageChange = (e) => {
     const files = Array.from(e.target.files);
+    const maxBytes = APP_CONSTANTS.MAX_FILE_SIZE;
+    const oversized = files.find((f) => f.size > maxBytes);
+    if (oversized) {
+      toast.error(`Each image must be ${maxAdminImageMb}MB or smaller (or use an image URL).`);
+      e.target.value = '';
+      return;
+    }
     const currentCount = existingImages.length + selectedImages.length;
     const remainingSlots = 6 - currentCount;
     if (files.length > remainingSlots) {

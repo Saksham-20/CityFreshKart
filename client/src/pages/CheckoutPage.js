@@ -6,7 +6,7 @@ import api from '../services/api';
 import { razorpayService } from '../services/razorpayService';
 import { addressService } from '../services/addressService';
 import toast from 'react-hot-toast';
-import { formatCartQuantityLabel, resolveBasePriceForWeight } from '../utils/weightSystem';
+import { formatCartQuantityLabel, getCartLineTotal } from '../utils/weightSystem';
 
 const CheckoutPage = () => {
   const navigate = useNavigate();
@@ -234,9 +234,7 @@ const CheckoutPage = () => {
           </div>
           <div className="px-4 py-3 space-y-2">
             {items.map(item => {
-              const itemPrice = item.discount
-                ? resolveBasePriceForWeight(item.price_per_kg, item.quantity, item.weight_price_overrides || {}) * (1 - item.discount / 100)
-                : resolveBasePriceForWeight(item.price_per_kg, item.quantity, item.weight_price_overrides || {});
+              const itemPrice = getCartLineTotal(item);
               return (
                 <div key={item.id} className="flex justify-between text-sm text-on-surface-variant">
                   <span className="flex-1 pr-2">{item.name} × {formatCartQuantityLabel(item)}</span>

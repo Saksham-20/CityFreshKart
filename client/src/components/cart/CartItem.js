@@ -1,6 +1,7 @@
 import React from 'react';
 import useCart from '../../hooks/useCart';
 import { getImageUrl, getPlaceholderImage, IMAGE_DIMS } from '../../utils/imageUtils';
+import { formatCartQuantityLabel, getCartLinePricing, getCartLineTotal } from '../../utils/weightSystem';
 import QuantitySelector from '../ui/QuantitySelector';
 
 const WEIGHT_STEP = 0.5;
@@ -20,13 +21,16 @@ const CartItem = ({ item }) => {
   const handleRemove = () => removeFromCart(item.id);
 
   const pricePerKg = item.price_per_kg || 0;
-  const discountedPricePerKg = item.discount
-    ? pricePerKg * (1 - item.discount / 100)
-    : pricePerKg;
-  const lineTotal = (discountedPricePerKg * item.quantity).toLocaleString('en-IN', {
+  const pricing = getCartLinePricing(item);
+  const lineTotal = getCartLineTotal(item).toLocaleString('en-IN', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
+  const unitLabel = item.pricing_type === 'per_piece' ? '/pc' : '/kg';
+  const priceMeta = pricing.hasTiers
+    ? `₹${Number.isInteger(pricing.basePrice) ? pricing.basePrice : pricing.basePrice.toFixed(2)} for ${formatCartQuantityLabel(item)}`
+    : `₹${pricePerKg}${unitLabel}`;
+  const discountSuffix = item.discount > 0 ? ` · ${item.discount}% off` : '';
 
   return (
     <div className="flex items-start gap-3 sm:gap-4 p-4 hover:bg-gray-50 transition-colors duration-150">
@@ -61,7 +65,9 @@ const CartItem = ({ item }) => {
           </button>
         </div>
 
-        <p className="text-xs text-gray-500 mt-0.5">₹{pricePerKg}/kg{item.discount > 0 ? ` · ${item.discount}% off` : ''}</p>
+        <p className="text-xs text-gray-500 mt-0.5">
+          {priceMeta}{discountSuffix}
+        </p>
 
         <div className="flex items-center justify-between mt-2 gap-2">
           <QuantitySelector
@@ -72,7 +78,7 @@ const CartItem = ({ item }) => {
           />
           <div className="text-right flex-shrink-0">
             <div className="text-sm font-bold text-gray-900">₹{lineTotal}</div>
-            <div className="text-[10px] text-gray-400">{item.quantity} kg</div>
+            <div className="text-[10px] text-gray-400">{formatCartQuantityLabel(item)}</div>
           </div>
         </div>
       </div>

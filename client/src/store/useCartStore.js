@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import api from '../services/api';
-import { getTierWeightsFromOverrides, resolveBasePriceForWeight } from '../utils/weightSystem';
+import { getCartLineTotal, getTierWeightsFromOverrides } from '../utils/weightSystem';
 
 const normalizeQuantityForItem = (item, quantity) => {
   const q = Number(quantity);
@@ -61,11 +61,7 @@ const useCartStore = create((set, get) => ({
   calculateSummary: () => {
     const { items, freeDeliveryThreshold, deliveryFeeAmount } = get();
 
-    const subtotal = items.reduce((sum, item) => {
-      const price = resolveBasePriceForWeight(item.price_per_kg || 0, item.quantity || 0, item.weight_price_overrides || {});
-      const discountedPrice = item.discount ? price * (1 - item.discount / 100) : price;
-      return sum + discountedPrice;
-    }, 0);
+    const subtotal = items.reduce((sum, item) => sum + getCartLineTotal(item), 0);
 
     const deliveryFee = subtotal >= freeDeliveryThreshold ? 0 : deliveryFeeAmount;
 

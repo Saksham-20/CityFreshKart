@@ -295,10 +295,10 @@ certbot renew --quiet --no-self-upgrade
 
 ### Nginx in front of Node (VPS)
 
-For file uploads (admin product images), set a body size limit **above** your `MAX_FILE_SIZE` (default 5MB):
+For file uploads (admin product images), set a body size limit **above** your `MAX_FILE_SIZE` (default 5MB in code / `env.example`). If Nginx’s default (often 1MB) is unchanged, the browser gets **413 Payload Too Large** before Node sees the request.
 
 ```nginx
-client_max_body_size 10M;
+client_max_body_size 8M;
 ```
 
 For a React SPA, always fall back to `index.html` so deep links like `/admin/products` work after refresh:
