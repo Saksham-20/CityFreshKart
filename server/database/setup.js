@@ -176,8 +176,10 @@ async function setupDatabase() {
       throw error;
     }
 
-    // Upsert sample products: update image_url/category for existing ones, insert new ones
-    try {
+    // Demo catalog: dev / staging only — production uses admin-created products only
+    const seedSamples = process.env.NODE_ENV !== 'production';
+    if (seedSamples) {
+      try {
       const sampleProducts = [
         // Vegetables
         { name: 'Tomatoes',    category: 'Vegetables', description: 'Fresh red tomatoes, juicy and ripe', price_per_kg: 40, discount: 0,  image_url: 'https://images.pexels.com/photos/1327838/pexels-photo-1327838.jpeg?auto=compress&cs=tinysrgb&w=400&h=300&fit=crop' },
@@ -203,28 +205,33 @@ async function setupDatabase() {
       let inserted = 0;
       let updated = 0;
       for (const product of sampleProducts) {
+        const slug = slugify(product.name);
+        // Match by canonical slug OR seed name so we never INSERT when slug already exists
+        // (e.g. admin renamed "Onions" — slug still onions → duplicate slug without this).
         const existing = await pool.query(
-          'SELECT id FROM products WHERE LOWER(name) = LOWER($1)',
-          [product.name],
+          `SELECT id FROM products
+           WHERE slug = $1 OR LOWER(TRIM(name)) = LOWER(TRIM($2))
+           ORDER BY CASE WHEN slug = $1 THEN 0 ELSE 1 END
+           LIMIT 1`,
+          [slug, product.name],
         );
         if (existing.rows.length > 0) {
-          // Update image_url and category for existing products
           await pool.query(
             `UPDATE products
              SET image_url = $1,
                  image = COALESCE(image, $2),
                  category = $3,
-                 slug = COALESCE(NULLIF(slug, ''), $4),
+                 slug = COALESCE(NULLIF(TRIM(slug), ''), $4),
                  updated_at = NOW()
-             WHERE LOWER(name) = LOWER($5)`,
-            [product.image_url, product.image_url, product.category, slugify(product.name), product.name],
+             WHERE id = $5`,
+            [product.image_url, product.image_url, product.category, slug, existing.rows[0].id],
           );
           updated++;
         } else {
           await pool.query(
             `INSERT INTO products (name, slug, category, description, price_per_kg, discount, image, image_url, is_active, quantity_available, created_at, updated_at)
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW(), NOW())`,
-            [product.name, slugify(product.name), product.category, product.description, product.price_per_kg, product.discount, product.image_url, product.image_url, true, 100],
+            [product.name, slug, product.category, product.description, product.price_per_kg, product.discount, product.image_url, product.image_url, true, 100],
           );
           inserted++;
         }
@@ -257,20 +264,25 @@ async function setupDatabase() {
         }
       }
       console.log('✅ Seeded product weight tiers for sample products');
-    } catch (error) {
-      console.error('❌ Sample products sync failed:', error.message);
-      throw error;
+      } catch (error) {
+        console.error('❌ Sample products sync failed:', error.message);
+        throw error;
+      }
+    } else {
+      console.log('ℹ️  Skipping sample products (NODE_ENV=production)');
     }
 
     console.log('');
     console.log('🎉 Database setup completed successfully!');
     console.log('');
     console.log('📋 Configure ADMIN_PHONE / ADMIN_PASSWORD (and test user) via environment — credentials are not printed.');
-    console.log('');
-    console.log('🛍️ Sample Data Available:');
-    console.log('- 16 Fresh Vegetables & Fruits');
-    console.log('- Weight-based pricing (₹/kg)');
-    console.log('- Discounts on select items');
+    if (seedSamples) {
+      console.log('');
+      console.log('🛍️ Sample Data Available:');
+      console.log('- 16 Fresh Vegetables & Fruits');
+      console.log('- Weight-based pricing (₹/kg)');
+      console.log('- Discounts on select items');
+    }
 
   } catch (error) {
     console.error('❌ Database setup failed:', error);
