@@ -204,6 +204,14 @@ const useCartStore = create((set, get) => ({
     persist(items);
   },
 
+  // Remove a whole product from cart (all its weight-tier rows).
+  removeProductFromCart: (productId) => {
+    const pid = productId == null ? '' : String(productId);
+    const items = get().items.filter((i) => String(i.id) !== pid);
+    set({ items });
+    persist(items);
+  },
+
   clearCart: () => {
     set({ items: [] });
     localStorage.removeItem('cart');

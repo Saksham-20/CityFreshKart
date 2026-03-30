@@ -2,7 +2,11 @@ import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { ShoppingCart, Plus, Minus } from 'lucide-react';
 import { cn } from '@/utils/cn';
-import { calculatePriceWithOverrides } from '@/utils/weightSystem';
+import {
+  calculatePriceWithOverrides,
+  formatCartQuantityLabel,
+  getTierWeightsFromOverrides,
+} from '@/utils/weightSystem';
 import WeightSelector from '../ui/WeightSelector';
 import Button from '../ui/Button';
 import { useCartStore } from '../../store/useCartStore';
@@ -24,6 +28,8 @@ const ProductCard = ({
   const cartItems = useCartStore(state => state.items);
   const addToCart = useCartStore(state => state.addToCart);
   const updateItemQuantity = useCartStore(state => state.updateItemQuantity);
+  const adjustPackCount = useCartStore(state => state.adjustPackCount);
+  const removeFromCart = useCartStore(state => state.removeFromCart);
 
   const pricing = calculatePriceWithOverrides(
     product.price_per_kg,
@@ -35,9 +41,32 @@ const ProductCard = ({
   const imageSrc = product.image_url || product.image;
   const stockValue = product.quantity_available ?? product.stock_quantity ?? product.stock;
   const inStock = typeof stockValue === 'number' ? stockValue > 0 : !!stockValue;
-  const cartItem = cartItems.find(item => item.id === product.id);
-  const safeIsInCart = typeof onAddToCart === 'function' ? isInCart : Boolean(cartItem);
-  const safeCartQuantity = typeof onAddToCart === 'function' ? cartQuantity : (cartItem?.quantity || 0);
+  const productCartLines = cartItems.filter((i) => String(i.id) === String(product.id));
+  const primaryCartLine = productCartLines[0];
+  const safeIsInCart = typeof onAddToCart === 'function' ? isInCart : productCartLines.length > 0;
+
+  const mergedQuantity = productCartLines.reduce((sum, l) => {
+    const q = Number(l.quantity) || 0;
+    const packs = Math.max(1, parseInt(l.packCount, 10) || 1);
+    return sum + q * packs;
+  }, 0);
+
+  const mergedQuantityLabel = primaryCartLine
+    ? formatCartQuantityLabel({
+      pricing_type: primaryCartLine.pricing_type,
+      quantity: mergedQuantity,
+      packCount: 1,
+      weight_display_unit: primaryCartLine.weight_display_unit,
+    })
+    : '';
+
+  const safeCartQuantityNumber = typeof onAddToCart === 'function'
+    ? cartQuantity
+    : (primaryCartLine?.quantity || 0);
+
+  const safeCartQuantityDisplay = typeof onAddToCart === 'function'
+    ? cartQuantity
+    : mergedQuantityLabel;
 
   const handleAddClick = () => {
     if (typeof onAddToCart !== 'function') {
@@ -61,6 +90,54 @@ const ProductCard = ({
       return;
     }
     updateItemQuantity(product.id, nextQty);
+  };
+
+  const productHasAdminTierOverrides =
+    getTierWeightsFromOverrides(product.weight_price_overrides || {}).length > 0
+    && product.pricing_type !== 'per_piece';
+
+  const lineKeyFor = (line) => line?.lineId || line?.id;
+
+  const selectedTierWeight = Number(selectedWeight) || 0;
+  const selectedTierLine = productCartLines.find(
+    (l) => Math.abs(Number(l.quantity) - selectedTierWeight) < 1e-6,
+  );
+
+  const handleMinus = () => {
+    // Callback mode (older product grid usage): keep existing behavior.
+    if (typeof onUpdateQuantity === 'function') {
+      handleQuantityChange(safeCartQuantityNumber - 1);
+      return;
+    }
+
+    if (!primaryCartLine) return;
+
+    // Admin tier products: decrement the selected tier packCount.
+    if (productHasAdminTierOverrides) {
+      if (!selectedTierLine) return; // selected tier not present, no-op
+      const lk = lineKeyFor(selectedTierLine);
+      const packs = Math.max(1, parseInt(selectedTierLine.packCount, 10) || 1);
+      if (packs > 1) adjustPackCount(lk, -1);
+      else removeFromCart(lk);
+      return;
+    }
+
+    // Non-tier products: subtract selected tier weight from the single cart line.
+    const lk = lineKeyFor(primaryCartLine);
+    const nextQty = Number(primaryCartLine.quantity) - selectedTierWeight;
+    if (nextQty <= 0) removeFromCart(lk);
+    else updateItemQuantity(lk, nextQty);
+  };
+
+  const handlePlus = () => {
+    // Callback mode: keep existing behavior.
+    if (typeof onUpdateQuantity === 'function') {
+      handleQuantityChange(safeCartQuantityNumber + 1);
+      return;
+    }
+
+    // Store mode: always add the currently selected tier/weight.
+    addToCart(product, selectedWeight);
   };
 
   return (
@@ -213,7 +290,7 @@ const ProductCard = ({
           ) : (
             <div className="flex items-center gap-2 bg-green-50 rounded-lg p-1.5">
               <Button
-                onClick={() => handleQuantityChange(safeCartQuantity - 1)}
+                onClick={handleMinus}
                 size="sm"
                 variant="ghost"
                 className="flex-1"
@@ -221,10 +298,10 @@ const ProductCard = ({
                 <Minus className="w-4 h-4" />
               </Button>
               <span className="flex-1 text-center text-sm font-semibold text-green-600" data-testid="cart-quantity">
-                {safeCartQuantity}
+                {safeCartQuantityDisplay}
               </span>
               <Button
-                onClick={() => handleQuantityChange(safeCartQuantity + 1)}
+                onClick={handlePlus}
                 size="sm"
                 variant="ghost"
                 className="flex-1"

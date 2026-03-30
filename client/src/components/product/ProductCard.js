@@ -6,7 +6,6 @@ import {
   formatCartQuantityLabel,
   resolveBasePriceForWeight,
   getTierWeightsFromOverrides,
-  findCartLineForProduct,
 } from '../../utils/weightSystem';
 
 const KG_OPTIONS = [0.5, 1];
@@ -47,17 +46,28 @@ const ProductCard = React.memo(({ product, className = '', highlightFlash = fals
   );
 
   const productId = product.product_id || product.id;
-  const cartItem = useMemo(
-    () => findCartLineForProduct(
-      cartItems,
-      productId,
-      selectedQty,
-      product.weight_price_overrides || {},
-    ),
-    [cartItems, productId, selectedQty, product.weight_price_overrides],
+  const productCartLines = useMemo(
+    () => cartItems.filter((i) => String(i.id) === String(productId) || String(i.product_id || '') === String(productId)),
+    [cartItems, productId],
   );
-  const isInCart = !!cartItem;
-  const cartQty = cartItem?.quantity || 0;
+  const anyInCart = productCartLines.length > 0;
+
+  // Highest tier line is used for +/- decrements on tiered (override) products.
+  const sortedCartLines = useMemo(
+    () => [...productCartLines].sort((a, b) => Number(b.quantity) - Number(a.quantity)),
+    [productCartLines],
+  );
+
+  const highestTierLine = sortedCartLines[0];
+  const highestTierLineKey = highestTierLine ? (highestTierLine.lineId || highestTierLine.id) : null;
+
+  const mergedQty = productCartLines.reduce((sum, line) => {
+    const q = Number(line.quantity) || 0;
+    const packs = Math.max(1, parseInt(line.packCount, 10) || 1);
+    return sum + q * packs;
+  }, 0);
+
+  const cartQty = mergedQty;
   const outOfStock = (product.quantity_available !== undefined && parseFloat(product.quantity_available) <= 0) ||
                      (product.stock_quantity !== undefined && product.stock_quantity <= 0);
 
@@ -74,35 +84,67 @@ const ProductCard = React.memo(({ product, className = '', highlightFlash = fals
     }, selectedQty);
   }, [addToCart, product, productId, pricePerUnit, selectedQty, discountPercent, weightUnit]);
 
-  const lineKey = cartItem ? (cartItem.lineId || cartItem.id) : null;
+  const lineKey = highestTierLineKey;
+
+  const isTieredProduct =
+    getTierWeightsFromOverrides(product.weight_price_overrides || {}).length > 0 && !isPerPiece;
 
   const handleIncrease = useCallback(() => {
-    if (!cartItem || !lineKey) return;
-    const tiers = getTierWeightsFromOverrides(cartItem.weight_price_overrides || product.weight_price_overrides || {});
-    if (tiers.length > 0) {
-      adjustPackCount(lineKey, 1);
+    if (!anyInCart) return;
+    // For tiered (override) products, always add the currently selected tier/weight pack.
+    if (isTieredProduct) {
+      // Store.addToCart(product, selectedQty) will either create the selected tier line or increment its packCount.
+      handleAddToCart();
       return;
     }
+
+    // Non-tier: adjust the single cart line quantity by the selected weight.
+    if (!lineKey) return;
     updateItemQuantity(lineKey, parseFloat((cartQty + selectedQty).toFixed(2)));
-  }, [cartItem, cartQty, lineKey, product.weight_price_overrides, selectedQty, adjustPackCount, updateItemQuantity]);
+  }, [
+    anyInCart,
+    isTieredProduct,
+    cartQty,
+    lineKey,
+    selectedQty,
+    updateItemQuantity,
+    handleAddToCart,
+  ]);
 
   const handleDecrease = useCallback(() => {
-    if (!cartItem || !lineKey) return;
-    const tiers = getTierWeightsFromOverrides(cartItem.weight_price_overrides || product.weight_price_overrides || {});
-    if (tiers.length > 0) {
-      if ((cartItem.packCount || 1) > 1) {
-        adjustPackCount(lineKey, -1);
-      } else {
-        removeFromCart(lineKey);
-      }
+    if (!anyInCart) return;
+    // For tiered (override) products, decrement the highest tier line (so UI uses a stable rule).
+    if (isTieredProduct) {
+      if (!lineKey) return;
+      const packs = Math.max(1, parseInt(highestTierLine?.packCount, 10) || 1);
+      if (packs > 1) adjustPackCount(lineKey, -1);
+      else removeFromCart(lineKey);
       return;
     }
+
+    // Non-tier: adjust the single cart line quantity by the selected weight.
+    if (!lineKey) return;
     const newQty = parseFloat((cartQty - selectedQty).toFixed(2));
     if (newQty <= 0) removeFromCart(lineKey);
     else updateItemQuantity(lineKey, newQty);
-  }, [cartItem, cartQty, lineKey, product.weight_price_overrides, selectedQty, adjustPackCount, removeFromCart, updateItemQuantity]);
+  }, [
+    anyInCart,
+    isTieredProduct,
+    cartQty,
+    lineKey,
+    selectedQty,
+    adjustPackCount,
+    removeFromCart,
+    updateItemQuantity,
+    highestTierLine,
+  ]);
 
-  const cartQtyLabel = cartItem ? formatCartQuantityLabel(cartItem) : '';
+  const cartQtyLabel = formatCartQuantityLabel({
+    pricing_type: product.pricing_type || (isPerPiece ? 'per_piece' : 'per_kg'),
+    quantity: cartQty,
+    packCount: 1,
+    weight_display_unit: weightUnit,
+  });
 
   const unitLabel = isPerPiece ? '/pc' : `/${formatWeightDisplay(selectedQty, weightUnit)}`;
 
@@ -183,7 +225,7 @@ const ProductCard = React.memo(({ product, className = '', highlightFlash = fals
         {/* Add to cart / quantity control */}
         {!outOfStock && (
           <div className="mt-auto">
-            {!isInCart ? (
+            {!anyInCart ? (
               <button
                 type="button"
                 onClick={handleAddToCart}

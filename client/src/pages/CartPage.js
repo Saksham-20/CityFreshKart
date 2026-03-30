@@ -15,7 +15,7 @@ const FREE_DELIVERY_THRESHOLD = 300;
 
 const CartPage = () => {
   const navigate = useNavigate();
-  const { items, removeFromCart, updateItemQuantity, adjustPackCount, calculateSummary } = useCart();
+  const { items, removeFromCart, removeProductFromCart, updateItemQuantity, adjustPackCount, calculateSummary } = useCart();
   const { subtotal, deliveryFee, total } = calculateSummary();
 
   const amountToFree = Math.max(FREE_DELIVERY_THRESHOLD - subtotal, 0);
@@ -32,36 +32,101 @@ const CartPage = () => {
 
   const lineKeyFor = (item) => item.lineId || item.id;
 
-  const handleIncrease = (item) => {
-    const lk = lineKeyFor(item);
-    if (item.pricing_type !== 'per_piece') {
-      const tiers = tierOptionsFor(item);
-      if (tiers.length > 0) {
-        adjustPackCount(lk, 1);
-        return;
-      }
+  // Group cart lines by product id so different weight tiers show as one row on UI.
+  const groupedItems = React.useMemo(() => {
+    if (!Array.isArray(items) || items.length === 0) return [];
+
+    const byProduct = new Map();
+    items.forEach((item) => {
+      const pid = item.id;
+      if (pid == null) return;
+      if (!byProduct.has(pid)) byProduct.set(pid, []);
+      byProduct.get(pid).push(item);
+    });
+
+    const groups = Array.from(byProduct.entries()).map(([productId, lines]) => {
+      const sorted = [...lines].sort((a, b) => Number(b.quantity) - Number(a.quantity));
+      const primaryLine = sorted[0];
+      const primaryKey = lineKeyFor(primaryLine);
+
+      const isPerPiece = primaryLine.pricing_type === 'per_piece';
+      const tierWeights = isPerPiece ? [] : tierOptionsFor(primaryLine);
+      const hasTiers = tierWeights.length > 0;
+
+      const packsFor = (l) => Math.max(1, parseInt(l.packCount, 10) || 1);
+      const mergedQuantity = lines.reduce((sum, l) => {
+        const q = Number(l.quantity) || 0;
+        return sum + q * packsFor(l);
+      }, 0);
+
+      const mergedLabelItem = isPerPiece
+        ? { pricing_type: 'per_piece', quantity: mergedQuantity, packCount: 1 }
+        : {
+          pricing_type: primaryLine.pricing_type,
+          quantity: mergedQuantity,
+          packCount: 1,
+          weight_display_unit: primaryLine.weight_display_unit,
+        };
+
+      const mergedQuantityLabel = formatCartQuantityLabel(mergedLabelItem);
+      const mergedLineTotal = lines.reduce((sum, l) => sum + getCartLineTotal(l), 0);
+
+      const mergedBasePriceTotal = hasTiers
+        ? lines.reduce((sum, l) => sum + getCartLinePricing(l).basePrice, 0)
+        : 0;
+
+      return {
+        productId,
+        name: primaryLine.name,
+        image_url: primaryLine.image_url,
+        pricing_type: primaryLine.pricing_type,
+        price_per_kg: primaryLine.price_per_kg || 0,
+        discount: primaryLine.discount || 0,
+        weight_display_unit: primaryLine.weight_display_unit,
+        primaryLine,
+        primaryKey,
+        isPerPiece,
+        hasTiers,
+        mergedQuantityLabel,
+        mergedLineTotal,
+        mergedBasePriceTotal,
+      };
+    });
+
+    return groups;
+  }, [items]);
+
+  const handleIncreaseGroup = (group) => {
+    if (!group) return;
+    if (group.hasTiers && !group.isPerPiece) {
+      // For admin tier products, just add one more pack of the highest tier.
+      adjustPackCount(group.primaryKey, 1);
+      return;
     }
-    const step = stepFor(item);
-    updateItemQuantity(lk, parseFloat((item.quantity + step).toFixed(2)));
+
+    const step = stepFor(group.primaryLine);
+    updateItemQuantity(group.primaryKey, parseFloat((group.primaryLine.quantity + step).toFixed(2)));
   };
-  const handleDecrease = (item) => {
-    const lk = lineKeyFor(item);
-    if (item.pricing_type !== 'per_piece') {
-      const tiers = tierOptionsFor(item);
-      if (tiers.length > 0) {
-        if ((item.packCount || 1) > 1) {
-          adjustPackCount(lk, -1);
-        } else {
-          removeFromCart(lk);
-        }
-        return;
-      }
+
+  const handleDecreaseGroup = (group) => {
+    if (!group) return;
+    if (group.hasTiers && !group.isPerPiece) {
+      // For admin tier products, subtract one pack from the highest tier.
+      // Store will remove the line if packCount would drop below 1.
+      adjustPackCount(group.primaryKey, -1);
+      return;
     }
-    const step = stepFor(item);
-    const minQ = minQtyFor(item);
-    const newQty = parseFloat((item.quantity - step).toFixed(2));
-    if (newQty < minQ - 1e-6) removeFromCart(lk);
-    else updateItemQuantity(lk, newQty);
+
+    const step = stepFor(group.primaryLine);
+    const minQ = minQtyFor(group.primaryLine);
+    const newQty = parseFloat((group.primaryLine.quantity - step).toFixed(2));
+    if (newQty < minQ - 1e-6) removeFromCart(group.primaryKey);
+    else updateItemQuantity(group.primaryKey, newQty);
+  };
+
+  const handleRemoveGroup = (group) => {
+    if (!group) return;
+    removeProductFromCart(group.productId);
   };
 
   if (items.length === 0) {
@@ -126,27 +191,24 @@ const CartPage = () => {
         <div className="mx-3 sm:mx-0 bg-surface-container-lowest rounded-2xl outline outline-1 outline-outline-variant/10 divide-y divide-surface-container overflow-hidden shadow-editorial">
           <div className="px-4 py-3 flex items-center justify-between">
             <h2 className="text-sm font-headline font-bold text-on-surface">Your Items</h2>
-            <span className="text-xs text-on-surface-variant">{items.length} {items.length === 1 ? 'item' : 'items'}</span>
+          <span className="text-xs text-on-surface-variant">{groupedItems.length} {groupedItems.length === 1 ? 'item' : 'items'}</span>
           </div>
 
-          {items.map((item) => {
-            const isPerPiece = item.pricing_type === 'per_piece';
-            const pricePerKg = item.price_per_kg || 0;
-            const pricing = getCartLinePricing(item);
-            const lineTotal = getCartLineTotal(item).toFixed(2);
-            const unitLabel = isPerPiece ? '/pc' : '/kg';
-            const priceMeta = pricing.hasTiers
-              ? `₹${Number.isInteger(pricing.basePrice) ? pricing.basePrice : pricing.basePrice.toFixed(2)} for ${formatCartQuantityLabel(item)}`
-              : `₹${pricePerKg}${unitLabel}`;
-            const discountSuffix = item.discount > 0 ? ` · ${item.discount}% off` : '';
+        {groupedItems.map((group) => {
+          const unitLabel = group.isPerPiece ? '/pc' : '/kg';
+          const priceMeta = group.hasTiers
+            ? `₹${Number.isInteger(group.mergedBasePriceTotal) ? group.mergedBasePriceTotal : group.mergedBasePriceTotal.toFixed(2)} for ${group.mergedQuantityLabel}`
+            : `₹${group.price_per_kg}${unitLabel}`;
+          const discountSuffix = group.discount > 0 ? ` · ${group.discount}% off` : '';
+          const lineTotal = group.mergedLineTotal.toFixed(2);
 
-            return (
-              <div key={item.lineId || item.id} className="flex items-center gap-3 px-4 py-3">
+          return (
+            <div key={group.productId} className="flex items-center gap-3 px-4 py-3">
                 {/* Image */}
                 <div className="flex-shrink-0 w-14 h-14 rounded-xl overflow-hidden bg-surface-container-low outline outline-1 outline-outline-variant/10">
                   <img
-                    src={getImageUrl(item.image_url)}
-                    alt={item.name}
+                  src={getImageUrl(group.image_url)}
+                  alt={group.name}
                     width={IMAGE_DIMS.cartLineSm.width}
                     height={IMAGE_DIMS.cartLineSm.height}
                     className="w-full h-full object-cover"
@@ -159,10 +221,10 @@ const CartPage = () => {
                 {/* Info */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-start justify-between gap-1">
-                    <h3 className="text-sm font-semibold text-on-surface truncate pr-1">{item.name}</h3>
+                  <h3 className="text-sm font-semibold text-on-surface truncate pr-1">{group.name}</h3>
                     <button
                       type="button"
-                      onClick={() => removeFromCart(lineKeyFor(item))}
+                    onClick={() => handleRemoveGroup(group)}
                       className="flex-shrink-0 text-on-surface-variant hover:text-error transition-colors p-0.5 -mt-0.5"
                     >
                       <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -180,27 +242,27 @@ const CartPage = () => {
                       <div className="flex items-center bg-gradient-to-r from-primary to-primary-container rounded-lg overflow-hidden shadow-primary-glow">
                         <button
                           type="button"
-                          onClick={() => handleDecrease(item)}
+                          onClick={() => handleDecreaseGroup(group)}
                           className="w-7 h-6 flex items-center justify-center text-on-primary text-sm font-bold hover:opacity-90 transition-opacity"
                           aria-label="Decrease quantity"
                         >
                           −
                         </button>
                         <span className="text-on-primary text-[11px] font-bold px-2 min-w-[3.25rem] text-center">
-                          {formatCartQuantityLabel(item)}
+                          {group.mergedQuantityLabel}
                         </span>
                         <button
                           type="button"
-                          onClick={() => handleIncrease(item)}
+                          onClick={() => handleIncreaseGroup(group)}
                           className="w-7 h-6 flex items-center justify-center text-on-primary text-sm font-bold hover:opacity-90 transition-opacity"
                           aria-label="Increase quantity"
                         >
                           +
                         </button>
                       </div>
-                      {!isPerPiece && (
+                      {!group.isPerPiece && (
                         <span className="text-[10px] text-on-surface-variant">
-                          {tierOptionsFor(item).length > 0 ? 'Admin tier weights' : '±50g · exact weight pricing'}
+                          {group.hasTiers ? 'Admin tier weights' : '±50g · exact weight pricing'}
                         </span>
                       )}
                     </div>
@@ -208,8 +270,8 @@ const CartPage = () => {
                   </div>
                 </div>
               </div>
-            );
-          })}
+          );
+        })}
         </div>
 
         {/* Continue shopping */}
@@ -231,7 +293,7 @@ const CartPage = () => {
         {/* Price summary */}
         <div className="flex items-center justify-between mb-3 text-sm">
           <div className="flex items-center gap-3 text-on-surface-variant">
-            <span>{items.length} {items.length === 1 ? 'item' : 'items'}</span>
+            <span>{groupedItems.length} {groupedItems.length === 1 ? 'item' : 'items'}</span>
             <span>·</span>
             <span>Delivery: <span className={deliveryFee === 0 ? 'text-primary font-bold' : 'font-medium text-on-surface'}>{deliveryFee === 0 ? 'FREE' : `₹${deliveryFee}`}</span></span>
           </div>

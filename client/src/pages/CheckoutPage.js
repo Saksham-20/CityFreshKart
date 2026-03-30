@@ -68,6 +68,49 @@ const CheckoutPage = () => {
 
   const { subtotal, deliveryFee, total } = calculateSummary();
 
+  // Group weight-tier cart rows by product id for display on checkout.
+  // (Plain computation instead of `useMemo` to avoid Rules-of-Hooks issues with early returns.)
+  const groupedOrderSummaryItems = (() => {
+    if (!Array.isArray(items) || items.length === 0) return [];
+
+    const byProduct = new Map();
+    items.forEach((item) => {
+      const pid = item.id;
+      if (pid == null) return;
+      if (!byProduct.has(pid)) byProduct.set(pid, []);
+      byProduct.get(pid).push(item);
+    });
+
+    return Array.from(byProduct.entries()).map(([productId, lines]) => {
+      const primaryLine = [...lines].sort((a, b) => Number(b.quantity) - Number(a.quantity))[0];
+      const packsFor = (l) => Math.max(1, parseInt(l.packCount, 10) || 1);
+
+      const mergedQuantity = lines.reduce((sum, l) => {
+        const q = Number(l.quantity) || 0;
+        return sum + q * packsFor(l);
+      }, 0);
+
+      const mergedLabelItem = primaryLine.pricing_type === 'per_piece'
+        ? { pricing_type: 'per_piece', quantity: mergedQuantity, packCount: 1 }
+        : {
+          pricing_type: primaryLine.pricing_type,
+          quantity: mergedQuantity,
+          packCount: 1,
+          weight_display_unit: primaryLine.weight_display_unit,
+        };
+
+      const mergedQuantityLabel = formatCartQuantityLabel(mergedLabelItem);
+      const mergedLineTotal = lines.reduce((sum, l) => sum + getCartLineTotal(l), 0);
+
+      return {
+        productId,
+        name: primaryLine.name,
+        mergedQuantityLabel,
+        mergedLineTotal,
+      };
+    });
+  })();
+
   const validateNewAddress = () => {
     if (!useNewAddress) return '';
     if (String(newAddressForm.houseNumber || '').trim().length > 100) return 'House number is too long';
@@ -234,14 +277,14 @@ const CheckoutPage = () => {
         {/* Order Summary */}
         <div className="bg-surface-container-lowest rounded-2xl outline outline-1 outline-outline-variant/15 overflow-hidden shadow-editorial">
           <div className="px-4 py-3 border-b border-surface-container">
-            <h3 className="font-semibold text-on-surface text-sm">Order Summary ({items.length} {items.length === 1 ? 'item' : 'items'})</h3>
+            <h3 className="font-semibold text-on-surface text-sm">Order Summary ({groupedOrderSummaryItems.length} {groupedOrderSummaryItems.length === 1 ? 'item' : 'items'})</h3>
           </div>
           <div className="px-4 py-3 space-y-2">
-            {items.map(item => {
-              const itemPrice = getCartLineTotal(item);
+            {groupedOrderSummaryItems.map((group) => {
+              const itemPrice = group.mergedLineTotal;
               return (
-                <div key={item.lineId || item.id} className="flex justify-between text-sm text-on-surface-variant">
-                  <span className="flex-1 pr-2">{item.name} × {formatCartQuantityLabel(item)}</span>
+                <div key={group.productId} className="flex justify-between text-sm text-on-surface-variant">
+                  <span className="flex-1 pr-2">{group.name} × {group.mergedQuantityLabel}</span>
                   <span className="font-medium text-on-surface">₹{itemPrice.toFixed(2)}</span>
                 </div>
               );
