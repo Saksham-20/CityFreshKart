@@ -18,8 +18,8 @@ function messageForHttpStatus(status, statusText) {
   if (status === 413 || st.includes('payload') || st.includes('too large')) {
     return (
       'The request or image is too large for the server to accept (HTTP 413). ' +
-      'Use a smaller image (within the admin upload limit) or an image URL. ' +
-      'If the file is already small, your host or Nginx may need a higher client_max_body_size.'
+      'Use an image within the 5MB admin limit or use an image URL. ' +
+      'If a 2-3MB file still fails, set your reverse proxy/Nginx client_max_body_size to at least 8M.'
     );
   }
   if (status === 429) {

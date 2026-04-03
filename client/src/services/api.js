@@ -3,11 +3,13 @@ import { useAuthStore } from '../store/useAuthStore';
 import { getPublicApiOrigin } from '../utils/publicOrigin';
 
 const API_BASE_URL = `${getPublicApiOrigin()}/api`;
+const parsedTimeoutMs = parseInt(process.env.REACT_APP_API_TIMEOUT_MS, 10);
+const apiTimeoutMs = Number.isFinite(parsedTimeoutMs) && parsedTimeoutMs > 0 ? parsedTimeoutMs : 60000;
 
 // Create axios instance
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 30000,
+  timeout: apiTimeoutMs,
   withCredentials: true, // Send httpOnly cookies automatically
 });
 

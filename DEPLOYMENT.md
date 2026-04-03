@@ -301,6 +301,12 @@ For file uploads (admin product images), set a body size limit **above** your `M
 client_max_body_size 8M;
 ```
 
+After updating this value, reload Nginx so the new limit applies:
+
+```bash
+sudo nginx -t && sudo systemctl reload nginx
+```
+
 For a React SPA, always fall back to `index.html` so deep links like `/admin/products` work after refresh:
 
 ```nginx

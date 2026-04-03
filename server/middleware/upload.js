@@ -3,7 +3,10 @@ const path = require('path');
 const fs = require('fs');
 const uploadRoot = path.join(__dirname, '..', 'uploads');
 /** Default 5MB; override with MAX_FILE_SIZE (bytes). Nginx must allow ≥ this or uploads return 413. */
-const maxFileSizeBytes = parseInt(process.env.MAX_FILE_SIZE, 10) || 5 * 1024 * 1024;
+const parsedMaxBytes = parseInt(process.env.MAX_FILE_SIZE, 10);
+const maxFileSizeBytes = Number.isFinite(parsedMaxBytes) && parsedMaxBytes > 0
+  ? parsedMaxBytes
+  : 5 * 1024 * 1024;
 
 const formatFileSize = (bytes) => {
   if (!Number.isFinite(bytes) || bytes <= 0) return '5MB';
@@ -57,6 +60,8 @@ const fileFilter = (req, file, cb) => {
     ts: new Date().toISOString(),
     event: 'upload_rejected_type',
     requestId: req.requestId,
+    contentLength: req.headers['content-length'],
+    userAgent: req.headers['user-agent'],
     mimetype: file.mimetype,
     originalname: file.originalname,
     fieldname: file.fieldname,
@@ -89,7 +94,7 @@ const handleUploadError = (error, req, res, next) => {
     }));
 
     if (error.code === 'LIMIT_FILE_SIZE') {
-      return res.status(400).json({
+      return res.status(413).json({
         success: false,
         ref,
         errorCode: 'FILE_TOO_LARGE',

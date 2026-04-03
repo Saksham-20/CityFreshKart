@@ -185,6 +185,17 @@ if (process.env.NODE_ENV === 'production') {
 // Error handling middleware
 app.use(errorLogger);
 app.use((err, req, res, next) => {
+  if (err?.status === 413 || err?.type === 'entity.too.large' || err?.code === 'LIMIT_FILE_SIZE') {
+    const ref = req.requestId || 'unknown';
+    return res.status(413).json({
+      success: false,
+      ref,
+      errorCode: 'REQUEST_TOO_LARGE',
+      message:
+        'Request payload too large. Use a smaller image or increase reverse proxy client_max_body_size above MAX_FILE_SIZE.',
+    });
+  }
+
   const ref = req.requestId || 'unknown';
   logStructured('error', {
     requestId: ref,
