@@ -63,6 +63,24 @@ const PromoCarousel = () => {
             ? 'bg-secondary-container/20 outline outline-1 outline-secondary-container/30'
             : 'bg-primary-fixed/20 outline outline-1 outline-primary-fixed/30';
 
+          // Calculate lowest price from weight tiers
+          const overrides = product.weight_price_overrides || {};
+          let displayPrice = effective;
+          let displayWeight = 1;
+          if (Object.keys(overrides).length > 0) {
+            const weights = Object.keys(overrides)
+              .map((k) => parseFloat(k))
+              .filter((n) => Number.isFinite(n) && n > 0)
+              .sort((a, b) => a - b);
+            if (weights.length > 0) {
+              displayWeight = weights[0];
+              const tierPrice = Number(overrides[displayWeight.toFixed(2)]) || (price * displayWeight);
+              displayPrice = d > 0 ? tierPrice * (1 - d / 100) : tierPrice;
+            }
+          }
+
+          const weightDisplay = product.weight_display_unit || 'kg';
+
           let badge = null;
           if (isDisc) {
             badge = (
@@ -99,13 +117,9 @@ const PromoCarousel = () => {
                     {product.name}
                   </h3>
                   <div className="flex items-baseline gap-1.5 mb-3">
-                    <span className="text-primary font-extrabold text-xl">₹{effective.toFixed(0)}</span>
-                    {isDisc && (
-                      <span className="text-on-surface-variant text-xs line-through opacity-60">
-                        ₹{price.toFixed(0)}
-                      </span>
-                    )}
-                    <span className="text-on-surface-variant text-[10px] font-medium">/ kg</span>
+                    <span className="text-on-surface-variant text-[10px] font-medium">From</span>
+                    <span className="text-primary font-extrabold text-xl">₹{displayPrice.toFixed(0)}</span>
+                    <span className="text-on-surface-variant text-[10px] font-medium">/ {displayWeight}{weightDisplay}</span>
                   </div>
                   <Link
                     to={`/?highlight=${encodeURIComponent(product.id)}`}

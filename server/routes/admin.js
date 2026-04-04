@@ -1290,6 +1290,13 @@ router.delete('/users/:id', async (req, res) => {
 
   } catch (error) {
     console.error('Delete admin user error:', error);
+    // Handle foreign key constraint violation
+    if (error.code === '23503') {
+      return res.status(409).json({
+        message: 'User has associated data and cannot be deleted. Check admin panel for linked orders or accounts.',
+        errorCode: 'FK_VIOLATION',
+      });
+    }
     return adminServerError(req, res, 'Could not complete the request. Try again; contact support with the reference if it continues.', 'INTERNAL');
   }
 });

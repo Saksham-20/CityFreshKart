@@ -250,6 +250,25 @@ const AdminMarketingBannersPage = () => {
           </div>
         </div>
 
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <div className="flex gap-3">
+            <div className="text-blue-600 text-lg mt-0.5">ℹ️</div>
+            <div>
+              <h3 className="font-semibold text-blue-900 mb-2">Recommended banner dimensions</h3>
+              <div className="grid grid-cols-2 gap-4 text-sm text-blue-800">
+                <div>
+                  <p className="font-medium">Full banner</p>
+                  <p className="text-blue-700">{IMAGE_DIMS.marketingBanner.width} × {IMAGE_DIMS.marketingBanner.height}px</p>
+                </div>
+                <div>
+                  <p className="font-medium">Aspect ratio</p>
+                  <p className="text-blue-700">2:1 (landscape)</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <label className="flex items-center gap-2 cursor-pointer">
           <input
             type="checkbox"

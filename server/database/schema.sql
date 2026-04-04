@@ -173,7 +173,7 @@ WHERE p.category_id IS NULL
 CREATE TABLE IF NOT EXISTS orders (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     order_number VARCHAR(50) UNIQUE NOT NULL,
-    user_id UUID REFERENCES users(id),
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
     phone VARCHAR(20),
     delivery_address TEXT,
     subtotal DECIMAL(10,2) NOT NULL,
