@@ -123,6 +123,7 @@ async function setupDatabase() {
       '007_drop_products_category_check.sql',
       '008_idempotency_and_payment_dedup.sql',
       '009_hot_query_indexes.sql',
+      '010_add_orders_user_cascade_delete.sql',
     ];
     for (const name of migrationFiles) {
       const migrationPath = path.join(__dirname, 'migrations', name);
