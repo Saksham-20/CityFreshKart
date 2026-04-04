@@ -11,6 +11,8 @@
  * - client/public/icons/icon-192x192-maskable.png
  * - client/public/icons/icon-512x512.png
  * - client/public/icons/icon-512x512-maskable.png
+ * - client/public/icons/shortcut-products.png
+ * - client/public/icons/shortcut-cart.png
  */
 
 const sharp = require('sharp');
@@ -64,6 +66,27 @@ async function generateIcons() {
         .toFile(maskableIconPath);
       console.log(`✅ Generated: icon-${name}-maskable.png (${size}×${size}, masked)`);
     }
+
+    // Generate shortcut icons (192x192 for quick access shortcuts)
+    const shortcutIconPath = path.join(ICONS_DIR, 'shortcut-products.png');
+    await sharp(SOURCE_LOGO)
+      .resize(192, 192, {
+        fit: 'contain',
+        background: { r: 255, g: 255, b: 255, alpha: 1 },
+      })
+      .png()
+      .toFile(shortcutIconPath);
+    console.log('✅ Generated: shortcut-products.png (192×192)');
+
+    const shortcutCartPath = path.join(ICONS_DIR, 'shortcut-cart.png');
+    await sharp(SOURCE_LOGO)
+      .resize(192, 192, {
+        fit: 'contain',
+        background: { r: 255, g: 255, b: 255, alpha: 1 },
+      })
+      .png()
+      .toFile(shortcutCartPath);
+    console.log('✅ Generated: shortcut-cart.png (192×192)');
 
     console.log('\n✨ All PWA icons generated successfully!');
     console.log(`📁 Icons saved to: ${ICONS_DIR}`);
