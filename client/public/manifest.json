@@ -42,13 +42,13 @@
       "name": "Products",
       "short_name": "Products",
       "url": "/",
-      "icons": [{ "src": "/icons/shortcut-products.png", "sizes": "192x192", "type": "image/png" }]
+      "icons": [{ "src": "/icons/shortcut-products-white.png", "sizes": "192x192", "type": "image/png" }]
     },
     {
       "name": "Cart",
       "short_name": "Cart",
       "url": "/cart",
-      "icons": [{ "src": "/icons/shortcut-cart.png", "sizes": "192x192", "type": "image/png" }]
+      "icons": [{ "src": "/icons/shortcut-cart-white.png", "sizes": "192x192", "type": "image/png" }]
     }
   ]
 }
