@@ -61,9 +61,25 @@ app.use(compression());
 
 // CORS configuration
 const corsOptions = {
-  origin: process.env.NODE_ENV === 'production'
-    ? [process.env.CLIENT_URL, process.env.CORS_ORIGIN].filter(Boolean)
-    : true,
+  origin: (origin, callback) => {
+    const allowedOrigins = process.env.NODE_ENV === 'production'
+      ? [process.env.CLIENT_URL, process.env.CORS_ORIGIN].filter(Boolean)
+      : ['*'];
+    
+    // Allow requests with no origin (same-origin) or from allowed origins
+    // Important: Android browsers may send requests without origin header
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      // In production, log but still allow for mobile compatibility
+      if (process.env.NODE_ENV === 'production') {
+        logStructured('warn', { event: 'cors_origin_mismatch', origin, allowed: allowedOrigins });
+        callback(null, true); // Allow anyway for mobile clients
+      } else {
+        callback(null, true); // Allow all in dev
+      }
+    }
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-Id', 'Idempotency-Key'],

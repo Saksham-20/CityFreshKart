@@ -87,7 +87,10 @@ const Navigation = () => {
   return (
     <nav className="hidden lg:flex items-center space-x-8">
       <Link to="/" className="flex items-center">
-        <img src="/CityFreshKart.png" alt="CityFreshKart" className="h-8 w-auto object-contain" />
+        {/* Mobile logo - shown only on small screens */}
+        <img src="/logo-mobile.png" alt="CityFreshKart" className="sm:hidden h-8 w-auto object-contain" />
+        {/* Desktop logo - shown on sm and larger */}
+        <img src="/CityFreshKart.png" alt="CityFreshKart" className="hidden sm:block h-8 w-auto object-contain" />
       </Link>
       {/* Main Navigation Items */}
       {navigationItems.map((item) => (

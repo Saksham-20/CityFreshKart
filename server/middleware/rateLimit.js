@@ -103,6 +103,7 @@ const authLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   handler: rateLimitJsonHandler,
+  skip: (req) => req.method === 'OPTIONS', // Skip CORS preflight - critical for Android
 });
 
 const uploadLimiter = rateLimit({

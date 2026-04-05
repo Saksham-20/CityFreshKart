@@ -43,10 +43,17 @@ const AdminLayout = ({ children }) => {
                 <FiMenu className="w-5 h-5" />
               </button>
               <Link to="/admin" className="flex items-center">
+                {/* Mobile logo */}
+                <img
+                  src="/logo-mobile.png"
+                  alt="CityFreshKart"
+                  className="sm:hidden h-7 w-auto object-contain"
+                />
+                {/* Desktop logo */}
                 <img
                   src="/CityFreshKart.png"
                   alt="CityFreshKart"
-                  className="h-7 sm:h-8 w-auto object-contain"
+                  className="hidden sm:block h-7 sm:h-8 w-auto object-contain"
                 />
                 <div className="ml-2 sm:ml-3 min-w-0">
                   <p className="text-base sm:text-xl font-bold text-gray-900 leading-tight">Admin Panel</p>
