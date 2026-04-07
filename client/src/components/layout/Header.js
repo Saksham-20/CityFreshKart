@@ -32,6 +32,56 @@ function SearchPanel({
     ? 'relative mt-2 max-h-[min(50vh,20rem)] overflow-y-auto rounded-2xl bg-surface-container-lowest shadow-editorial outline outline-1 outline-outline-variant/20 py-1 z-[70]'
     : 'absolute left-0 right-0 top-full mt-1 max-h-[min(70vh,22rem)] overflow-y-auto rounded-2xl bg-surface-container-lowest shadow-editorial outline outline-1 outline-outline-variant/20 py-1 z-[70]';
 
+  // Helper to get lowest tier price from product
+  const getDisplayPrice = (product) => {
+    const basePrice = Number(product.price_per_kg) || 0;
+    const discount = Number(product.discount) || 0;
+    const effective = discount > 0 ? basePrice * (1 - discount / 100) : basePrice;
+    
+    const overrides = product.weight_price_overrides || {};
+    if (Object.keys(overrides).length === 0) {
+      return effective;
+    }
+    
+    const tiers = Object.keys(overrides)
+      .map((k) => parseFloat(k))
+      .filter((n) => Number.isFinite(n) && n > 0)
+      .sort((a, b) => a - b);
+    
+    if (tiers.length === 0) {
+      return effective;
+    }
+    
+    const smallestTier = tiers[0];
+    const tierPrice = Number(overrides[smallestTier.toFixed(2)]) || (basePrice * smallestTier);
+    return discount > 0 ? tierPrice * (1 - discount / 100) : tierPrice;
+  };
+
+  // Helper to get display unit and quantity for tier
+  const getDisplayUnitAndQty = (product) => {
+    const pricingType = product.pricing_type || 'per_kg';
+    const overrides = product.weight_price_overrides || {};
+    
+    if (Object.keys(overrides).length === 0) {
+      return pricingType === 'per_piece' ? '1 pc' : '1 kg';
+    }
+    
+    const tiers = Object.keys(overrides)
+      .map((k) => parseFloat(k))
+      .filter((n) => Number.isFinite(n) && n > 0)
+      .sort((a, b) => a - b);
+    
+    if (tiers.length === 0) {
+      return pricingType === 'per_piece' ? '1 pc' : '1 kg';
+    }
+    
+    const smallestTier = tiers[0];
+    if (pricingType === 'per_piece') {
+      return `${Math.round(smallestTier)} ${smallestTier === 1 ? 'pc' : 'pcs'}`;
+    }
+    return `${smallestTier}${product.weight_display_unit || 'kg'}`;
+  };
+
   return (
     <div ref={containerRef} className="w-full relative z-[60]">
       <form onSubmit={onSubmit} className="w-full relative">
@@ -89,7 +139,7 @@ function SearchPanel({
                   <span className="min-w-0 flex-1">
                     <span className="block text-sm font-semibold text-on-surface truncate">{p.name}</span>
                     <span className="text-xs font-bold text-primary">
-                      ₹{Number(p.price_per_kg || 0).toFixed(0)}/{p.pricing_type === 'per_piece' ? 'pc' : 'kg'}
+                      ₹{getDisplayPrice(p).toFixed(0)} / {getDisplayUnitAndQty(p)}
                     </span>
                   </span>
                 </button>

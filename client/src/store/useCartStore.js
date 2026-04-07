@@ -64,11 +64,22 @@ const useCartStore = create((set, get) => ({
       }
 
       const data = json?.data || {};
-      set({
-        freeDeliveryThreshold: parseFloat(data.free_delivery_threshold) || 300,
-        deliveryFeeAmount: parseFloat(data.delivery_fee) || 50,
-        minOrderAmount: parseFloat(data.min_order_amount) || 0,
-      });
+      const parsed = {
+        freeDeliveryThreshold: data.free_delivery_threshold !== undefined && data.free_delivery_threshold !== null && data.free_delivery_threshold !== '' 
+          ? parseFloat(data.free_delivery_threshold) 
+          : 300,
+        deliveryFeeAmount: data.delivery_fee !== undefined && data.delivery_fee !== null && data.delivery_fee !== '' 
+          ? parseFloat(data.delivery_fee) 
+          : 50,
+        minOrderAmount: data.min_order_amount !== undefined && data.min_order_amount !== null && data.min_order_amount !== '' 
+          ? parseFloat(data.min_order_amount) 
+          : 0,
+      };
+      
+      // Only update if parsed values are valid numbers
+      if (Number.isFinite(parsed.freeDeliveryThreshold) && Number.isFinite(parsed.deliveryFeeAmount) && Number.isFinite(parsed.minOrderAmount)) {
+        set(parsed);
+      }
     } catch (_) {
       // keep defaults on error
     }

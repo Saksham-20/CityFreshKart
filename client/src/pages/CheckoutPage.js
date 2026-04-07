@@ -30,12 +30,26 @@ const CheckoutPage = () => {
   const [loading, setLoading] = useState(false);
   const [addressesLoading, setAddressesLoading] = useState(true);
   const [error, setError] = useState('');
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
 
   useEffect(() => {
     if (user) {
       loadAddresses();
     }
   }, [user]);
+
+  useEffect(() => {
+    // Load and wait for settings to be ready before checkout calculations
+    (async () => {
+      try {
+        await useCartStore.getState().loadSettings();
+        setSettingsLoaded(true);
+      } catch (e) {
+        console.error('Failed to load settings', e);
+        setSettingsLoaded(true); // Still proceed with defaults
+      }
+    })();
+  }, []);
 
   const loadAddresses = async () => {
     try {

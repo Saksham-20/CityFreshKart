@@ -81,8 +81,14 @@ router.get('/carousel', async (req, res) => {
         created_at,
         COALESCE(pricing_type, 'per_kg') AS pricing_type,
         COALESCE(weight_display_unit, 'kg') AS weight_display_unit,
-        COALESCE(is_featured, false) AS is_featured
+        COALESCE(is_featured, false) AS is_featured,
+        COALESCE(wp.weight_price_overrides, '{}'::json) AS weight_price_overrides
       FROM products
+      LEFT JOIN LATERAL (
+        SELECT json_object_agg(weight_option::text, price_override) AS weight_price_overrides
+        FROM product_weight_prices
+        WHERE product_id = products.id
+      ) wp ON true
       WHERE is_active = true
         AND (
           discount > 0
@@ -196,8 +202,14 @@ router.get('/search', async (req, res) => {
         quantity_available,
         created_at,
         COALESCE(pricing_type, 'per_kg') AS pricing_type,
-        COALESCE(weight_display_unit, 'kg') AS weight_display_unit
+        COALESCE(weight_display_unit, 'kg') AS weight_display_unit,
+        COALESCE(wp.weight_price_overrides, '{}'::json) AS weight_price_overrides
       FROM products
+      LEFT JOIN LATERAL (
+        SELECT json_object_agg(weight_option::text, price_override) AS weight_price_overrides
+        FROM product_weight_prices
+        WHERE product_id = products.id
+      ) wp ON true
       WHERE is_active = true
         AND (
           name ILIKE $1
@@ -226,8 +238,14 @@ router.get('/search', async (req, res) => {
           quantity_available,
           created_at,
           COALESCE(pricing_type, 'per_kg') AS pricing_type,
-          COALESCE(weight_display_unit, 'kg') AS weight_display_unit
+          COALESCE(weight_display_unit, 'kg') AS weight_display_unit,
+          COALESCE(wp.weight_price_overrides, '{}'::json) AS weight_price_overrides
         FROM products
+        LEFT JOIN LATERAL (
+          SELECT json_object_agg(weight_option::text, price_override) AS weight_price_overrides
+          FROM product_weight_prices
+          WHERE product_id = products.id
+        ) wp ON true
         WHERE is_active = true
           AND (name ILIKE $1 OR COALESCE(description, '') ILIKE $1)
         ORDER BY name ASC

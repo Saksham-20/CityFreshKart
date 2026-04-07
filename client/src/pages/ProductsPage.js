@@ -5,6 +5,7 @@ import ProductCardSkeleton from '../components/product/ProductCardSkeleton';
 import PromoCarousel from '../components/product/PromoCarousel';
 import OffersCarousel from '../components/product/OffersCarousel';
 import api from '../services/api';
+import { useCartStore } from '../store/useCartStore';
 
 const DEFAULT_CATEGORY_NAMES = ['Vegetables', 'Fruits', 'Dairy', 'Bakery', 'Grains', 'Herbs & Spices', 'Other'];
 const getCategoryEmoji = (name) => {
@@ -74,6 +75,11 @@ const ProductsPage = () => {
 
   useEffect(() => {
     fetchCategories();
+  }, []);
+
+  useEffect(() => {
+    // Refresh settings when products page loads
+    useCartStore.getState().loadSettings();
   }, []);
 
   useEffect(() => {

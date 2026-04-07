@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import useCart from '../hooks/useCart';
 import { getImageUrl, getPlaceholderImage, IMAGE_DIMS } from '../utils/imageUtils';
@@ -8,18 +8,36 @@ import {
   getCartLineTotal,
   getTierWeightsFromOverrides,
 } from '../utils/weightSystem';
+import { useCartStore } from '../store/useCartStore';
 
 const GRAM_STEP_KG = 0.05; // fallback step when no explicit tiers
 const PIECE_STEP = 1;
-const FREE_DELIVERY_THRESHOLD = 300;
 
 const CartPage = () => {
   const navigate = useNavigate();
   const { items, removeFromCart, removeProductFromCart, updateItemQuantity, adjustPackCount, calculateSummary } = useCart();
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
+  
+  // Subscribe to cart store to get fresh settings values
+  const freeDeliveryThreshold = useCartStore((state) => state.freeDeliveryThreshold);
+  
   const { subtotal, deliveryFee, total } = calculateSummary();
 
-  const amountToFree = Math.max(FREE_DELIVERY_THRESHOLD - subtotal, 0);
-  const deliveryProgress = Math.min((subtotal / FREE_DELIVERY_THRESHOLD) * 100, 100);
+  // Load settings when cart page mounts
+  useEffect(() => {
+    (async () => {
+      try {
+        await useCartStore.getState().loadSettings();
+        setSettingsLoaded(true);
+      } catch (e) {
+        console.error('Failed to load settings', e);
+        setSettingsLoaded(true); // Still proceed with defaults
+      }
+    })();
+  }, []);
+
+  const amountToFree = Math.max(freeDeliveryThreshold - subtotal, 0);
+  const deliveryProgress = Math.min((subtotal / freeDeliveryThreshold) * 100, 100);
 
   const tierOptionsFor = (item) => (
     item.pricing_type === 'per_piece'

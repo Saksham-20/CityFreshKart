@@ -171,14 +171,34 @@ app.use('/api/wishlist', (req, res) => {
 app.get('/api/settings', async (req, res) => {
   try {
     const { pool } = require('./database/config');
-    const result = await pool.query('SELECT key, value FROM store_settings ORDER BY key');
-    const settings = {};
-    result.rows.forEach(row => { settings[row.key] = row.value; });
-    res.json({ success: true, data: settings });
+    const defaults = {
+      free_delivery_threshold: '300',
+      delivery_fee: '50',
+      min_order_amount: '0',
+    };
+    
+    try {
+      const result = await pool.query('SELECT key, value FROM store_settings ORDER BY key');
+      const settings = { ...defaults };
+      result.rows.forEach(row => { 
+        if (settings.hasOwnProperty(row.key)) {
+          settings[row.key] = row.value; 
+        }
+      });
+      res.json({ success: true, data: settings });
+    } catch (dbError) {
+      logStructured('warn', {
+        requestId: req.requestId,
+        event: 'settings_query_fallback',
+        message: dbError.message,
+      });
+      // Return defaults if DB query fails
+      res.json({ success: true, data: defaults });
+    }
   } catch (error) {
     logStructured('error', {
       requestId: req.requestId,
-      event: 'public_settings_db_error',
+      event: 'public_settings_error',
       message: error.message,
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined,
     });

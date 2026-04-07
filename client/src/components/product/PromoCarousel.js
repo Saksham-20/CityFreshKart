@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../../services/api';
 import { getImageUrl, IMAGE_DIMS } from '../../utils/imageUtils';
+import { formatWeightDisplay } from '../../utils/weightSystem';
 
 const PromoCarousel = () => {
   const [items, setItems] = useState([]);
@@ -63,23 +64,30 @@ const PromoCarousel = () => {
             ? 'bg-secondary-container/20 outline outline-1 outline-secondary-container/30'
             : 'bg-primary-fixed/20 outline outline-1 outline-primary-fixed/30';
 
-          // Calculate lowest price from weight tiers
+          // Calculate lowest price from tiers based on pricing type
           const overrides = product.weight_price_overrides || {};
+          const pricingType = product.pricing_type || 'per_kg';
           let displayPrice = effective;
           let displayWeight = 1;
+          let displayUnit = 'kg';
+          
           if (Object.keys(overrides).length > 0) {
-            const weights = Object.keys(overrides)
+            const tiers = Object.keys(overrides)
               .map((k) => parseFloat(k))
               .filter((n) => Number.isFinite(n) && n > 0)
               .sort((a, b) => a - b);
-            if (weights.length > 0) {
-              displayWeight = weights[0];
+            if (tiers.length > 0) {
+              displayWeight = tiers[0];
               const tierPrice = Number(overrides[displayWeight.toFixed(2)]) || (price * displayWeight);
               displayPrice = d > 0 ? tierPrice * (1 - d / 100) : tierPrice;
             }
           }
-
-          const weightDisplay = product.weight_display_unit || 'kg';
+          
+          if (pricingType === 'per_piece') {
+            displayUnit = 'pc';
+          } else {
+            displayUnit = product.weight_display_unit || 'kg';
+          }
 
           let badge = null;
           if (isDisc) {
@@ -119,7 +127,9 @@ const PromoCarousel = () => {
                   <div className="flex items-baseline gap-1.5 mb-3">
                     <span className="text-on-surface-variant text-[10px] font-medium">From</span>
                     <span className="text-primary font-extrabold text-xl">₹{displayPrice.toFixed(0)}</span>
-                    <span className="text-on-surface-variant text-[10px] font-medium">/ {displayWeight}{weightDisplay}</span>
+                    <span className="text-on-surface-variant text-[10px] font-medium">
+                      / {pricingType === 'per_piece' ? `${Math.round(displayWeight)} ${displayWeight === 1 ? 'pc' : 'pcs'}` : `${displayWeight}${displayUnit}`}
+                    </span>
                   </div>
                   <Link
                     to={`/?highlight=${encodeURIComponent(product.id)}`}
