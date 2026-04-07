@@ -66,7 +66,7 @@ const PromoCarousel = () => {
 
           // Calculate lowest price from tiers based on pricing type
           const overrides = product.weight_price_overrides || {};
-          const pricingType = product.pricing_type || 'per_kg';
+          let pricingType = product.pricing_type || 'per_kg';
           let displayPrice = effective;
           let displayWeight = 1;
           let displayUnit = 'kg';
@@ -80,6 +80,14 @@ const PromoCarousel = () => {
               displayWeight = tiers[0];
               const tierPrice = Number(overrides[displayWeight.toFixed(2)]) || (price * displayWeight);
               displayPrice = d > 0 ? tierPrice * (1 - d / 100) : tierPrice;
+              
+              // Detect if overrides represent piece quantities (small whole numbers like 3, 6, 12)
+              const isPieceBasedOverrides = tiers.every(t => 
+                Number.isInteger(t) && t >= 1 && t <= 100
+              );
+              if (isPieceBasedOverrides && pricingType === 'per_kg') {
+                pricingType = 'per_piece';
+              }
             }
           }
           
