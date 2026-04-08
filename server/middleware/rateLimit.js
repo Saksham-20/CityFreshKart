@@ -51,6 +51,13 @@ function rateLimitJsonHandler(req, res) {
   });
 }
 
+// Helper to check if request is from localhost in development
+function isLocalhost(req) {
+  if (process.env.NODE_ENV !== 'development') return false;
+  const ip = req.ip || req.connection?.remoteAddress || '';
+  return ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1' || ip.includes('localhost');
+}
+
 /**
  * Global API limiter (optional Redis store for PM2 cluster / multi-instance).
  */
@@ -62,6 +69,9 @@ function buildGlobalApiLimiter(store) {
     legacyHeaders: false,
     handler: rateLimitJsonHandler,
     skip: (req) => {
+      // Skip rate limiting for localhost in development
+      if (isLocalhost(req)) return true;
+      
       const url = req.originalUrl || req.url || '';
       if (req.method === 'GET' && (url === '/api/health' || url.startsWith('/api/health?'))) return true;
       if (req.method === 'GET' && (url === '/api/settings' || url.startsWith('/api/settings?'))) return true;
@@ -103,7 +113,10 @@ const authLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   handler: rateLimitJsonHandler,
-  skip: (req) => req.method === 'OPTIONS', // Skip CORS preflight - critical for Android
+  skip: (req) => {
+    if (isLocalhost(req)) return true; // Skip for localhost in dev
+    return req.method === 'OPTIONS'; // Skip CORS preflight - critical for Android
+  },
 });
 
 const uploadLimiter = rateLimit({
@@ -112,6 +125,7 @@ const uploadLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   handler: rateLimitJsonHandler,
+  skip: (req) => isLocalhost(req), // Skip for localhost in dev
 });
 
 const checkoutLimiter = rateLimit({
@@ -122,6 +136,7 @@ const checkoutLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   handler: rateLimitJsonHandler,
+  skip: (req) => isLocalhost(req), // Skip for localhost in dev
 });
 
 const adminProductWriteLimiter = rateLimit({
@@ -133,6 +148,7 @@ const adminProductWriteLimiter = rateLimit({
   legacyHeaders: false,
   handler: rateLimitJsonHandler,
   keyGenerator: (req) => (req.user?.id ? `uid:${req.user.id}` : req.ip),
+  skip: (req) => isLocalhost(req), // Skip for localhost in dev
 });
 
 module.exports = {

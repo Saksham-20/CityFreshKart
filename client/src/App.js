@@ -23,6 +23,7 @@ const ProductsPage = lazy(() => import('./pages/ProductsPage'));
 const CartPage = lazy(() => import('./pages/CartPage'));
 const CheckoutPage = lazy(() => import('./pages/CheckoutPage'));
 const OrderConfirmationPage = lazy(() => import('./pages/OrderConfirmationPage'));
+const PaymentConfirmationPage = lazy(() => import('./pages/PaymentConfirmationPage'));
 const LoginPage = lazy(() => import('./pages/LoginPage'));
 const AdminDashboardPage = lazy(() => import('./pages/AdminDashboardPage'));
 const AdminProductsPage = lazy(() => import('./pages/AdminProductsPage'));
@@ -167,6 +168,7 @@ function App() {
           <Route path="/products" element={<RedirectPreserveSearch to="/" />} />
           <Route path="/cart" element={isAuthenticated ? <MainLayout><CartPage /></MainLayout> : <Navigate to="/login" replace />} />
           <Route path="/checkout" element={<ProtectedRoute><MainLayout><CheckoutPage /></MainLayout></ProtectedRoute>} />
+          <Route path="/payment-confirmation/:orderId" element={<ProtectedRoute><MainLayout><PaymentConfirmationPage /></MainLayout></ProtectedRoute>} />
           <Route path="/orders" element={<ProtectedRoute><MainLayout><OrdersPage /></MainLayout></ProtectedRoute>} />
           <Route path="/orders/:orderId/confirmation" element={<ProtectedRoute><MainLayout><OrderConfirmationPage /></MainLayout></ProtectedRoute>} />
           <Route path="/orders/:orderId" element={<ProtectedRoute><MainLayout><OrderDetailPage /></MainLayout></ProtectedRoute>} />

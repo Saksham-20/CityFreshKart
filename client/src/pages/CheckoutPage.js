@@ -228,31 +228,67 @@ const CheckoutPage = () => {
 
     try {
       if (paymentMethod === 'razorpay') {
+        // STEP 1: Create order first (with status='pending')
+        const orderResponse = await placeOrder();
+        
+        if (!orderResponse.data.success) {
+          setError(orderResponse.data.message || 'Order creation failed.');
+          setLoading(false);
+          return;
+        }
+
+        const orderId = orderResponse.data.data?.order?.id || orderResponse.data.data?.id;
+        
+        if (!orderId) {
+          setError('Order created but ID not returned. Please contact support.');
+          setLoading(false);
+          return;
+        }
+
+        // STEP 2: Initiate Razorpay payment with order ID
         await razorpayService.openCheckout({
           amount: total,
+          backendOrderId: orderId,
           name: user.name || user.phone,
           email: user.email || '',
           phone: user.phone || '',
           description: `CityFreshKart Order — ₹${total.toFixed(2)}`,
-          onSuccess: async ({ razorpay_payment_id, razorpay_order_id }) => {
+          onSuccess: async ({ razorpay_payment_id, razorpay_order_id, backendOrderId }) => {
             try {
-              const response = await placeOrder({ razorpay_payment_id, razorpay_order_id });
-              if (response.data.success) {
-                clearCart();
-                const orderId = response.data.data?.order?.id || response.data.data?.id;
-                toast.success('Order placed! Waiting for admin confirmation.', { duration: 5000 });
-                navigate(orderId ? `/orders/${orderId}` : '/orders');
-              } else {
-                setError(response.data.message || 'Order creation failed after payment.');
-              }
+              // STEP 3: Update order with payment details
+              await razorpayService.updateOrderPayment(
+                backendOrderId || orderId,
+                razorpay_payment_id,
+                razorpay_order_id
+              );
+              
+              clearCart();
+              toast.success('Payment confirmed! Your order is being processed.', { duration: 5000 });
+              // Navigate to payment confirmation page
+              navigate(`/payment-confirmation/${backendOrderId || orderId}`);
             } catch (err) {
-              setError('Payment succeeded but order creation failed. Please contact support.');
+              console.error('Failed to update order with payment:', err);
+              // Payment succeeded but update failed - still navigate to order
+              clearCart();
+              toast('Payment successful! Order details will be updated shortly.', { 
+                duration: 5000,
+                icon: '⚠️',
+              });
+              navigate(`/orders/${backendOrderId || orderId}`);
             } finally {
               setLoading(false);
             }
           },
           onFailure: (err) => {
-            setError(err.message === 'Payment cancelled' ? 'Payment was cancelled.' : 'Payment failed. Please try again.');
+            setError(err.message === 'Payment cancelled' 
+              ? 'Payment was cancelled. Your order is saved and you can try again later.' 
+              : 'Payment failed. Your order is saved, you can retry payment from your orders.');
+            // Order exists but payment failed - user can retry later
+            toast('Order saved. You can retry payment from your order history.', {
+              duration: 4000,
+              icon: 'ℹ️',
+            });
+            navigate(`/orders/${orderId}`);
             setLoading(false);
           },
         });

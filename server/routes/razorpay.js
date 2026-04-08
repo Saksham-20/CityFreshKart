@@ -42,6 +42,7 @@ router.post('/create-order', authenticateToken, checkoutLimiter, [
   body('amount').notEmpty().withMessage('Amount is required').bail()
     .isFloat({ min: 1 }).withMessage('Amount must be at least ₹1'),
   body('currency').optional().isString().withMessage('Currency must be a string'),
+  body('orderId').optional().isUUID().withMessage('Order ID must be a valid UUID'),
 ], async (req, res) => {
   try {
     if (!razorpay) {
@@ -56,18 +57,52 @@ router.post('/create-order', authenticateToken, checkoutLimiter, [
       return res.status(400).json({ errors: errors.array() });
     }
 
-    const { amount, currency } = req.body;
+    const { amount, currency, orderId } = req.body;
+
+    // If orderId provided, verify it exists and belongs to user
+    if (orderId) {
+      const orderCheck = await pool.query(
+        'SELECT id, status, total_price FROM orders WHERE id = $1::uuid AND user_id = $2::uuid',
+        [orderId, req.user.id]
+      );
+      if (orderCheck.rows.length === 0) {
+        return res.status(404).json({
+          success: false,
+          message: 'Order not found or does not belong to you',
+        });
+      }
+      if (orderCheck.rows[0].status !== 'pending') {
+        return res.status(400).json({
+          success: false,
+          message: 'Order is not in pending status',
+        });
+      }
+    }
 
     // Frontend sends INR (rupees). Razorpay expects paise as integer.
     const rupees = parseFloat(amount);
     const paise = Math.round(rupees * 100);
 
+    // Receipt must be <= 40 chars. UUID is 36 chars, so use it directly or truncate
+    const receipt = orderId 
+      ? orderId.replace(/-/g, '').substring(0, 32) // Remove hyphens and truncate to 32 chars
+      : `rcpt_${Date.now()}`;
+
     const order = await razorpay.orders.create({
       amount: paise,
       currency: currency || 'INR',
-      receipt: `rcpt_${Date.now()}`,
+      receipt: receipt,
       payment_capture: 1,
+      notes: orderId ? { backend_order_id: orderId } : {},
     });
+
+    // If orderId provided, update order with razorpay_order_id
+    if (orderId) {
+      await pool.query(
+        'UPDATE orders SET razorpay_order_id = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2::uuid AND user_id = $3::uuid',
+        [order.id, orderId, req.user.id]
+      );
+    }
 
     return res.json({
       success: true,
@@ -76,6 +111,7 @@ router.post('/create-order', authenticateToken, checkoutLimiter, [
         amount: order.amount, // paise
         currency: order.currency,
         orderId: order.id,
+        backendOrderId: orderId || null,
       },
     });
   } catch (error) {
@@ -377,6 +413,55 @@ router.get('/payment-status/:paymentId', authenticateToken, async (req, res) => 
     });
     const mapped = mapRazorpayError(error, 'Failed to fetch payment status');
     res.status(mapped.status).json(mapped.body);
+  }
+});
+
+// @route   PUT /api/razorpay/update-order-payment
+// @desc    Update order with payment details after successful payment
+// @access  Private
+router.put('/update-order-payment', authenticateToken, [
+  body('orderId').notEmpty().withMessage('Order ID is required').bail()
+    .isUUID().withMessage('Order ID must be a valid UUID'),
+  body('razorpay_payment_id').notEmpty().withMessage('Razorpay payment ID is required'),
+  body('razorpay_order_id').notEmpty().withMessage('Razorpay order ID is required'),
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    const { orderId, razorpay_payment_id, razorpay_order_id } = req.body;
+
+    // Update order with payment details and change status to confirmed
+    const result = await pool.query(`
+      UPDATE orders 
+      SET razorpay_payment_id = $1, 
+          razorpay_order_id = $2,
+          status = CASE WHEN status = 'pending' THEN 'confirmed' ELSE status END,
+          updated_at = CURRENT_TIMESTAMP
+      WHERE id = $3::uuid AND user_id = $4::uuid AND status = 'pending'
+      RETURNING *
+    `, [razorpay_payment_id, razorpay_order_id, orderId, req.user.id]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Order not found, does not belong to you, or is not in pending status',
+      });
+    }
+
+    return res.json({
+      success: true,
+      message: 'Order updated with payment details',
+      data: { order: result.rows[0] },
+    });
+  } catch (error) {
+    console.error('Update order payment error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to update order with payment details',
+    });
   }
 });
 

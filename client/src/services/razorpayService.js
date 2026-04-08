@@ -14,9 +14,13 @@ function loadRazorpayScript() {
 
 export const razorpayService = {
   // Create Razorpay order on backend
-  async createOrder(amount, currency = 'INR') {
+  async createOrder(amount, currency = 'INR', backendOrderId = null) {
     try {
-      const response = await api.post('/razorpay/create-order', { amount, currency });
+      const payload = { amount, currency };
+      if (backendOrderId) {
+        payload.orderId = backendOrderId;
+      }
+      const response = await api.post('/razorpay/create-order', payload);
       return response.data?.data || response.data;
     } catch (error) {
       throw new Error(error.response?.data?.message || 'Failed to create payment order');
@@ -33,13 +37,27 @@ export const razorpayService = {
     }
   },
 
+  // Update order with payment details after verification
+  async updateOrderPayment(orderId, razorpay_payment_id, razorpay_order_id) {
+    try {
+      const response = await api.put('/razorpay/update-order-payment', {
+        orderId,
+        razorpay_payment_id,
+        razorpay_order_id,
+      });
+      return response.data;
+    } catch (error) {
+      throw new Error(error.response?.data?.message || 'Failed to update order with payment');
+    }
+  },
+
   // Open Razorpay checkout modal
-  async openCheckout({ amount, orderId, name, email, phone, description, onSuccess, onFailure }) {
+  async openCheckout({ amount, orderId, backendOrderId, name, email, phone, description, onSuccess, onFailure }) {
     const loaded = await loadRazorpayScript();
     if (!loaded) throw new Error('Failed to load Razorpay SDK');
 
-    // Create Razorpay order on backend
-    const order = await razorpayService.createOrder(amount);
+    // Create Razorpay order on backend (optionally linked to existing order)
+    const order = await razorpayService.createOrder(amount, 'INR', backendOrderId);
 
     const options = {
       key: order.keyId,
@@ -57,7 +75,12 @@ export const razorpayService = {
             orderId: response.razorpay_order_id,
             signature: response.razorpay_signature,
           });
-          if (onSuccess) onSuccess({ ...verified, razorpay_payment_id: response.razorpay_payment_id, razorpay_order_id: response.razorpay_order_id });
+          if (onSuccess) onSuccess({ 
+            ...verified, 
+            razorpay_payment_id: response.razorpay_payment_id, 
+            razorpay_order_id: response.razorpay_order_id,
+            backendOrderId: order.backendOrderId || backendOrderId,
+          });
         } catch (err) {
           if (onFailure) onFailure(err);
         }
