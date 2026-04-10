@@ -127,6 +127,13 @@ uploads/
 coverage/
 .nyc_output/
 test-results/
+playwright-report/
+playwright-report-mobile-check/
+client/playwright-report/
+client/e2e/
+playwright.config.js
+playwright.mobile-check.config.js
+client/playwright.config.ts
 
 # Misc
 *.tgz
