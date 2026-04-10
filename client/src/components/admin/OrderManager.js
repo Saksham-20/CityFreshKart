@@ -137,24 +137,59 @@ const OrderManager = () => {
   const handleDeleteOrder = async (order) => {
     if (!order) return;
 
-    const confirmed = window.confirm(`Delete order #${order.order_number}? This cannot be undone.`);
+    const isPermanentDelete = order.status === 'cancelled';
+    const actionLabel = isPermanentDelete ? 'delete permanently' : 'delete';
+
+    const confirmed = window.confirm(
+      isPermanentDelete
+        ? `Delete order #${order.order_number} permanently? This will remove it from backend and cannot be undone.`
+        : `Delete order #${order.order_number}? This cannot be undone.`,
+    );
     if (!confirmed) return;
 
     try {
       setDeletingOrderId(order.id);
-      await api.delete(`/admin/orders/${order.id}`);
-      setOrders((prev) => prev.filter((currentOrder) => currentOrder.id !== order.id));
+      await api.delete(`/admin/orders/${order.id}`, { params: { permanent: isPermanentDelete } });
+
+      if (isPermanentDelete) {
+        setOrders((prev) => prev.filter((currentOrder) => currentOrder.id !== order.id));
+      } else {
+        setOrders((prev) => prev.map((currentOrder) => {
+          if (currentOrder.id !== order.id) return currentOrder;
+          return {
+            ...currentOrder,
+            status: 'cancelled',
+            rejection_reason: 'Your order is deleted by admin.',
+            rejected_at: new Date().toISOString(),
+          };
+        }));
+      }
 
       if (selectedOrder?.id === order.id) {
-        setShowDetailsModal(false);
-        setShowStatusModal(false);
-        setSelectedOrder(null);
+        if (isPermanentDelete) {
+          setShowDetailsModal(false);
+          setShowStatusModal(false);
+          setSelectedOrder(null);
+        } else {
+          setSelectedOrder((prev) => (prev
+            ? {
+              ...prev,
+              status: 'cancelled',
+              rejection_reason: 'Your order is deleted by admin.',
+              rejected_at: new Date().toISOString(),
+            }
+            : prev));
+        }
         setAdminNote('');
       }
 
-      toast.success(`Order #${order.order_number} deleted`);
+      toast.success(
+        isPermanentDelete
+          ? `Order #${order.order_number} deleted permanently`
+          : `Order #${order.order_number} deleted`,
+      );
     } catch (error) {
-      const message = error.response?.data?.message || 'Failed to delete order';
+      const message = error.response?.data?.message || `Failed to ${actionLabel} order`;
       toast.error(message);
       console.error('Failed to delete order:', message);
     } finally {
@@ -350,7 +385,7 @@ const OrderManager = () => {
                 onClick={() => handleDeleteOrder(order)}
                 disabled={deletingOrderId === order.id}
               >
-                {deletingOrderId === order.id ? 'Deleting...' : 'Delete'}
+                {deletingOrderId === order.id ? 'Deleting...' : (order.status === 'cancelled' ? 'Delete Permanently' : 'Delete')}
               </Button>
             </div>
           </div>
@@ -447,7 +482,7 @@ const OrderManager = () => {
                       onClick={() => handleDeleteOrder(order)}
                       disabled={deletingOrderId === order.id}
                     >
-                      {deletingOrderId === order.id ? 'Deleting...' : 'Delete'}
+                      {deletingOrderId === order.id ? 'Deleting...' : (order.status === 'cancelled' ? 'Delete Permanently' : 'Delete')}
                     </Button>
                   </td>
                 </tr>

@@ -29,14 +29,14 @@ const getStatusColor = (status) => {
   return colors[status] || 'bg-surface-container-high text-on-surface-variant outline outline-1 outline-outline-variant/20';
 };
 
-const StatusTimeline = ({ status }) => {
+const StatusTimeline = ({ status, rejectionReason }) => {
   if (status === 'cancelled') {
     return (
       <div className="flex items-center gap-3 p-4 bg-error-container/25 rounded-xl outline outline-1 outline-error/30">
         <span className="text-2xl">❌</span>
         <div>
           <p className="font-semibold text-error">Order Rejected</p>
-          <p className="text-sm text-on-surface-variant">Your order was not accepted. Please contact support if you have questions.</p>
+          <p className="text-sm text-on-surface-variant">{rejectionReason || 'Your order is deleted'}</p>
         </div>
       </div>
     );
@@ -197,6 +197,7 @@ const OrderDetailPage = () => {
   const status = order.status || 'pending';
   const isPending = status === 'pending';
   const isCancelled = status === 'cancelled';
+  const rejectionReason = String(order.rejection_reason || order.rejectionReason || '').trim() || 'Your order is deleted';
 
   return (
     <div className="min-h-screen bg-surface pb-10">
@@ -232,7 +233,7 @@ const OrderDetailPage = () => {
         {/* Status Timeline — hidden on print */}
         <div className="bg-surface-container-lowest rounded-2xl outline outline-1 outline-outline-variant/15 p-5 print:hidden shadow-editorial">
           <h3 className="font-semibold text-on-surface text-sm mb-5">Order Status</h3>
-          <StatusTimeline status={status} />
+          <StatusTimeline status={status} rejectionReason={rejectionReason} />
         </div>
 
         {/* Items */}
@@ -315,6 +316,17 @@ const OrderDetailPage = () => {
               <div>
                 <p className="text-xs font-semibold text-on-surface-variant uppercase mb-1">Notes / Instructions</p>
                 <p className="text-sm text-on-surface italic whitespace-pre-line">{order.notes}</p>
+              </div>
+            )}
+            {isCancelled && (
+              <div>
+                <p className="text-xs font-semibold text-error uppercase mb-1">Rejected Message</p>
+                <p className="text-sm text-on-surface whitespace-pre-line">{rejectionReason}</p>
+                {(order.rejected_at || order.rejectedAt) && (
+                  <p className="text-xs text-on-surface-variant mt-1">
+                    Rejected on {new Date(order.rejected_at || order.rejectedAt).toLocaleString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                  </p>
+                )}
               </div>
             )}
           </div>

@@ -1012,6 +1012,8 @@ router.put('/orders/:id/status', [
 
     const { id } = req.params;
     const { status, admin_note } = req.body;
+    const normalizedAdminNote = String(admin_note || '').trim();
+    const rejectionReason = normalizedAdminNote || 'Your order is deleted';
 
     // Check if order exists
     const existingOrder = await pool.query('SELECT id, notes, user_id, order_number FROM orders WHERE id = $1', [id]);
@@ -1019,18 +1021,42 @@ router.put('/orders/:id/status', [
       return res.status(404).json({ message: 'Order not found' });
     }
 
-    if (admin_note && admin_note.trim()) {
+    if (status === 'cancelled') {
+      await pool.query(
+        `UPDATE orders
+         SET status = $1,
+             rejection_reason = $2,
+             rejected_at = CURRENT_TIMESTAMP,
+             rejected_by = $3,
+             updated_at = CURRENT_TIMESTAMP
+         WHERE id = $4`,
+        [status, rejectionReason, req.user?.id || null, id],
+      );
+    } else if (normalizedAdminNote) {
       const timestamp = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
       const existing = existingOrder.rows[0].notes || '';
       const separator = existing ? '\n' : '';
-      const newNotes = `${existing}${separator}[Admin ${timestamp}]: ${admin_note.trim()}`;
+      const newNotes = `${existing}${separator}[Admin ${timestamp}]: ${normalizedAdminNote}`;
       await pool.query(
-        'UPDATE orders SET status = $1, notes = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
+        `UPDATE orders
+         SET status = $1,
+             notes = $2,
+             rejection_reason = NULL,
+             rejected_at = NULL,
+             rejected_by = NULL,
+             updated_at = CURRENT_TIMESTAMP
+         WHERE id = $3`,
         [status, newNotes, id],
       );
     } else {
       await pool.query(
-        'UPDATE orders SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+        `UPDATE orders
+         SET status = $1,
+             rejection_reason = NULL,
+             rejected_at = NULL,
+             rejected_by = NULL,
+             updated_at = CURRENT_TIMESTAMP
+         WHERE id = $2`,
         [status, id],
       );
     }
@@ -1045,11 +1071,15 @@ router.put('/orders/:id/status', [
     };
     const label = statusLabelMap[status] || status;
 
+    const customerBody = status === 'cancelled'
+      ? rejectionReason
+      : `Your order #${orderRow.order_number || id} is now ${label}.`;
+
     Promise.allSettled([
       webPushService.sendToUser(orderRow.user_id, {
         type: 'order_status',
         title: `Order ${label}`,
-        body: `Your order #${orderRow.order_number || id} is now ${label}.`,
+        body: customerBody,
         orderId: id,
         url: `/orders/${id}`,
       }),
@@ -1071,7 +1101,7 @@ router.put('/orders/:id/status', [
 });
 
 // @route   DELETE /api/admin/orders/:id
-// @desc    Delete any order regardless of status
+// @desc    Delete order from admin view by marking it rejected for user history
 // @access  Admin
 router.delete('/orders/:id', [
   param('id').isUUID().withMessage('Invalid order id'),
@@ -1086,13 +1116,14 @@ router.delete('/orders/:id', [
   }
 
   const { id } = req.params;
+  const permanentRequested = String(req.query.permanent || '').toLowerCase() === 'true';
   const client = await pool.pool.connect();
 
   try {
     await client.query('BEGIN');
 
     const existingOrder = await client.query(
-      'SELECT id, order_number, status FROM orders WHERE id = $1 FOR UPDATE',
+      'SELECT id, order_number, status, user_id FROM orders WHERE id = $1 FOR UPDATE',
       [id],
     );
 
@@ -1107,8 +1138,24 @@ router.delete('/orders/:id', [
     }
 
     const order = existingOrder.rows[0];
+    const adminDeleteReason = 'Your order is deleted by admin.';
 
-    await client.query('DELETE FROM orders WHERE id = $1', [id]);
+    const shouldHardDelete = permanentRequested && order.status === 'cancelled';
+
+    if (shouldHardDelete) {
+      await client.query('DELETE FROM orders WHERE id = $1', [id]);
+    } else {
+      await client.query(
+        `UPDATE orders
+         SET status = 'cancelled',
+             rejection_reason = $1,
+             rejected_at = CURRENT_TIMESTAMP,
+             rejected_by = $2,
+             updated_at = CURRENT_TIMESTAMP
+         WHERE id = $3`,
+        [adminDeleteReason, req.user?.id || null, id],
+      );
+    }
     await client.query('COMMIT');
 
     logStructured('info', {
@@ -1120,14 +1167,34 @@ router.delete('/orders/:id', [
       deletedBy: req.user?.id,
     });
 
+    if (!shouldHardDelete) {
+      Promise.allSettled([
+        webPushService.sendToUser(order.user_id, {
+          type: 'order_status',
+          title: 'Order Rejected',
+          body: adminDeleteReason,
+          orderId: id,
+          url: `/orders/${id}`,
+        }),
+        webPushService.sendToAdmins({
+          type: 'order_status_admin',
+          title: 'Order deleted by admin',
+          body: `Order #${order.order_number || id} marked as rejected.`,
+          orderId: id,
+          url: '/admin/orders',
+        }),
+      ]).catch(() => undefined);
+    }
+
     return res.json({
       success: true,
-      message: 'Order deleted successfully',
+      message: shouldHardDelete ? 'Order permanently deleted' : 'Order deleted successfully',
       data: {
         order: {
           id: order.id,
           order_number: order.order_number,
-          status: order.status,
+          status: shouldHardDelete ? 'deleted' : 'cancelled',
+          rejection_reason: shouldHardDelete ? null : adminDeleteReason,
         },
       },
     });

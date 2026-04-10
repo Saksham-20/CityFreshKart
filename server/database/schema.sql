@@ -183,10 +183,17 @@ CREATE TABLE IF NOT EXISTS orders (
     razorpay_payment_id VARCHAR(255),
     razorpay_order_id VARCHAR(255),
     status VARCHAR(50) NOT NULL DEFAULT 'pending', -- pending, confirmed, delivered, cancelled
+    rejection_reason TEXT,
+    rejected_at TIMESTAMP WITH TIME ZONE,
+    rejected_by UUID REFERENCES users(id) ON DELETE SET NULL,
     notes TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
+
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS rejection_reason TEXT;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS rejected_at TIMESTAMP WITH TIME ZONE;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS rejected_by UUID REFERENCES users(id) ON DELETE SET NULL;
 
 -- Order items table
 CREATE TABLE IF NOT EXISTS order_items (

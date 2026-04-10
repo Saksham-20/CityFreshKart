@@ -68,6 +68,13 @@ const OrdersPage = () => {
 
   const getStatusText = (status) => STATUS_LABELS[status] || (status ? status.charAt(0).toUpperCase() + status.slice(1) : 'Unknown');
 
+  const getRejectionMessage = (order) => {
+    if (!order) return '';
+    const status = order.status || order.order_status;
+    if (status !== 'cancelled') return '';
+    return String(order.rejection_reason || order.rejectionReason || '').trim() || 'Your order is deleted';
+  };
+
   const handleViewOrder = (orderId) => {
     navigate(`/orders/${orderId}`);
   };
@@ -170,6 +177,13 @@ const OrdersPage = () => {
                       </p>
                     </div>
                   </div>
+
+                  {((order.status || order.order_status) === 'cancelled') && (
+                    <div className="mb-4 p-3 rounded-xl bg-error-container/25 outline outline-1 outline-error/20">
+                      <p className="text-xs font-semibold uppercase text-error mb-1">Rejected Message</p>
+                      <p className="text-sm text-on-surface-variant">{getRejectionMessage(order)}</p>
+                    </div>
+                  )}
 
                   {/* Items Preview */}
                   {order.items && order.items.length > 0 && (

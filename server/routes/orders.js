@@ -416,6 +416,8 @@ router.post('/', authenticateToken, checkoutLimiter, async (req, res) => {
 router.post('/:id/cancel', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
+    const customerReasonInput = String(req.body?.reason || '').trim();
+    const customerReason = customerReasonInput || 'Order cancelled by customer.';
 
     // Check if order exists and belongs to user
     const order = await query(
@@ -443,8 +445,14 @@ router.post('/:id/cancel', authenticateToken, async (req, res) => {
 
       // Update order status
       await client.query(
-        'UPDATE orders SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
-        ['cancelled', id],
+        `UPDATE orders
+         SET status = $1,
+             rejection_reason = $2,
+             rejected_at = CURRENT_TIMESTAMP,
+             rejected_by = NULL,
+             updated_at = CURRENT_TIMESTAMP
+         WHERE id = $3`,
+        ['cancelled', customerReason, id],
       );
 
       // Restore product stock

@@ -138,6 +138,9 @@ model Order {
   paymentStatus String   @default("pending") @map("payment_status") // pending, paid, failed
   paymentMethod String?  @map("payment_method") // razorpay, cod
   addressId     String?  @map("address_id") // Shipping address at time of order
+  rejectionReason String? @map("rejection_reason")
+  rejectedAt    DateTime? @map("rejected_at")
+  rejectedBy    String?   @map("rejected_by")
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @updatedAt @map("updated_at")
 
