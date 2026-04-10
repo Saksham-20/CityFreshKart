@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import api from '../services/api';
 import { getCartLineTotal, getTierWeightsFromOverrides } from '../utils/weightSystem';
+import { getPublicApiOrigin } from '../utils/publicOrigin';
 
 const normalizeQuantityForItem = (item, quantity) => {
   const q = Number(quantity);
@@ -55,7 +56,7 @@ const useCartStore = create((set, get) => ({
         json = res.data;
       } catch (e) {
         try {
-          const res = await fetch('http://localhost:5000/api/settings');
+          const res = await fetch(`${getPublicApiOrigin()}/api/settings`);
           json = await res.json();
         } catch (e2) {
           const res = await fetch('/api/settings');

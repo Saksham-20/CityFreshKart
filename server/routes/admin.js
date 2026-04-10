@@ -1,7 +1,7 @@
 const express = require('express');
 const pool = require('../database/config');
 const { authenticateToken, requireAdmin } = require('../middleware/auth');
-const { body, validationResult } = require('express-validator');
+const { body, param, validationResult } = require('express-validator');
 const { upload, handleUploadError } = require('../middleware/upload');
 const webPushService = require('../services/webPushService');
 const { getStoreOrderSettings } = require('../services/storeSettingsService');
@@ -1001,6 +1001,7 @@ router.post('/orders', async (req, res) => {
 // @desc    Update order status (and optionally append an admin note)
 // @access  Admin
 router.put('/orders/:id/status', [
+  param('id').isUUID().withMessage('Invalid order id'),
   body('status').isIn(['pending', 'confirmed', 'delivered', 'cancelled']).withMessage('Invalid status'),
 ], async (req, res) => {
   try {
@@ -1066,6 +1067,91 @@ router.put('/orders/:id/status', [
   } catch (error) {
     console.error('Update order status error:', error);
     return adminServerError(req, res, 'Could not complete the request. Try again; contact support with the reference if it continues.', 'INTERNAL');
+  }
+});
+
+// @route   DELETE /api/admin/orders/:id
+// @desc    Delete any order regardless of status
+// @access  Admin
+router.delete('/orders/:id', [
+  param('id').isUUID().withMessage('Invalid order id'),
+], async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return jsonClientError(res, req, 400, {
+      message: 'Invalid order id',
+      errorCode: 'INVALID_ORDER_ID',
+      details: errors.array(),
+    });
+  }
+
+  const { id } = req.params;
+  const client = await pool.pool.connect();
+
+  try {
+    await client.query('BEGIN');
+
+    const existingOrder = await client.query(
+      'SELECT id, order_number, status FROM orders WHERE id = $1 FOR UPDATE',
+      [id],
+    );
+
+    if (existingOrder.rows.length === 0) {
+      await client.query('ROLLBACK');
+      logStructured('warn', {
+        requestId: req.requestId,
+        event: 'admin_order_delete_not_found',
+        orderId: id,
+      });
+      return jsonClientError(res, req, 404, { message: 'Order not found', errorCode: 'ORDER_NOT_FOUND' });
+    }
+
+    const order = existingOrder.rows[0];
+
+    await client.query('DELETE FROM orders WHERE id = $1', [id]);
+    await client.query('COMMIT');
+
+    logStructured('info', {
+      requestId: req.requestId,
+      event: 'admin_order_deleted',
+      orderId: order.id,
+      orderNumber: order.order_number,
+      status: order.status,
+      deletedBy: req.user?.id,
+    });
+
+    return res.json({
+      success: true,
+      message: 'Order deleted successfully',
+      data: {
+        order: {
+          id: order.id,
+          order_number: order.order_number,
+          status: order.status,
+        },
+      },
+    });
+  } catch (error) {
+    if (error?.code === '22P02') {
+      return jsonClientError(res, req, 400, {
+        message: 'Invalid order id',
+        errorCode: 'INVALID_ORDER_ID',
+      });
+    }
+
+    logStructured('error', {
+      requestId: req.requestId,
+      event: 'admin_order_delete_failed',
+      orderId: id,
+      pgCode: error.code,
+      constraint: error.constraint,
+      detail: error.detail,
+      message: error.message,
+    });
+    try { await client.query('ROLLBACK'); } catch (_) {}
+    return adminServerError(req, res, 'Could not complete the request. Try again; contact support with the reference if it continues.', 'INTERNAL');
+  } finally {
+    client.release();
   }
 });
 

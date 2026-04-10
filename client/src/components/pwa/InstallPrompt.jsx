@@ -82,15 +82,15 @@ const InstallPrompt = () => {
         className={cn(
           'fixed left-3 right-3 sm:left-auto sm:right-6 sm:w-[22rem]',
           'bg-gradient-to-r from-primary to-primary-container text-on-primary rounded-2xl shadow-primary-glow',
-          'p-4 pt-3 flex flex-col gap-3 z-[60]',
+          'p-3 pt-2 sm:p-4 sm:pt-3 flex flex-col gap-2.5 sm:gap-3 z-[60]',
           'max-h-[calc(100vh-7rem)] overflow-y-auto',
           'outline outline-1 outline-on-primary/20',
         )}
         style={{
           // Default: above MobileBottomNav. Cart: no nav but sticky checkout bar — lift clear of it.
           bottom: isCart
-            ? 'calc(env(safe-area-inset-bottom) + 9.5rem)'
-            : 'calc(env(safe-area-inset-bottom) + 5.25rem)',
+            ? 'calc(env(safe-area-inset-bottom) + 9rem)'
+            : 'calc(env(safe-area-inset-bottom) + 4.5rem)',
         }}
       >
         <button
@@ -107,9 +107,9 @@ const InstallPrompt = () => {
         </button>
 
         <div className="flex items-start gap-3 pr-8">
-          <Download className="w-5 h-5 flex-shrink-0 mt-0.5" />
+          <Download className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0 mt-0.5" />
           <div className="flex-1 min-w-0">
-            <h3 className="font-semibold text-sm">
+            <h3 className="font-semibold text-xs sm:text-sm">
               Install CityFreshKart
             </h3>
             <p className="text-xs text-on-primary/85 mt-1">
@@ -128,7 +128,7 @@ const InstallPrompt = () => {
                 setIsVisible(false);
               }}
               className={cn(
-                'flex-1 min-w-[7rem] px-3 py-2 rounded-lg text-sm font-semibold',
+                'flex-1 min-w-[6.25rem] sm:min-w-[7rem] px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-lg text-xs sm:text-sm font-semibold',
                 'bg-white text-primary',
                 'hover:bg-white/95 active:bg-white/90',
                 'transition-colors duration-200'
@@ -142,7 +142,7 @@ const InstallPrompt = () => {
               type="button"
               onClick={() => setIosModalOpen(true)}
               className={cn(
-                'flex-1 min-w-[7rem] px-3 py-2 rounded-lg text-sm font-semibold',
+                'flex-1 min-w-[6.25rem] sm:min-w-[7rem] px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-lg text-xs sm:text-sm font-semibold',
                 'bg-white text-primary',
                 'hover:bg-white/95 active:bg-white/90',
                 'transition-colors duration-200'
@@ -155,7 +155,7 @@ const InstallPrompt = () => {
             <button
               type="button"
               onClick={dismiss}
-              className="flex-1 px-3 py-2 rounded-lg text-sm font-semibold bg-white/15 hover:bg-white/25 transition-colors"
+              className="flex-1 px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-lg text-xs sm:text-sm font-semibold bg-white/15 hover:bg-white/25 transition-colors"
             >
               Close
             </button>

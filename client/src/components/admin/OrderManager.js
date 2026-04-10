@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import toast from 'react-hot-toast';
 import Button from '../ui/Button';
 import Modal from '../ui/Modal';
 import Loading from '../ui/Loading';
@@ -58,6 +59,7 @@ const OrderManager = () => {
   const [selectedStatus, setSelectedStatus] = useState('pending');
   const [adminNote, setAdminNote] = useState('');
   const [updatingStatus, setUpdatingStatus] = useState(false);
+  const [deletingOrderId, setDeletingOrderId] = useState(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [catalogProducts, setCatalogProducts] = useState([]);
   const [createForm, setCreateForm] = useState({
@@ -129,6 +131,34 @@ const OrderManager = () => {
       console.error('Failed to update order status:', error.response?.data?.message || error.message);
     } finally {
       setUpdatingStatus(false);
+    }
+  };
+
+  const handleDeleteOrder = async (order) => {
+    if (!order) return;
+
+    const confirmed = window.confirm(`Delete order #${order.order_number}? This cannot be undone.`);
+    if (!confirmed) return;
+
+    try {
+      setDeletingOrderId(order.id);
+      await api.delete(`/admin/orders/${order.id}`);
+      setOrders((prev) => prev.filter((currentOrder) => currentOrder.id !== order.id));
+
+      if (selectedOrder?.id === order.id) {
+        setShowDetailsModal(false);
+        setShowStatusModal(false);
+        setSelectedOrder(null);
+        setAdminNote('');
+      }
+
+      toast.success(`Order #${order.order_number} deleted`);
+    } catch (error) {
+      const message = error.response?.data?.message || 'Failed to delete order';
+      toast.error(message);
+      console.error('Failed to delete order:', message);
+    } finally {
+      setDeletingOrderId(null);
     }
   };
 
@@ -314,6 +344,14 @@ const OrderManager = () => {
               {STATUS_FLOW[order.status]?.length > 0 && (
                 <Button variant="outline" size="sm" onClick={() => openStatusModal(order)}>Update</Button>
               )}
+              <Button
+                variant="danger"
+                size="sm"
+                onClick={() => handleDeleteOrder(order)}
+                disabled={deletingOrderId === order.id}
+              >
+                {deletingOrderId === order.id ? 'Deleting...' : 'Delete'}
+              </Button>
             </div>
           </div>
         ))}
@@ -403,6 +441,14 @@ const OrderManager = () => {
                         Update Status
                       </Button>
                     )}
+                    <Button
+                      variant="danger"
+                      size="sm"
+                      onClick={() => handleDeleteOrder(order)}
+                      disabled={deletingOrderId === order.id}
+                    >
+                      {deletingOrderId === order.id ? 'Deleting...' : 'Delete'}
+                    </Button>
                   </td>
                 </tr>
               ))}
