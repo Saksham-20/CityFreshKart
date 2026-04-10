@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCartStore } from '../store/useCartStore';
 import { useAuthStore } from '../store/useAuthStore';
@@ -12,6 +12,7 @@ const CheckoutPage = () => {
   const navigate = useNavigate();
   const { items, calculateSummary, clearCart } = useCartStore();
   const { user } = useAuthStore();
+  const hasPlacedOrderRef = useRef(false);
 
   const [savedAddresses, setSavedAddresses] = useState([]);
   const [selectedAddressId, setSelectedAddressId] = useState(null);
@@ -30,7 +31,6 @@ const CheckoutPage = () => {
   const [loading, setLoading] = useState(false);
   const [addressesLoading, setAddressesLoading] = useState(true);
   const [error, setError] = useState('');
-  const [settingsLoaded, setSettingsLoaded] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -43,10 +43,8 @@ const CheckoutPage = () => {
     (async () => {
       try {
         await useCartStore.getState().loadSettings();
-        setSettingsLoaded(true);
       } catch (e) {
         console.error('Failed to load settings', e);
-        setSettingsLoaded(true); // Still proceed with defaults
       }
     })();
   }, []);
@@ -71,6 +69,10 @@ const CheckoutPage = () => {
   };
 
   if (!items || items.length === 0) {
+    if (hasPlacedOrderRef.current) {
+      return null;
+    }
+
     navigate('/cart');
     return null;
   }
@@ -262,6 +264,7 @@ const CheckoutPage = () => {
                 razorpay_order_id
               );
               
+              hasPlacedOrderRef.current = true;
               clearCart();
               toast.success('Payment confirmed! Your order is being processed.', { duration: 5000 });
               // Navigate to payment confirmation page
@@ -269,6 +272,7 @@ const CheckoutPage = () => {
             } catch (err) {
               console.error('Failed to update order with payment:', err);
               // Payment succeeded but update failed - still navigate to order
+              hasPlacedOrderRef.current = true;
               clearCart();
               toast('Payment successful! Order details will be updated shortly.', { 
                 duration: 5000,
@@ -295,10 +299,10 @@ const CheckoutPage = () => {
       } else {
         const response = await placeOrder();
         if (response.data.success) {
+          hasPlacedOrderRef.current = true;
           clearCart();
-          const orderId = response.data.data?.order?.id || response.data.data?.id;
           toast.success('Order placed! Waiting for admin confirmation.', { duration: 5000 });
-          navigate(orderId ? `/orders/${orderId}` : '/orders');
+          navigate('/orders');
         } else {
           setError(response.data.message || 'Order failed. Please try again.');
           setLoading(false);
