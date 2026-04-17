@@ -26,7 +26,7 @@ const authenticateToken = async (req, res, next) => {
 
     // Get user from database using userId from token
     const result = await query(
-      'SELECT id, phone, name, is_admin FROM users WHERE id = $1',
+      'SELECT id, phone, name, is_admin, token_version FROM users WHERE id = $1',
       [decoded.id],
     );
 
@@ -34,6 +34,17 @@ const authenticateToken = async (req, res, next) => {
       return res.status(401).json({
         success: false,
         message: 'Invalid token',
+      });
+    }
+
+    const tokenVersion = Number.isFinite(decoded.token_version) ? decoded.token_version : 0;
+    const currentTokenVersion = Number.isFinite(result.rows[0].token_version)
+      ? result.rows[0].token_version
+      : 0;
+    if (tokenVersion !== currentTokenVersion) {
+      return res.status(401).json({
+        success: false,
+        message: 'Session expired. Please login again.',
       });
     }
 
@@ -90,12 +101,15 @@ const optionalAuth = async (req, res, next) => {
     if (token) {
       const decoded = jwt.verify(token, getJwtSecret());
       const result = await query(
-        'SELECT id, phone, name, is_admin FROM users WHERE id = $1',
+        'SELECT id, phone, name, is_admin, token_version FROM users WHERE id = $1',
         [decoded.id],
       );
 
       if (result.rows.length > 0) {
         const u = result.rows[0];
+        const tokenVersion = Number.isFinite(decoded.token_version) ? decoded.token_version : 0;
+        const currentTokenVersion = Number.isFinite(u.token_version) ? u.token_version : 0;
+        if (tokenVersion !== currentTokenVersion) return next();
         req.user = { id: u.id, phone: u.phone, name: u.name, is_admin: u.is_admin };
       }
     }

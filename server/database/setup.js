@@ -125,6 +125,8 @@ async function setupDatabase() {
       '009_hot_query_indexes.sql',
       '010_add_orders_user_cascade_delete.sql',
       '011_add_order_rejection_metadata.sql',
+      '012_add_password_reset_otps.sql',
+      '013_harden_password_reset_and_sessions.sql',
     ];
     for (const name of migrationFiles) {
       const migrationPath = path.join(__dirname, 'migrations', name);

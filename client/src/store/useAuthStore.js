@@ -6,12 +6,13 @@ const useAuthStore = create((set, get) => ({
   user: null,
   token: null,
   isAuthenticated: false,
-  loading: true,
+  loading: false,
+  bootstrapping: true,
   error: null,
 
   // Initialize auth from localStorage
   initialize: async () => {
-    set({ loading: true });
+    set({ bootstrapping: true });
     try {
       const token = localStorage.getItem('token');
       const user = localStorage.getItem('user');
@@ -35,7 +36,7 @@ const useAuthStore = create((set, get) => ({
         }
       }
     } finally {
-      set({ loading: false });
+      set({ bootstrapping: false });
     }
   },
 
@@ -138,6 +139,83 @@ const useAuthStore = create((set, get) => ({
     } catch (error) {
       const message = error.response?.data?.message || error.message;
       set({ error: message, loading: false });
+      return { success: false, message };
+    }
+  },
+
+  forgotPasswordStart: async (phone) => {
+    set({ error: null });
+    try {
+      const response = await api.post('/auth/forgot-password/start', { phone });
+      return {
+        success: Boolean(response.data?.success),
+        message: response.data?.message || 'Phone verified',
+        data: response.data?.data || null,
+      };
+    } catch (error) {
+      const message = error.response?.data?.message || error.message;
+      set({ error: message });
+      return { success: false, message, errorCode: error.response?.data?.errorCode };
+    }
+  },
+
+  forgotPasswordWithEmail: async (phone, email) => {
+    set({ error: null });
+    try {
+      const response = await api.post('/auth/forgot-password/email', { phone, email });
+      return {
+        success: Boolean(response.data?.success),
+        message: response.data?.message || 'OTP sent',
+        data: response.data?.data || null,
+      };
+    } catch (error) {
+      const message = error.response?.data?.message || error.message;
+      set({ error: message });
+      return {
+        success: false,
+        message,
+        retryAfterSeconds: error.response?.data?.retryAfterSeconds,
+        errorCode: error.response?.data?.errorCode,
+      };
+    }
+  },
+
+  verifyResetOtp: async (phone, email, otp) => {
+    set({ error: null });
+    try {
+      const response = await api.post('/auth/verify-reset-otp', { phone, email, otp });
+      const resetToken = response.data?.data?.resetToken;
+      if (!response.data?.success || !resetToken) {
+        throw new Error(response.data?.message || 'OTP verification failed');
+      }
+      return { success: true, resetToken, message: response.data?.message || 'OTP verified' };
+    } catch (error) {
+      const message = error.response?.data?.message || error.message;
+      set({ error: message });
+      return {
+        success: false,
+        message,
+        attemptsRemaining: error.response?.data?.attemptsRemaining,
+      };
+    }
+  },
+
+  resetPasswordWithOtp: async (phone, email, resetToken, newPassword) => {
+    set({ error: null });
+    try {
+      const response = await api.post('/auth/reset-password', {
+        phone,
+        email,
+        resetToken,
+        newPassword,
+      });
+      return {
+        success: Boolean(response.data?.success),
+        message: response.data?.message || 'Password reset successful',
+      };
+    } catch (error) {
+      const message = error.response?.data?.message || error.message;
+      set({ error: message });
       return { success: false, message };
     }
   },

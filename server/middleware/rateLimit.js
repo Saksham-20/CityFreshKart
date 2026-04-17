@@ -119,6 +119,37 @@ const authLimiter = rateLimit({
   },
 });
 
+const resetInitiateLimiter = rateLimit({
+  windowMs: 10 * 60 * 1000,
+  max: process.env.NODE_ENV === 'production'
+    ? (parseInt(process.env.RESET_INIT_RATE_LIMIT_MAX, 10) || 20)
+    : 1000,
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: rateLimitJsonHandler,
+  keyGenerator: (req) => {
+    const phone = String(req.body?.phone || '').replace(/\D/g, '').slice(-10);
+    const email = String(req.body?.email || '').trim().toLowerCase();
+    return `${req.ip}|${phone}|${email}`;
+  },
+  skip: (req) => isLocalhost(req),
+});
+
+const resetVerifyLimiter = rateLimit({
+  windowMs: 10 * 60 * 1000,
+  max: process.env.NODE_ENV === 'production'
+    ? (parseInt(process.env.RESET_VERIFY_RATE_LIMIT_MAX, 10) || 30)
+    : 1000,
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: rateLimitJsonHandler,
+  keyGenerator: (req) => {
+    const phone = String(req.body?.phone || '').replace(/\D/g, '').slice(-10);
+    return `${req.ip}|${phone}`;
+  },
+  skip: (req) => isLocalhost(req),
+});
+
 const uploadLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
   max: parseInt(process.env.UPLOAD_RATE_LIMIT_MAX, 10) || 30,
@@ -157,6 +188,8 @@ module.exports = {
   fallbackGlobalLimiterToMemory,
   buildGlobalApiLimiter,
   authLimiter,
+  resetInitiateLimiter,
+  resetVerifyLimiter,
   uploadLimiter,
   checkoutLimiter,
   adminProductWriteLimiter,

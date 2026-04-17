@@ -3,10 +3,20 @@ const router = express.Router();
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { authenticateToken } = require('../middleware/auth');
-const { authLimiter } = require('../middleware/rateLimit');
+const { authLimiter, resetInitiateLimiter, resetVerifyLimiter } = require('../middleware/rateLimit');
 const { getJwtSecret } = require('../config/jwt');
 const { jsonClientError, logApiError } = require('../utils/apiErrors');
+const { body, validationResult } = require('express-validator');
 const { isFirebaseAdminConfigured, verifyFirebaseIdToken } = require('../services/firebaseAdmin');
+const { isEmailDeliveryEnabled, sendPasswordResetOtpEmail } = require('../services/emailService');
+const {
+  OTP_MAX_ATTEMPTS,
+  normalizePhone,
+  normalizeEmail,
+  createAndStoreOtp,
+  verifyOtpAndCreateResetToken,
+  consumeResetTokenAndUpdatePassword,
+} = require('../services/passwordResetService');
 
 // Safe db query accessor
 const dbQuery = async (text, params) => {
@@ -23,6 +33,25 @@ const setAuthCookie = (res, token) => {
     maxAge: 7 * 24 * 60 * 60 * 1000,
     path: '/',
   });
+};
+
+const issueAuthToken = (user) => jwt.sign(
+  {
+    id: user.id,
+    is_admin: user.is_admin,
+    token_version: Number.isFinite(user.token_version) ? user.token_version : 0,
+  },
+  getJwtSecret(),
+  { expiresIn: '7d' },
+);
+
+const maskEmail = (email = '') => {
+  const normalized = normalizeEmail(email);
+  const [localPart, domain] = normalized.split('@');
+  if (!localPart || !domain) return '';
+  const first = localPart[0];
+  const last = localPart.length > 1 ? localPart[localPart.length - 1] : '';
+  return `${first}${'*'.repeat(Math.max(localPart.length - 2, 1))}${last}@${domain}`;
 };
 
 router.post('/register', authLimiter, async (req, res) => {
@@ -43,16 +72,12 @@ router.post('/register', authLimiter, async (req, res) => {
     const userResult = await dbQuery(`
       INSERT INTO users (phone, password_hash, name, is_admin, created_at, updated_at)
       VALUES ($1, $2, $3, $4, NOW(), NOW())
-      RETURNING id, phone, name, is_admin, created_at
+      RETURNING id, phone, name, is_admin, token_version, created_at
     `, [phone, passwordHash, name, false]);
 
     const user = userResult.rows[0];
 
-    const token = jwt.sign(
-      { id: user.id, is_admin: user.is_admin },
-      getJwtSecret(),
-      { expiresIn: '7d' }
-    );
+    const token = issueAuthToken(user);
 
     setAuthCookie(res, token);
     res.status(201).json({ success: true, message: 'Registered successfully', data: { user, token } });
@@ -72,7 +97,7 @@ router.post('/login', authLimiter, async (req, res) => {
       return res.status(400).json({ success: false, message: 'Phone and password required' });
     }
 
-    const userResult = await dbQuery('SELECT id, phone, password_hash, name, is_admin FROM users WHERE phone = $1', [phone]);
+    const userResult = await dbQuery('SELECT id, phone, password_hash, name, is_admin, token_version FROM users WHERE phone = $1', [phone]);
     if (userResult.rows.length === 0) {
       return res.status(401).json({ success: false, message: 'Invalid credentials' });
     }
@@ -83,11 +108,7 @@ router.post('/login', authLimiter, async (req, res) => {
       return res.status(401).json({ success: false, message: 'Invalid credentials' });
     }
 
-    const token = jwt.sign(
-      { id: user.id, is_admin: user.is_admin },
-      getJwtSecret(),
-      { expiresIn: '7d' }
-    );
+    const token = issueAuthToken(user);
 
     setAuthCookie(res, token);
     res.json({ success: true, message: 'Logged in successfully', data: { user: { id: user.id, phone: user.phone, name: user.name, is_admin: user.is_admin }, token } });
@@ -99,6 +120,269 @@ router.post('/login', authLimiter, async (req, res) => {
     });
   }
 });
+
+router.post(
+  '/forgot-password/start',
+  resetInitiateLimiter,
+  [
+    body('phone')
+      .matches(/^\d{10}$/)
+      .withMessage('Phone must be 10 digits'),
+  ],
+  async (req, res) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ success: false, message: errors.array()[0].msg });
+      }
+      const phone = normalizePhone(req.body.phone);
+      const userResult = await dbQuery(
+        'SELECT id, phone, email FROM users WHERE phone = $1 LIMIT 1',
+        [phone],
+      );
+      if (userResult.rows.length === 0) {
+        return res.status(404).json({
+          success: false,
+          message: 'No account found with this phone number.',
+          errorCode: 'PHONE_NOT_FOUND',
+        });
+      }
+
+      const user = userResult.rows[0];
+      return res.status(200).json({
+        success: true,
+        message: user.email
+          ? 'Phone verified. Enter your account email to receive OTP.'
+          : 'Phone verified. No email linked yet, enter your email to continue.',
+        data: {
+          phone,
+          hasEmail: Boolean(user.email),
+          maskedEmail: user.email ? maskEmail(user.email) : null,
+        },
+      });
+    } catch (error) {
+      logApiError(req, 'auth_forgot_password_start_failed', error);
+      return jsonClientError(res, req, 500, {
+        message: 'Server error',
+        errorCode: 'AUTH_FORGOT_PASSWORD_START_FAILED',
+      });
+    }
+  },
+);
+
+router.post(
+  '/forgot-password/email',
+  resetInitiateLimiter,
+  [
+    body('phone').matches(/^\d{10}$/).withMessage('Phone must be 10 digits'),
+    body('email').isEmail().withMessage('Valid email is required'),
+  ],
+  async (req, res) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) return res.status(400).json({ success: false, message: errors.array()[0].msg });
+
+      if (!isEmailDeliveryEnabled()) {
+        logApiError(req, 'forgot_password_email_not_configured', new Error('Email provider is not configured'));
+        return res.status(503).json({
+          success: false,
+          message: 'Password reset email is not configured',
+          errorCode: 'PASSWORD_RESET_EMAIL_NOT_CONFIGURED',
+        });
+      }
+
+      const phone = normalizePhone(req.body.phone);
+      const email = normalizeEmail(req.body.email);
+      const userResult = await dbQuery(
+        'SELECT id, phone, email FROM users WHERE phone = $1 LIMIT 1',
+        [phone],
+      );
+      if (userResult.rows.length === 0) {
+        return res.status(404).json({
+          success: false,
+          message: 'No account found with this phone number.',
+          errorCode: 'PHONE_NOT_FOUND',
+        });
+      }
+
+      let user = userResult.rows[0];
+      if (!user.email) {
+        const emailOwner = await dbQuery(
+          'SELECT id FROM users WHERE LOWER(TRIM(email)) = $1 AND id <> $2 LIMIT 1',
+          [email, user.id],
+        );
+        if (emailOwner.rows.length > 0) {
+          return res.status(409).json({
+            success: false,
+            message: 'This email is already linked to another account.',
+            errorCode: 'EMAIL_ALREADY_LINKED',
+          });
+        }
+        const updatedUser = await dbQuery(
+          `UPDATE users
+           SET email = $1, updated_at = CURRENT_TIMESTAMP
+           WHERE id = $2
+           RETURNING id, phone, email`,
+          [email, user.id],
+        );
+        user = updatedUser.rows[0] || { ...user, email };
+      } else if (normalizeEmail(user.email) !== email) {
+        return res.status(400).json({
+          success: false,
+          message: 'The provided email does not match this phone number account.',
+          errorCode: 'PHONE_EMAIL_MISMATCH',
+        });
+      }
+
+      if (!isEmailDeliveryEnabled()) {
+        logApiError(req, 'forgot_password_email_not_configured', new Error('Email provider is not configured'));
+        return res.status(503).json({
+          success: false,
+          message: 'Password reset email is not configured',
+          errorCode: 'PASSWORD_RESET_EMAIL_NOT_CONFIGURED',
+        });
+      }
+
+      let otp;
+      try {
+        otp = await createAndStoreOtp({
+          userId: user.id,
+          email,
+          phone,
+        });
+      } catch (error) {
+        if (error.code === 'OTP_RESEND_COOLDOWN') {
+          return res.status(429).json({
+            success: false,
+            message: 'Please wait before requesting another OTP',
+            retryAfterSeconds: error.retryAfterSeconds,
+            errorCode: 'OTP_RESEND_COOLDOWN',
+          });
+        }
+        throw error;
+      }
+
+      await sendPasswordResetOtpEmail({
+        toEmail: email,
+        otp,
+      });
+      return res.status(200).json({
+        success: true,
+        message: 'OTP sent to your email.',
+        data: { phone, email: maskEmail(email) },
+      });
+    } catch (error) {
+      if (error.code === 'EMAIL_SEND_FAILED') {
+        logApiError(req, 'auth_forgot_password_email_send_failed', error);
+        return res.status(503).json({
+          success: false,
+          message: 'Password reset email is temporarily unavailable',
+          errorCode: 'PASSWORD_RESET_EMAIL_UNAVAILABLE',
+        });
+      }
+      logApiError(req, 'auth_forgot_password_failed', error);
+      return jsonClientError(res, req, 500, {
+        message: 'Server error',
+        errorCode: 'AUTH_FORGOT_PASSWORD_EMAIL_FAILED',
+      });
+    }
+  },
+);
+
+router.post(
+  '/verify-reset-otp',
+  resetVerifyLimiter,
+  [
+    body('phone').matches(/^\d{10}$/).withMessage('Phone must be 10 digits'),
+    body('email').isEmail().withMessage('Valid email is required'),
+    body('otp')
+      .isLength({ min: 6, max: 6 })
+      .withMessage('OTP must be 6 digits')
+      .matches(/^\d{6}$/)
+      .withMessage('OTP must be numeric'),
+  ],
+  async (req, res) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ success: false, message: errors.array()[0].msg });
+      }
+      const phone = normalizePhone(req.body.phone);
+      const email = normalizeEmail(req.body.email);
+      const otp = String(req.body.otp || '').trim();
+      const resetToken = await verifyOtpAndCreateResetToken({ phone, email, otp });
+      return res.status(200).json({
+        success: true,
+        message: 'OTP verified',
+        data: { resetToken },
+      });
+    } catch (error) {
+      if (error.code === 'OTP_INVALID' || error.code === 'OTP_INVALID_OR_EXPIRED') {
+        return res.status(400).json({
+          success: false,
+          message: error.code === 'OTP_INVALID' ? 'Invalid OTP' : 'Invalid or expired OTP',
+          attemptsRemaining:
+            typeof error.attemptsRemaining === 'number' ? error.attemptsRemaining : undefined,
+          errorCode: error.code,
+        });
+      }
+      if (error.code === 'OTP_ATTEMPTS_EXCEEDED') {
+        return res.status(429).json({
+          success: false,
+          message: `OTP attempts exceeded. Request a new OTP.`,
+          maxAttempts: OTP_MAX_ATTEMPTS,
+          errorCode: error.code,
+        });
+      }
+      logApiError(req, 'auth_verify_reset_otp_failed', error);
+      return jsonClientError(res, req, 500, {
+        message: 'Server error',
+        errorCode: 'AUTH_VERIFY_RESET_OTP_FAILED',
+      });
+    }
+  },
+);
+
+router.post(
+  '/reset-password',
+  resetVerifyLimiter,
+  [
+    body('phone').matches(/^\d{10}$/).withMessage('Phone must be 10 digits'),
+    body('email').isEmail().withMessage('Valid email is required'),
+    body('resetToken').isLength({ min: 32 }).withMessage('Valid reset token is required'),
+    body('newPassword').isLength({ min: 6 }).withMessage('New password must be at least 6 characters'),
+  ],
+  async (req, res) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ success: false, message: errors.array()[0].msg });
+      }
+      const phone = normalizePhone(req.body.phone);
+      const email = normalizeEmail(req.body.email);
+      const resetToken = String(req.body.resetToken || '').trim();
+      const newPassword = String(req.body.newPassword || '');
+      await consumeResetTokenAndUpdatePassword({ phone, email, resetToken, newPassword });
+      return res.status(200).json({
+        success: true,
+        message: 'Password reset successful. Please login with your new password.',
+      });
+    } catch (error) {
+      if (error.code === 'RESET_TOKEN_INVALID') {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid or expired reset token',
+          errorCode: error.code,
+        });
+      }
+      logApiError(req, 'auth_reset_password_failed', error);
+      return jsonClientError(res, req, 500, {
+        message: 'Server error',
+        errorCode: 'AUTH_RESET_PASSWORD_FAILED',
+      });
+    }
+  },
+);
 
 router.post('/google', authLimiter, async (req, res) => {
   try {
@@ -119,7 +403,7 @@ router.post('/google', authLimiter, async (req, res) => {
     let user;
     try {
       const byUid = await dbQuery(
-        'SELECT id, phone, name, is_admin FROM users WHERE google_uid = $1 LIMIT 1',
+        'SELECT id, phone, name, is_admin, token_version FROM users WHERE google_uid = $1 LIMIT 1',
         [decoded.uid],
       );
       user = byUid.rows[0];
@@ -128,7 +412,7 @@ router.post('/google', authLimiter, async (req, res) => {
     }
 
     if (!user) {
-      const existingByPhone = await dbQuery('SELECT id, phone, name, is_admin FROM users WHERE phone = $1 LIMIT 1', [syntheticPhone]);
+      const existingByPhone = await dbQuery('SELECT id, phone, name, is_admin, token_version FROM users WHERE phone = $1 LIMIT 1', [syntheticPhone]);
       if (existingByPhone.rows[0]) {
         user = existingByPhone.rows[0];
       } else {
@@ -136,7 +420,7 @@ router.post('/google', authLimiter, async (req, res) => {
         const created = await dbQuery(`
           INSERT INTO users (phone, password_hash, name, is_admin, created_at, updated_at)
           VALUES ($1, $2, $3, $4, NOW(), NOW())
-          RETURNING id, phone, name, is_admin
+          RETURNING id, phone, name, is_admin, token_version
         `, [syntheticPhone, placeholderHash, displayName, false]);
         user = created.rows[0];
       }
@@ -153,17 +437,13 @@ router.post('/google', authLimiter, async (req, res) => {
          WHERE id = $4`,
         [displayName, decoded.uid, decoded.email || null, user.id],
       );
-      const refreshed = await dbQuery('SELECT id, phone, name, is_admin FROM users WHERE id = $1', [user.id]);
+      const refreshed = await dbQuery('SELECT id, phone, name, is_admin, token_version FROM users WHERE id = $1', [user.id]);
       user = refreshed.rows[0] || user;
     } catch (_) {
       // Ignore if columns are absent.
     }
 
-    const token = jwt.sign(
-      { id: user.id, is_admin: user.is_admin },
-      getJwtSecret(),
-      { expiresIn: '7d' },
-    );
+    const token = issueAuthToken(user);
 
     setAuthCookie(res, token);
     res.json({ success: true, message: 'Google sign-in successful', data: { user, token } });

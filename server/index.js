@@ -9,6 +9,8 @@ require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 
 const { assertJwtSecretForProduction } = require('./config/jwt');
 assertJwtSecretForProduction();
+const { assertEmailConfigForProduction } = require('./services/emailService');
+assertEmailConfigForProduction();
 
 const authRoutes = require('./routes/auth');
 const productRoutes = require('./routes/products');

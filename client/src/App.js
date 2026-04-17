@@ -74,7 +74,7 @@ const FloatingOverlays = () => {
 };
 
 function App() {
-  const { isAuthenticated, loading } = useAuth();
+  const { isAuthenticated, bootstrapping } = useAuth();
   const initialize = useAuthStore(state => state.initialize);
 
   // Initialize auth and store settings on app load
@@ -84,7 +84,7 @@ function App() {
     useCartStore.getState().loadSettings();
   }, [initialize]);
 
-  if (loading) {
+  if (bootstrapping) {
     return <PageLoader />;
   }
 
