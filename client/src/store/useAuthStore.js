@@ -256,6 +256,25 @@ const useAuthStore = create((set, get) => ({
     }
   },
 
+  // Update user phone number (for Google users and checkout)
+  updateUserPhone: async (phone) => {
+    set({ loading: true, error: null });
+    try {
+      const response = await api.put('/auth/phone', { phone });
+      if (response.data.success && response.data.data?.user) {
+        const user = response.data.data.user;
+        localStorage.setItem('user', JSON.stringify(user));
+        set({ user, loading: false, error: null });
+        return { success: true, user };
+      }
+      throw new Error(response.data?.message || 'Failed to update phone number');
+    } catch (error) {
+      const message = error.response?.data?.message || error.message;
+      set({ error: message, loading: false });
+      return { success: false, message };
+    }
+  },
+
   // Logout
   logout: () => {
     localStorage.removeItem('token');

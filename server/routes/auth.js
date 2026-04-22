@@ -397,13 +397,13 @@ router.post('/google', authLimiter, async (req, res) => {
 
     const decoded = await verifyFirebaseIdToken(idToken);
     const displayName = (decoded.name || '').trim() || (decoded.email || '').split('@')[0] || 'Customer';
-    const syntheticPhone = `9${String(Math.abs([...decoded.uid].reduce((a, c) => a + c.charCodeAt(0), 0))).padStart(9, '0').slice(0, 9)}`;
 
     // Explicit-link mode: only auto-login by linked Google UID; otherwise create separate account.
+    // Phone is NOT auto-generated; users must provide real phone at checkout.
     let user;
     try {
       const byUid = await dbQuery(
-        'SELECT id, phone, name, is_admin, token_version FROM users WHERE google_uid = $1 LIMIT 1',
+        'SELECT id, phone, name, is_admin, token_version, google_uid FROM users WHERE google_uid = $1 LIMIT 1',
         [decoded.uid],
       );
       user = byUid.rows[0];
@@ -412,18 +412,16 @@ router.post('/google', authLimiter, async (req, res) => {
     }
 
     if (!user) {
-      const existingByPhone = await dbQuery('SELECT id, phone, name, is_admin, token_version FROM users WHERE phone = $1 LIMIT 1', [syntheticPhone]);
-      if (existingByPhone.rows[0]) {
-        user = existingByPhone.rows[0];
-      } else {
-        const placeholderHash = await bcrypt.hash(`google:${decoded.uid}`, 10);
-        const created = await dbQuery(`
-          INSERT INTO users (phone, password_hash, name, is_admin, created_at, updated_at)
-          VALUES ($1, $2, $3, $4, NOW(), NOW())
-          RETURNING id, phone, name, is_admin, token_version
-        `, [syntheticPhone, placeholderHash, displayName, false]);
-        user = created.rows[0];
-      }
+      // Create new user with temporary phone placeholder (real phone to be set at checkout)
+      const placeholderHash = await bcrypt.hash(`google:${decoded.uid}`, 10);
+      // Use Google UID hash to create a placeholder that won't conflict with real phone numbers
+      const tempPhone = `G${decoded.uid.slice(0, 10).padEnd(10, '0')}`;
+      const created = await dbQuery(`
+        INSERT INTO users (phone, password_hash, name, is_admin, created_at, updated_at, google_uid)
+        VALUES ($1, $2, $3, $4, NOW(), NOW(), $5)
+        RETURNING id, phone, name, is_admin, token_version, google_uid
+      `, [tempPhone, placeholderHash, displayName, false, decoded.uid]);
+      user = created.rows[0];
     }
 
     // Best-effort link columns (for deployments with these columns).
@@ -437,7 +435,7 @@ router.post('/google', authLimiter, async (req, res) => {
          WHERE id = $4`,
         [displayName, decoded.uid, decoded.email || null, user.id],
       );
-      const refreshed = await dbQuery('SELECT id, phone, name, is_admin, token_version FROM users WHERE id = $1', [user.id]);
+      const refreshed = await dbQuery('SELECT id, phone, name, is_admin, token_version, google_uid, email FROM users WHERE id = $1', [user.id]);
       user = refreshed.rows[0] || user;
     } catch (_) {
       // Ignore if columns are absent.
@@ -570,6 +568,50 @@ router.put('/profile', authenticateToken, async (req, res) => {
     return jsonClientError(res, req, 500, {
       message: 'Server error',
       errorCode: 'AUTH_PROFILE_UPDATE_FAILED',
+    });
+  }
+});
+
+// Update user phone number (required for Google-logged-in users at checkout)
+router.put('/phone', authenticateToken, async (req, res) => {
+  try {
+    const { phone } = req.body;
+    if (!phone) {
+      return res.status(400).json({ success: false, message: 'Phone number is required' });
+    }
+
+    // Validate and normalize phone: must be 10 digits
+    const normalizedPhone = String(phone).replace(/\D/g, '').slice(-10);
+    if (!/^\d{10}$/.test(normalizedPhone)) {
+      return res.status(400).json({ success: false, message: 'Please provide a valid 10-digit phone number' });
+    }
+
+    // Check if phone is already registered by another user
+    const existing = await dbQuery(
+      'SELECT id FROM users WHERE phone = $1 AND id != $2 LIMIT 1',
+      [normalizedPhone, req.user.id],
+    );
+    if (existing.rows.length > 0) {
+      return res.status(409).json({ success: false, message: 'This phone number is already registered' });
+    }
+
+    // Update user phone
+    const result = await dbQuery(
+      'UPDATE users SET phone = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 RETURNING id, phone, name, is_admin, email, google_uid, token_version',
+      [normalizedPhone, req.user.id],
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    const user = result.rows[0];
+    res.json({ success: true, message: 'Phone number updated successfully', data: { user } });
+  } catch (error) {
+    logApiError(req, 'auth_phone_update_failed', error);
+    return jsonClientError(res, req, 500, {
+      message: 'Failed to update phone number',
+      errorCode: 'AUTH_PHONE_UPDATE_FAILED',
     });
   }
 });

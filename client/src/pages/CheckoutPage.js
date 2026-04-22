@@ -7,6 +7,7 @@ import { razorpayService } from '../services/razorpayService';
 import { addressService } from '../services/addressService';
 import toast from 'react-hot-toast';
 import { formatCartQuantityLabel, getCartLineTotal } from '../utils/weightSystem';
+import PhoneAddModal from '../components/PhoneAddModal';
 
 const CheckoutPage = () => {
   const navigate = useNavigate();
@@ -31,6 +32,7 @@ const CheckoutPage = () => {
   const [loading, setLoading] = useState(false);
   const [addressesLoading, setAddressesLoading] = useState(true);
   const [error, setError] = useState('');
+  const [showPhoneModal, setShowPhoneModal] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -184,6 +186,17 @@ const CheckoutPage = () => {
   const handleOrderSubmit = async (e) => {
     e.preventDefault();
 
+    // Check if user is a Google login user with no real phone number
+    // Phone placeholder for Google users starts with 'G' (from backend)
+    const isGoogleUser = user?.google_uid;
+    const hasValidPhone = /^\d{10}$/.test(String(user?.phone || '').trim());
+    
+    if (isGoogleUser && !hasValidPhone) {
+      // Show phone modal instead of trying to submit
+      setShowPhoneModal(true);
+      return;
+    }
+
     const address = getDeliveryAddress();
     if (!address) {
       setError(useNewAddress ? 'Please enter your delivery address' : 'Please select or enter a delivery address');
@@ -315,8 +328,22 @@ const CheckoutPage = () => {
     }
   };
 
+  const handlePhoneAdded = (updatedUser) => {
+    // Update the order phone with the newly added phone
+    const newPhone = String(updatedUser?.phone || '').replace(/\D/g, '').slice(0, 10);
+    setOrderPhone(newPhone);
+    setShowPhoneModal(false);
+    // Automatically submit the order now that phone is added
+    toast.success('Phone added! Now completing your order...');
+    // Trigger order submission after a short delay to ensure UI updates
+    setTimeout(() => {
+      document.getElementById('checkout-form')?.dispatchEvent(new Event('submit', { bubbles: true }));
+    }, 500);
+  };
+
   return (
-    <div className="min-h-screen bg-surface pt-14 pb-[10.5rem]">
+    <>
+      <div className="min-h-screen bg-surface pt-14 pb-[10.5rem]">
       {/* Header */}
       <div className="glass-header border-b border-outline-variant/10 px-4 py-3 flex items-center gap-3 sticky top-14 z-10">
         <button type="button" onClick={() => navigate('/cart')} className="text-on-surface-variant p-1 -ml-1 rounded-lg hover:bg-surface-container-low">
@@ -634,6 +661,15 @@ const CheckoutPage = () => {
         </button>
       </div>
     </div>
+
+      {/* Phone Add Modal for Google Users */}
+      <PhoneAddModal
+        isOpen={showPhoneModal}
+        onClose={() => setShowPhoneModal(false)}
+        onPhoneAdded={handlePhoneAdded}
+        user={user}
+      />
+    </>
   );
 };
 
