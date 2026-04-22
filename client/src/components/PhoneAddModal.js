@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import api from '../services/api';
+import { useAuthStore } from '../store/useAuthStore';
 import toast from 'react-hot-toast';
 
 const PhoneAddModal = ({ isOpen, onClose, onPhoneAdded, user }) => {
   const [phone, setPhone] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const updateUserPhone = useAuthStore(state => state.updateUserPhone);
 
   if (!isOpen) return null;
 
@@ -29,21 +30,17 @@ const PhoneAddModal = ({ isOpen, onClose, onPhoneAdded, user }) => {
     setError('');
 
     try {
-      const response = await api.put('/auth/phone', { phone });
+      // Use the store's updateUserPhone action to update both API and Zustand state
+      const result = await updateUserPhone(phone);
 
-      if (response.data.success) {
-        const updatedUser = response.data.data?.user;
-        if (updatedUser) {
-          // Update user in localStorage
-          localStorage.setItem('user', JSON.stringify(updatedUser));
-          toast.success('Phone number added successfully!');
-          onPhoneAdded(updatedUser);
-          setPhone('');
-          onClose();
-        }
+      if (result.success && result.user) {
+        toast.success('Phone number added successfully!');
+        onPhoneAdded(result.user);
+        setPhone('');
+        onClose();
       } else {
-        setError(response.data.message || 'Failed to update phone number');
-        toast.error(response.data.message || 'Failed to update phone number');
+        setError(result.message || 'Failed to update phone number');
+        toast.error(result.message || 'Failed to update phone number');
       }
     } catch (err) {
       const errorMsg = err.response?.data?.message || err.message || 'Failed to add phone number';

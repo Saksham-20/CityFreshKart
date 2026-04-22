@@ -190,7 +190,10 @@ const CheckoutPage = () => {
     // Placeholder phones: start with '000000' (sequential migration placeholders) or 'G' (Firebase UID-based)
     const isGoogleUser = user?.google_uid;
     const phonePlaceholderPattern = /^(000000|G)/;
-    const hasValidPhone = /^\d{10}$/.test(String(user?.phone || '').trim()) && !phonePlaceholderPattern.test(String(user?.phone || '').trim());
+    
+    // Check orderPhone state first (updated by handlePhoneAdded), then fall back to user.phone
+    const phoneToCheck = orderPhone || String(user?.phone || '').trim();
+    const hasValidPhone = /^\d{10}$/.test(phoneToCheck) && !phonePlaceholderPattern.test(phoneToCheck);
     
     if (isGoogleUser && !hasValidPhone) {
       // Show phone modal instead of trying to submit
@@ -330,8 +333,9 @@ const CheckoutPage = () => {
   };
 
   const handlePhoneAdded = (updatedUser) => {
-    // Update the order phone with the newly added phone
-    const newPhone = String(updatedUser?.phone || '').replace(/\D/g, '').slice(0, 10);
+    // The store has been updated by updateUserPhone, so use the current user from store
+    const currentUser = useAuthStore.getState().user;
+    const newPhone = String(currentUser?.phone || updatedUser?.phone || '').replace(/\D/g, '').slice(0, 10);
     setOrderPhone(newPhone);
     setShowPhoneModal(false);
     // Automatically submit the order now that phone is added
