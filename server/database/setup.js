@@ -127,6 +127,7 @@ async function setupDatabase() {
       '011_add_order_rejection_metadata.sql',
       '012_add_password_reset_otps.sql',
       '013_harden_password_reset_and_sessions.sql',
+      '014_clear_google_user_phones.sql',
     ];
     for (const name of migrationFiles) {
       const migrationPath = path.join(__dirname, 'migrations', name);
