@@ -187,9 +187,10 @@ const CheckoutPage = () => {
     e.preventDefault();
 
     // Check if user is a Google login user with no real phone number
-    // Phone placeholder for Google users starts with 'G' (from backend)
+    // Placeholder phones: '0000000000' or starting with 'G' are treated as invalid
     const isGoogleUser = user?.google_uid;
-    const hasValidPhone = /^\d{10}$/.test(String(user?.phone || '').trim());
+    const phonePlaceholderPattern = /^(0000000000|G.*)$/;
+    const hasValidPhone = /^\d{10}$/.test(String(user?.phone || '').trim()) && !phonePlaceholderPattern.test(String(user?.phone || ''));
     
     if (isGoogleUser && !hasValidPhone) {
       // Show phone modal instead of trying to submit
