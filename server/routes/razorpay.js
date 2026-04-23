@@ -57,7 +57,9 @@ router.post('/create-order', authenticateToken, checkoutLimiter, [
       return res.status(400).json({ errors: errors.array() });
     }
 
-    const { amount, currency, orderId } = req.body;
+    // FIX #1: When orderId is given, ALWAYS use the DB total_price — never trust client amount
+    const { currency, orderId } = req.body;
+    let amountFromClient = parseFloat(req.body.amount);
 
     // If orderId provided, verify it exists and belongs to user
     if (orderId) {
@@ -77,15 +79,21 @@ router.post('/create-order', authenticateToken, checkoutLimiter, [
           message: 'Order is not in pending status',
         });
       }
+      // Always use the authoritative DB value — discard client-supplied amount
+      amountFromClient = parseFloat(orderCheck.rows[0].total_price);
+    }
+
+    if (!Number.isFinite(amountFromClient) || amountFromClient < 1) {
+      return res.status(400).json({ success: false, message: 'Invalid order amount' });
     }
 
     // Frontend sends INR (rupees). Razorpay expects paise as integer.
-    const rupees = parseFloat(amount);
+    const rupees = amountFromClient;
     const paise = Math.round(rupees * 100);
 
-    // Receipt must be <= 40 chars. UUID is 36 chars, so use it directly or truncate
-    const receipt = orderId 
-      ? orderId.replace(/-/g, '').substring(0, 32) // Remove hyphens and truncate to 32 chars
+    // Receipt must be <= 40 chars.
+    const receipt = orderId
+      ? orderId.replace(/-/g, '').substring(0, 32)
       : `rcpt_${Date.now()}`;
 
     const order = await razorpay.orders.create({
@@ -162,24 +170,40 @@ router.post('/payment-link', authenticateToken, checkoutLimiter, [
     }
     const requestedAmount = Number(amount);
     const expectedAmount = Number(dbOrder.total_price || 0);
-    if (!Number.isFinite(requestedAmount) || Math.abs(requestedAmount - expectedAmount) > 0.01) {
-      return res.status(400).json({ success: false, message: 'Amount mismatch for order' });
+    const amountDifference = Math.abs(requestedAmount - expectedAmount);
+    const percentDifference = expectedAmount > 0 ? ((amountDifference / expectedAmount) * 100).toFixed(2) : 0;
+    
+    // FIX #8: Sanitize phone and name before sending to Razorpay
+    const safePhone = String(req.body.userPhone || '').replace(/\D/g, '').slice(-10);
+    const safeName = String(req.body.userName || 'Customer').replace(/[<>"'&]/g, '').slice(0, 50);
+
+    // Strict amount validation — use DB value, reject any mismatch > 1 paise (₹0.01)
+    if (!Number.isFinite(requestedAmount) || amountDifference > 0.01) {
+      console.error(`[RAZORPAY_PAYMENT_LINK_ERROR] Amount mismatch:`, {
+        orderId, requestedAmount, expectedAmount, difference: amountDifference,
+      });
+      return res.status(400).json({
+        success: false,
+        message: `Amount mismatch for order. Expected ₹${expectedAmount}, got ₹${requestedAmount}. Please refresh cart and try again.`,
+      });
     }
 
-    // Create payment link
+    // Always use the DB authoritative amount for the payment link (not the client amount)
+    const paymentAmountInPaise = Math.round(expectedAmount * 100);
+    
     const paymentLinkResponse = await razorpay.paymentLink.create({
       upi_link: true,
-      amount: Math.round(expectedAmount * 100), // Razorpay expects amount in paise
+      amount: paymentAmountInPaise,
       currency: 'INR',
       accept_partial: false,
-      first_min_partial_amount: 100, // Minimum partial payment (₹1)
       reference_id: orderId,
-      description: `CityFreshKart Order #${orderId}`,
-      customer_notify: 1,
-      notify: {
-        sms: true,
-        email: true,
+      description: `CityFreshKart Order`,
+      customer: {
+        contact: safePhone ? `+91${safePhone}` : undefined,
+        name: safeName,
       },
+      customer_notify: 1,
+      notify: { sms: true, email: true },
       reminder_enable: true,
       notes: {
         order_id: orderId,
@@ -232,16 +256,29 @@ router.post('/verify-payment', authenticateToken, checkoutLimiter, [
 
     const { paymentId, orderId, signature } = req.body;
 
-    // Verify signature
+    // FIX #2 — Verify HMAC signature with timing-safe comparison
+    // IMPORTANT: Both buffers must be the same byte length for timingSafeEqual.
     const signaturePayload = `${orderId}|${paymentId}`;
     const expectedSignature = crypto
       .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET)
-      .update(signaturePayload.toString())
+      .update(signaturePayload)
       .digest('hex');
 
-    const isSignatureValid = expectedSignature === signature;
+    const incomingSig = String(signature || '');
+    let sigValid = false;
+    try {
+      // timingSafeEqual requires equal-length Buffers; both are 32-byte HMAC hex = 64 chars
+      if (incomingSig.length === expectedSignature.length) {
+        sigValid = crypto.timingSafeEqual(
+          Buffer.from(expectedSignature, 'hex'),
+          Buffer.from(incomingSig, 'hex'),
+        );
+      }
+    } catch (_) {
+      sigValid = false;
+    }
 
-    if (!isSignatureValid) {
+    if (!sigValid) {
       return res.status(400).json({
         success: false,
         ref: req.requestId,
@@ -256,6 +293,38 @@ router.post('/verify-payment', authenticateToken, checkoutLimiter, [
         success: false,
         ref: req.requestId,
         message: 'Payment not captured',
+      });
+    }
+
+    // FIX #2 — Cross-check captured amount against DB order total
+    // Look up by razorpay_order_id first; fall back to backendOrderId in notes
+    // (handles the case where create-order ran but razorpay_order_id wasn't saved yet)
+    let dbOrderForVerify = await pool.query(
+      'SELECT id, total_price FROM orders WHERE razorpay_order_id = $1 AND user_id = $2',
+      [orderId, req.user.id],
+    );
+    if (dbOrderForVerify.rows.length === 0) {
+      // Try matching via backend_order_id stored in Razorpay notes
+      const rzpOrder = await razorpay.orders.fetch(orderId).catch(() => null);
+      const backendOrderId = rzpOrder?.notes?.backend_order_id;
+      if (backendOrderId) {
+        dbOrderForVerify = await pool.query(
+          'SELECT id, total_price FROM orders WHERE id = $1::uuid AND user_id = $2',
+          [backendOrderId, req.user.id],
+        );
+      }
+    }
+    if (dbOrderForVerify.rows.length === 0) {
+      console.error(`[RAZORPAY_VERIFY] Order not found for razorpay_order_id=${orderId} user=${req.user.id}`);
+      return res.status(404).json({ success: false, message: 'Order not found', ref: req.requestId });
+    }
+    const expectedPaise = Math.round(parseFloat(dbOrderForVerify.rows[0].total_price) * 100);
+    if (payment.amount !== expectedPaise) {
+      console.error(`[RAZORPAY_VERIFY] AMOUNT MISMATCH — captured: ${payment.amount} paise, expected: ${expectedPaise} paise`);
+      return res.status(400).json({
+        success: false,
+        ref: req.requestId,
+        message: 'Payment amount does not match order total. Please contact support.',
       });
     }
 
@@ -337,10 +406,11 @@ router.post('/verify-payment', authenticateToken, checkoutLimiter, [
 });
 
 // @route   POST /api/razorpay/cod-order
-// @desc    Create cash-on-delivery order (no payment)
+// @desc    Mark a pending order as COD — FIX #11: only allowed on 'pending' orders
 // @access  Private
 router.post('/cod-order', authenticateToken, checkoutLimiter, [
-  body('orderId').notEmpty().withMessage('Order ID is required'),
+  body('orderId').notEmpty().withMessage('Order ID is required').bail()
+    .isUUID().withMessage('Order ID must be a valid UUID'),
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -350,36 +420,47 @@ router.post('/cod-order', authenticateToken, checkoutLimiter, [
 
     const { orderId } = req.body;
 
-    // Update order status to COD pending (payment not required)
+    // FIX #11: Guard — only update if status is exactly 'pending' to prevent resetting confirmed/delivered orders
     const updateResult = await pool.query(
       `UPDATE orders
-       SET payment_method = $1, status = $2, updated_at = CURRENT_TIMESTAMP
-       WHERE id = $3 AND user_id = $4
-       RETURNING id`,
-      ['cod', 'pending', orderId, req.user.id],
+       SET payment_method = 'cod', updated_at = CURRENT_TIMESTAMP
+       WHERE id = $1::uuid AND user_id = $2::uuid AND status = 'pending' AND payment_method != 'razorpay'
+       RETURNING id, status`,
+      [orderId, req.user.id],
     );
     if (updateResult.rowCount === 0) {
-      return res.status(404).json({ success: false, message: 'Order not found' });
+      // Check why — ownership or wrong status?
+      const check = await pool.query(
+        'SELECT id, status, payment_method FROM orders WHERE id = $1::uuid AND user_id = $2::uuid',
+        [orderId, req.user.id],
+      );
+      if (check.rows.length === 0) {
+        return res.status(404).json({ success: false, message: 'Order not found' });
+      }
+      const o = check.rows[0];
+      if (o.status !== 'pending') {
+        return res.status(409).json({ success: false, message: `Cannot switch to COD: order is already ${o.status}` });
+      }
+      return res.status(409).json({ success: false, message: 'Cannot switch to COD: order has an online payment in progress' });
     }
 
-    res.json({
+    return res.json({
       success: true,
-      message: 'COD order created successfully',
+      message: 'Order set to Cash on Delivery',
       paymentMethod: 'cod',
     });
 
   } catch (error) {
-    console.error('Create COD order error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to create COD order',
-      error: error.message,
+    logApiError(req, 'cod_order_failed', error);
+    return jsonClientError(res, req, 500, {
+      message: 'Failed to set COD payment method',
+      errorCode: 'COD_ORDER_FAILED',
     });
   }
 });
 
 // @route   GET /api/razorpay/payment-status/:paymentId
-// @desc    Get payment status
+// @desc    Get payment status — FIX #10: verify ownership via DB lookup
 // @access  Private
 router.get('/payment-status/:paymentId', authenticateToken, async (req, res) => {
   try {
@@ -392,12 +473,24 @@ router.get('/payment-status/:paymentId', authenticateToken, async (req, res) => 
 
     const { paymentId } = req.params;
 
+    // FIX #10: Verify this paymentId belongs to an order owned by the current user
+    const ownerCheck = await pool.query(
+      'SELECT id FROM orders WHERE razorpay_payment_id = $1 AND user_id = $2',
+      [paymentId, req.user.id],
+    );
+    if (ownerCheck.rows.length === 0) {
+      return res.status(403).json({
+        success: false,
+        message: 'Payment not found or does not belong to you',
+      });
+    }
+
     const payment = await razorpay.payments.fetch(paymentId);
 
     res.json({
       success: true,
       paymentId: payment.id,
-      amount: payment.amount / 100, // Convert paise to rupees
+      amount: payment.amount / 100,
       currency: payment.currency,
       status: payment.status,
       method: payment.method,
@@ -419,48 +512,96 @@ router.get('/payment-status/:paymentId', authenticateToken, async (req, res) => 
 // @route   PUT /api/razorpay/update-order-payment
 // @desc    Update order with payment details after successful payment
 // @access  Private
-router.put('/update-order-payment', authenticateToken, [
+// FIX #3 — This endpoint now verifies the payment with Razorpay API AND
+//           checks the HMAC signature before confirming the order.
+router.put('/update-order-payment', authenticateToken, checkoutLimiter, [
   body('orderId').notEmpty().withMessage('Order ID is required').bail()
     .isUUID().withMessage('Order ID must be a valid UUID'),
   body('razorpay_payment_id').notEmpty().withMessage('Razorpay payment ID is required'),
   body('razorpay_order_id').notEmpty().withMessage('Razorpay order ID is required'),
+  body('signature').notEmpty().withMessage('Razorpay signature is required'),
 ], async (req, res) => {
   try {
+    if (!razorpay) {
+      return res.status(503).json({ success: false, message: 'Payment service not configured.' });
+    }
+
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       return res.status(400).json({ errors: errors.array() });
     }
 
-    const { orderId, razorpay_payment_id, razorpay_order_id } = req.body;
+    const { orderId, razorpay_payment_id, razorpay_order_id, signature } = req.body;
 
-    // Update order with payment details and change status to confirmed
+    // Step 1: Verify HMAC signature (timing-safe, crash-safe)
+    const signaturePayload = `${razorpay_order_id}|${razorpay_payment_id}`;
+    const expectedSig = crypto
+      .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET)
+      .update(signaturePayload)
+      .digest('hex');
+    const sigStr = String(signature || '');
+    let sigValid = false;
+    try {
+      // timingSafeEqual requires equal-length Buffers
+      if (sigStr.length === expectedSig.length) {
+        sigValid = crypto.timingSafeEqual(Buffer.from(expectedSig, 'hex'), Buffer.from(sigStr, 'hex'));
+      }
+    } catch (_) { sigValid = false; }
+    if (!sigValid) {
+      console.error(`[UPDATE_ORDER_PAYMENT] Invalid signature — paymentId=${razorpay_payment_id} userId=${req.user.id}`);
+      return res.status(400).json({ success: false, message: 'Invalid payment signature' });
+    }
+
+    // Step 2: Fetch order from DB and verify ownership
+    const dbOrder = await pool.query(
+      'SELECT id, total_price, status FROM orders WHERE id = $1::uuid AND user_id = $2::uuid',
+      [orderId, req.user.id],
+    );
+    if (dbOrder.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Order not found or does not belong to you' });
+    }
+    const order = dbOrder.rows[0];
+    if (order.status !== 'pending') {
+      // Already processed — idempotent success
+      return res.json({ success: true, message: 'Order already processed', data: { order } });
+    }
+
+    // Step 3: Verify payment with Razorpay and cross-check amount
+    const payment = await razorpay.payments.fetch(razorpay_payment_id);
+    if (payment.status !== 'captured') {
+      return res.status(400).json({ success: false, message: 'Payment has not been captured' });
+    }
+    const expectedPaise = Math.round(parseFloat(order.total_price) * 100);
+    if (payment.amount !== expectedPaise) {
+      console.error(`[UPDATE_ORDER_PAYMENT] AMOUNT MISMATCH — captured: ${payment.amount}, expected: ${expectedPaise}, orderId: ${orderId}`);
+      return res.status(400).json({ success: false, message: 'Payment amount does not match order total' });
+    }
+
+    // Step 4: Confirm order in DB
     const result = await pool.query(`
-      UPDATE orders 
-      SET razorpay_payment_id = $1, 
+      UPDATE orders
+      SET razorpay_payment_id = $1,
           razorpay_order_id = $2,
-          status = CASE WHEN status = 'pending' THEN 'confirmed' ELSE status END,
+          status = 'confirmed',
           updated_at = CURRENT_TIMESTAMP
       WHERE id = $3::uuid AND user_id = $4::uuid AND status = 'pending'
       RETURNING *
     `, [razorpay_payment_id, razorpay_order_id, orderId, req.user.id]);
 
     if (result.rows.length === 0) {
-      return res.status(404).json({
-        success: false,
-        message: 'Order not found, does not belong to you, or is not in pending status',
-      });
+      return res.status(409).json({ success: false, message: 'Order could not be confirmed — may already be processed' });
     }
 
     return res.json({
       success: true,
-      message: 'Order updated with payment details',
+      message: 'Order confirmed with payment details',
       data: { order: result.rows[0] },
     });
   } catch (error) {
-    console.error('Update order payment error:', error);
-    return res.status(500).json({
-      success: false,
+    logApiError(req, 'update_order_payment_failed', error);
+    return jsonClientError(res, req, 500, {
       message: 'Failed to update order with payment details',
+      errorCode: 'UPDATE_ORDER_PAYMENT_FAILED',
     });
   }
 });

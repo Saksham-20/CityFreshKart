@@ -61,7 +61,13 @@ router.post('/register', authLimiter, async (req, res) => {
       return res.status(400).json({ success: false, message: 'All fields are required' });
     }
 
-    const existingUser = await dbQuery('SELECT id FROM users WHERE phone = $1', [phone]);
+    // FIX #12: Validate phone format — must be exactly 10 digits
+    const normalizedPhone = String(phone).replace(/\D/g, '').slice(-10);
+    if (!/^\d{10}$/.test(normalizedPhone)) {
+      return res.status(400).json({ success: false, message: 'Phone must be a valid 10-digit number' });
+    }
+
+    const existingUser = await dbQuery('SELECT id FROM users WHERE phone = $1', [normalizedPhone]);
     if (existingUser.rows.length > 0) {
       return res.status(409).json({ success: false, message: 'Phone already registered' });
     }
@@ -73,12 +79,11 @@ router.post('/register', authLimiter, async (req, res) => {
       INSERT INTO users (phone, password_hash, name, is_admin, created_at, updated_at)
       VALUES ($1, $2, $3, $4, NOW(), NOW())
       RETURNING id, phone, name, is_admin, token_version, created_at
-    `, [phone, passwordHash, name, false]);
+    `, [normalizedPhone, passwordHash, name.trim(), false]);
 
     const user = userResult.rows[0];
 
     const token = issueAuthToken(user);
-
     setAuthCookie(res, token);
     res.status(201).json({ success: true, message: 'Registered successfully', data: { user, token } });
   } catch (error) {
@@ -557,10 +562,33 @@ router.delete('/link/google', authenticateToken, async (req, res) => {
 router.put('/profile', authenticateToken, async (req, res) => {
   try {
     const { name, phone } = req.body;
+
+    // FIX #13: If phone is being updated, validate format and uniqueness
+    let normalizedPhone = undefined;
+    if (phone !== undefined && phone !== null) {
+      normalizedPhone = String(phone).replace(/\D/g, '').slice(-10);
+      if (!/^\d{10}$/.test(normalizedPhone)) {
+        return res.status(400).json({ success: false, message: 'Phone must be a valid 10-digit number' });
+      }
+      // Check uniqueness against other users
+      const existing = await dbQuery(
+        'SELECT id FROM users WHERE phone = $1 AND id != $2 LIMIT 1',
+        [normalizedPhone, req.user.id],
+      );
+      if (existing.rows.length > 0) {
+        return res.status(409).json({ success: false, message: 'This phone number is already registered' });
+      }
+    }
+
     const result = await dbQuery(`
-      UPDATE users SET name = COALESCE($1, name), phone = COALESCE($2, phone), updated_at = CURRENT_TIMESTAMP
-      WHERE id = $3 RETURNING id, name, phone, is_admin, created_at, updated_at
-    `, [name, phone, req.user.id]);
+      UPDATE users
+      SET name = COALESCE($1, name),
+          phone = COALESCE($2, phone),
+          updated_at = CURRENT_TIMESTAMP
+      WHERE id = $3
+      RETURNING id, name, phone, is_admin, created_at, updated_at
+    `, [name ? name.trim() : null, normalizedPhone || null, req.user.id]);
+
     if (result.rows.length === 0) return res.status(404).json({ success: false, message: 'User not found' });
     res.json({ success: true, message: 'Profile updated', data: { user: result.rows[0] } });
   } catch (error) {

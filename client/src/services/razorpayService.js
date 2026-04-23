@@ -14,6 +14,7 @@ function loadRazorpayScript() {
 
 export const razorpayService = {
   // Create Razorpay order on backend
+  // NOTE: amount is now ignored if backendOrderId is provided — the backend uses DB total_price
   async createOrder(amount, currency = 'INR', backendOrderId = null) {
     try {
       const payload = { amount, currency };
@@ -38,12 +39,14 @@ export const razorpayService = {
   },
 
   // Update order with payment details after verification
-  async updateOrderPayment(orderId, razorpay_payment_id, razorpay_order_id) {
+  // FIX: signature is now required — the backend verifies it before confirming the order
+  async updateOrderPayment(orderId, razorpay_payment_id, razorpay_order_id, signature) {
     try {
       const response = await api.put('/razorpay/update-order-payment', {
         orderId,
         razorpay_payment_id,
         razorpay_order_id,
+        signature,
       });
       return response.data;
     } catch (error) {
@@ -56,7 +59,7 @@ export const razorpayService = {
     const loaded = await loadRazorpayScript();
     if (!loaded) throw new Error('Failed to load Razorpay SDK');
 
-    // Create Razorpay order on backend (optionally linked to existing order)
+    // Create Razorpay order on backend (backend ignores amount and uses DB total_price when backendOrderId is set)
     const order = await razorpayService.createOrder(amount, 'INR', backendOrderId);
 
     const options = {
@@ -70,15 +73,33 @@ export const razorpayService = {
       theme: { color: '#16a34a' },
       handler: async (response) => {
         try {
+          // Step 1: Verify payment signature + amount with backend
           const verified = await razorpayService.verifyPayment({
             paymentId: response.razorpay_payment_id,
             orderId: response.razorpay_order_id,
             signature: response.razorpay_signature,
           });
-          if (onSuccess) onSuccess({ 
-            ...verified, 
-            razorpay_payment_id: response.razorpay_payment_id, 
+
+          // Step 2: Confirm backend order (if applicable), passing signature for server-side re-verification
+          if (backendOrderId && response.razorpay_signature) {
+            try {
+              await razorpayService.updateOrderPayment(
+                order.backendOrderId || backendOrderId,
+                response.razorpay_payment_id,
+                response.razorpay_order_id,
+                response.razorpay_signature,
+              );
+            } catch (updateErr) {
+              // Non-fatal if verifyPayment already succeeded — order may already be confirmed
+              console.warn('[RazorpayService] updateOrderPayment failed:', updateErr.message);
+            }
+          }
+
+          if (onSuccess) onSuccess({
+            ...verified,
+            razorpay_payment_id: response.razorpay_payment_id,
             razorpay_order_id: response.razorpay_order_id,
+            razorpay_signature: response.razorpay_signature,
             backendOrderId: order.backendOrderId || backendOrderId,
           });
         } catch (err) {

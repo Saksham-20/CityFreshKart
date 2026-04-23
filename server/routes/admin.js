@@ -622,11 +622,16 @@ router.put('/products/:id', adminProductWriteLimiter, uploadLimiter, upload.arra
       updateData.category = normalizedCat;
     }
 
-    // Columns that don't exist in the schema — skip them
-    const skipKeys = new Set(['id', 'slug', 'category_id', 'sku', 'weight',
-      'is_featured', 'is_bestseller', 'is_new_arrival', 'images', 'remaining_image_ids']);
+    // FIX #6: Use an explicit ALLOWLIST of updatable columns
+    // This replaces the old skipKeys blacklist approach which could allow
+    // updating restricted columns (e.g. user-linked fields) if new ones were added.
+    const ALLOWED_PRODUCT_UPDATE_KEYS = new Set([
+      'name', 'description', 'category', 'image', 'image_url',
+      'price_per_kg', 'discount', 'quantity_available', 'is_active',
+      'pricing_type', 'search_keywords', 'weight_display_unit',
+    ]);
 
-    // Build update query dynamically
+    // Build update query dynamically using allowlist only
     const updateFields = [];
     const updateValues = [];
     let paramCount = 0;
@@ -637,7 +642,7 @@ router.put('/products/:id', adminProductWriteLimiter, uploadLimiter, upload.arra
       ? updateData.pricing_type
       : (existingProduct.rows[0].pricing_type || 'per_kg');
     Object.keys(updateData).forEach(key => {
-      if (!skipKeys.has(key) && updateData[key] !== undefined && updateData[key] !== null) {
+      if (ALLOWED_PRODUCT_UPDATE_KEYS.has(key) && updateData[key] !== undefined && updateData[key] !== null) {
         paramCount++;
         updateFields.push(`${key} = $${paramCount}`);
         updateValues.push(updateData[key]);
@@ -852,11 +857,11 @@ router.get('/orders', async (req, res) => {
 
     const orders = await pool.query(query, queryParams);
 
-    // Get total count
+    // FIX #15: Use LEFT JOIN to match the main query and include admin-created orders (user_id = NULL)
     let countQuery = `
       SELECT COUNT(*) as total
       FROM orders o
-      JOIN users u ON o.user_id = u.id
+      LEFT JOIN users u ON o.user_id = u.id
       WHERE 1=1
     `;
 
@@ -1015,54 +1020,85 @@ router.put('/orders/:id/status', [
     const normalizedAdminNote = String(admin_note || '').trim();
     const rejectionReason = normalizedAdminNote || 'Your order is deleted';
 
-    // Check if order exists
-    const existingOrder = await pool.query('SELECT id, notes, user_id, order_number FROM orders WHERE id = $1', [id]);
-    if (existingOrder.rows.length === 0) {
-      return res.status(404).json({ message: 'Order not found' });
-    }
+    // FIX #20: Use transaction + SELECT FOR UPDATE to prevent race condition on cancel
+    const client = await pool.pool.connect();
+    let orderRow;
+    try {
+      await client.query('BEGIN');
 
-    if (status === 'cancelled') {
-      await pool.query(
-        `UPDATE orders
-         SET status = $1,
-             rejection_reason = $2,
-             rejected_at = CURRENT_TIMESTAMP,
-             rejected_by = $3,
-             updated_at = CURRENT_TIMESTAMP
-         WHERE id = $4`,
-        [status, rejectionReason, req.user?.id || null, id],
+      const existingOrder = await client.query(
+        'SELECT id, notes, user_id, order_number, status FROM orders WHERE id = $1 FOR UPDATE',
+        [id],
       );
-    } else if (normalizedAdminNote) {
-      const timestamp = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
-      const existing = existingOrder.rows[0].notes || '';
-      const separator = existing ? '\n' : '';
-      const newNotes = `${existing}${separator}[Admin ${timestamp}]: ${normalizedAdminNote}`;
-      await pool.query(
-        `UPDATE orders
-         SET status = $1,
-             notes = $2,
-             rejection_reason = NULL,
-             rejected_at = NULL,
-             rejected_by = NULL,
-             updated_at = CURRENT_TIMESTAMP
-         WHERE id = $3`,
-        [status, newNotes, id],
-      );
-    } else {
-      await pool.query(
-        `UPDATE orders
-         SET status = $1,
-             rejection_reason = NULL,
-             rejected_at = NULL,
-             rejected_by = NULL,
-             updated_at = CURRENT_TIMESTAMP
-         WHERE id = $2`,
-        [status, id],
-      );
+      if (existingOrder.rows.length === 0) {
+        await client.query('ROLLBACK');
+        return res.status(404).json({ message: 'Order not found' });
+      }
+      orderRow = existingOrder.rows[0];
+      const prevStatus = orderRow.status;
+
+      if (status === 'cancelled') {
+        await client.query(
+          `UPDATE orders
+           SET status = $1,
+               rejection_reason = $2,
+               rejected_at = CURRENT_TIMESTAMP,
+               rejected_by = $3,
+               updated_at = CURRENT_TIMESTAMP
+           WHERE id = $4`,
+          [status, rejectionReason, req.user?.id || null, id],
+        );
+        // FIX #20: Restore stock when cancelling (only if not already cancelled/delivered)
+        if (prevStatus !== 'cancelled' && prevStatus !== 'delivered') {
+          const orderItems = await client.query(
+            'SELECT product_id, quantity_kg FROM order_items WHERE order_id = $1',
+            [id],
+          );
+          for (const item of orderItems.rows) {
+            await client.query(
+              'UPDATE products SET quantity_available = quantity_available + $1 WHERE id = $2',
+              [item.quantity_kg, item.product_id],
+            );
+          }
+        }
+      } else if (normalizedAdminNote) {
+        const timestamp = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
+        const existing = orderRow.notes || '';
+        const separator = existing ? '\n' : '';
+        const newNotes = `${existing}${separator}[Admin ${timestamp}]: ${normalizedAdminNote}`;
+        await client.query(
+          `UPDATE orders
+           SET status = $1,
+               notes = $2,
+               rejection_reason = NULL,
+               rejected_at = NULL,
+               rejected_by = NULL,
+               updated_at = CURRENT_TIMESTAMP
+           WHERE id = $3`,
+          [status, newNotes, id],
+        );
+      } else {
+        await client.query(
+          `UPDATE orders
+           SET status = $1,
+               rejection_reason = NULL,
+               rejected_at = NULL,
+               rejected_by = NULL,
+               updated_at = CURRENT_TIMESTAMP
+           WHERE id = $2`,
+          [status, id],
+        );
+      }
+
+      await client.query('COMMIT');
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
     }
 
     // Notify customer and admins about status updates
-    const orderRow = existingOrder.rows[0];
     const statusLabelMap = {
       pending: 'Pending',
       confirmed: 'Accepted',

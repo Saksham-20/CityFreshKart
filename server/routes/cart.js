@@ -3,8 +3,12 @@ const { query } = require('../database/config');
 const { authenticateToken, optionalAuth } = require('../middleware/auth');
 const { validateUUID } = require('../middleware/validation');
 const { jsonClientError, logApiError } = require('../utils/apiErrors');
+const { getStoreOrderSettings } = require('../services/storeSettingsService');
 
 const router = express.Router();
+
+// FIX #9: Maximum items allowed in a cart merge request
+const MAX_MERGE_ITEMS = parseInt(process.env.MAX_CART_MERGE_ITEMS, 10) || 50;
 
 // @route   GET /api/cart
 // @desc    Get user's cart
@@ -29,7 +33,8 @@ router.get('/', authenticateToken, async (req, res) => {
       cartId = cartResult.rows[0].id;
     }
 
-    // Get cart items with product details
+    // Get cart items with product details AND weight price overrides
+    // CRITICAL FIX: Include weight_price_overrides so frontend can calculate with weight tier data
     const itemsResult = await query(`
       SELECT 
         ci.id,
@@ -43,25 +48,46 @@ router.get('/', authenticateToken, async (req, res) => {
         p.discount,
         p.stock_quantity,
         p.image as product_image,
+        p.pricing_type,
+        COALESCE(p.weight_display_unit, 'kg') as weight_display_unit,
         c.name as category_name,
-        c.slug as category_slug
+        c.slug as category_slug,
+        COALESCE(wp.weight_price_overrides, '{}'::json) AS weight_price_overrides
       FROM cart_items ci
       JOIN products p ON ci.product_id = p.id
       LEFT JOIN categories c ON p.category_id = c.id
+      LEFT JOIN LATERAL (
+        SELECT json_object_agg(weight_option::text, price_override) AS weight_price_overrides
+        FROM product_weight_prices
+        WHERE product_id = p.id
+      ) wp ON true
       WHERE ci.cart_id = $1 AND p.is_active = true
       ORDER BY ci.created_at DESC
     `, [cartId]);
 
-    // Calculate totals with weight support
+    // FIX #5: Get real delivery settings from DB instead of hardcoded values
+    let freeDeliveryThreshold = 300;
+    let deliveryFeeAmount = 50;
+    try {
+      const settings = await getStoreOrderSettings();
+      freeDeliveryThreshold = settings.free_delivery_threshold || 300;
+      deliveryFeeAmount = settings.delivery_fee || 50;
+    } catch (_) { /* fall back to defaults on error */ }
+
+    // Calculate totals with weight support and discount
     let subtotal = 0;
-    let itemCount = 0;
+    let itemCount = 0; // FIX #19: count distinct cart lines, not quantity units
     const items = itemsResult.rows.map(item => {
-      // For weight-based products: price_per_kg * weight * quantity
-      // For regular products: price * quantity
-      const unitPrice = item.price_per_kg ? (item.price_per_kg * (item.weight || 1)) : item.price;
+      // Base price = price_per_kg * weight (or * 1 for per-piece)
+      const basePrice = item.price_per_kg
+        ? (item.price_per_kg * (item.weight || 1))
+        : (item.price || 0);
+      // Apply discount percentage
+      const discountFactor = 1 - (parseFloat(item.discount || 0) / 100);
+      const unitPrice = parseFloat((basePrice * discountFactor).toFixed(2));
       const itemTotal = unitPrice * item.quantity;
       subtotal += itemTotal;
-      itemCount += item.quantity;
+      itemCount += 1; // FIX #19: 1 per distinct cart row
 
       return {
         ...item,
@@ -70,9 +96,9 @@ router.get('/', authenticateToken, async (req, res) => {
       };
     });
 
-    // FREE delivery above ₹300, else ₹30
-    const deliveryFee = subtotal >= 300 ? 0 : 30;
-    const estimatedTotal = subtotal + deliveryFee;
+    // FIX #5: Use real delivery fee from store settings, NO phantom tax
+    const deliveryFee = subtotal >= freeDeliveryThreshold ? 0 : deliveryFeeAmount;
+    const estimatedTotal = parseFloat((subtotal + deliveryFee).toFixed(2));
 
     res.json({
       success: true,
@@ -83,8 +109,8 @@ router.get('/', authenticateToken, async (req, res) => {
           item_count: itemCount,
           subtotal: parseFloat(subtotal.toFixed(2)),
           delivery_fee: deliveryFee,
-          estimated_tax: parseFloat((subtotal * 0.08).toFixed(2)), // 8% tax
-          estimated_total: parseFloat((estimatedTotal * 1.08).toFixed(2)),
+          estimated_total: estimatedTotal,
+          free_delivery_threshold: freeDeliveryThreshold,
         },
       },
     });
@@ -420,6 +446,14 @@ router.post('/merge', authenticateToken, async (req, res) => {
       return res.status(400).json({
         success: false,
         message: 'Guest items array is required',
+      });
+    }
+
+    // FIX #9: Limit number of items in a merge request to prevent DoS
+    if (guest_items.length > MAX_MERGE_ITEMS) {
+      return res.status(400).json({
+        success: false,
+        message: `Cannot merge more than ${MAX_MERGE_ITEMS} cart items`,
       });
     }
 

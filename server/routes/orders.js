@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const express = require('express');
 const { query, pool } = require('../database/config');
 const { authenticateToken } = require('../middleware/auth');
@@ -228,16 +229,35 @@ router.post('/', authenticateToken, checkoutLimiter, async (req, res) => {
       if (hasTiers) {
         const tierKey = `${item.product_id}:${qty.toFixed(2)}`;
         if (!weightOverrideMap.has(tierKey)) {
+          // CRITICAL FIX: Show available tiers to help debug why product is excluded
+          const availableTiers = Array.from(weightOverrideMap.keys())
+            .filter(k => k.startsWith(item.product_id))
+            .map(k => k.split(':')[1]);
+          
+          console.error(`[ORDER_VALIDATION_FAILED] Weight tier not found:`, {
+            productId: item.product_id,
+            productName: product.name,
+            requestedQuantity: qty,
+            requestedKey: tierKey,
+            availableTiers,
+            tierCount: availableTiers.length
+          });
+          
           return res.status(400).json({
             success: false,
-            error: { code: 'INVALID_TIER', message: `${product.name} must use admin-defined weight tiers` },
+            error: { 
+              code: 'INVALID_TIER', 
+              message: `${product.name} (${qty}kg) requires one of these weights: ${availableTiers.length > 0 ? availableTiers.join(', ') + ' kg' : 'No tiers configured'}` 
+            },
           });
         }
       }
     }
 
     // Recalculate totals strictly from DB values for integrity
+    // CRITICAL: Log each item's calculation for debugging price discrepancies
     let subtotal = 0;
+    const itemCalculations = [];
     for (const item of items) {
       const product = productsById.get(item.product_id);
       const pricePerKg = parseFloat(product.price_per_kg || 0);
@@ -247,8 +267,30 @@ router.post('/', authenticateToken, checkoutLimiter, async (req, res) => {
       const baseTotal = Number.isFinite(overridePrice) ? overridePrice : (pricePerKg * quantityKg);
       const itemTotal = baseTotal * (1 - discount / 100);
       subtotal += itemTotal;
+      
+      // Log each item for debugging
+      itemCalculations.push({
+        productId: item.product_id,
+        productName: product.name,
+        quantityKg,
+        currentPricePerKg: pricePerKg,
+        hasWeightTierOverride: Number.isFinite(overridePrice),
+        tierOverridePrice: overridePrice,
+        baseTotal,
+        discountPercent: discount,
+        itemTotal: parseFloat(itemTotal.toFixed(2))
+      });
     }
     subtotal = parseFloat(subtotal.toFixed(2));
+    
+    if (process.env.NODE_ENV !== 'production') {
+      console.log(`[ORDER_CALC] Item-by-item breakdown:`, {
+        itemCount: items.length,
+        calculatedSubtotal: subtotal,
+        userId: req.user.id,
+        timestamp: new Date().toISOString(),
+      });
+    }
 
     if (minOrderAmount > 0 && subtotal < minOrderAmount) {
       return res.status(400).json({
@@ -259,8 +301,45 @@ router.post('/', authenticateToken, checkoutLimiter, async (req, res) => {
 
     const deliveryFee = subtotal >= freeDeliveryThreshold ? 0 : deliveryFeeAmount;
     const totalPrice = parseFloat((subtotal + deliveryFee).toFixed(2));
+    
+    // CRITICAL FIX: Validate that received amounts match calculated amounts
+    // If they don't match, it means product prices changed since cart was loaded
+    const receivedSubtotal = parseFloat(req.body.subtotal || 0);
+    const receivedTotal = parseFloat(req.body.total_price || 0);
+    
+    if (Number.isFinite(receivedSubtotal) && Number.isFinite(receivedTotal)) {
+      const subtotalDiff = Math.abs(subtotal - receivedSubtotal);
+      const totalDiff = Math.abs(totalPrice - receivedTotal);
+      
+      if (subtotalDiff > 0.1 || totalDiff > 0.1) {
+        console.warn(`[ORDER_PRICE_CHANGED] Prices recalculated - product prices may have changed:`, {
+          receivedSubtotal,
+          calculatedSubtotal: subtotal,
+          subtotalDifference: subtotalDiff,
+          receivedTotal,
+          calculatedTotal: totalPrice,
+          totalDifference: totalDiff,
+          percentChange: ((totalDiff / receivedTotal) * 100).toFixed(2) + '%',
+          userId: req.user.id,
+          reason: 'Using calculated amounts for order integrity'
+        });
+      }
+    }
+    
+    if (process.env.NODE_ENV !== 'production') {
+      console.log(`[ORDER_CALC_DEBUG] Final order amounts:`, {
+        itemCount: items.length,
+        calculatedSubtotal: subtotal,
+        deliveryFee,
+        calculatedTotal: totalPrice,
+        userId: req.user.id,
+        timestamp: new Date().toISOString(),
+      });
+    }
 
-    const orderNumber = `ORD-${Date.now()}-${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
+    // FIX #7: Use crypto.randomBytes for unpredictable order numbers
+    const randomSuffix = crypto.randomBytes(4).toString('hex').toUpperCase();
+    const orderNumber = `ORD-${Date.now()}-${randomSuffix}`;
 
     const client = await pool.connect();
     try {
@@ -300,6 +379,40 @@ router.post('/', authenticateToken, checkoutLimiter, async (req, res) => {
       ]);
 
       const order = orderResult.rows[0];
+
+      // CRITICAL FIX: Log price discrepancy to audit table if detected
+      const receivedSubtotal = parseFloat(req.body.subtotal || 0);
+      const receivedTotal = parseFloat(req.body.total_price || 0);
+      
+      if (Number.isFinite(receivedSubtotal) && Number.isFinite(receivedTotal)) {
+        const subtotalDiff = Math.abs(subtotal - receivedSubtotal);
+        const totalDiff = Math.abs(totalPrice - receivedTotal);
+        
+        if (subtotalDiff > 0.1 || totalDiff > 0.1) {
+          // Log the discrepancy with item details
+          const percentDiff = receivedTotal > 0 ? ((totalDiff / receivedTotal) * 100).toFixed(2) : 0;
+          await client.query(`
+            INSERT INTO order_audit_log (
+              order_id, user_id, event_type, 
+              received_subtotal, received_total,
+              calculated_subtotal, calculated_total,
+              items_json, discrepancy_amount, discrepancy_percent, reason
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+          `, [
+            order.id,
+            req.user.id,
+            'price_recalculated',
+            receivedSubtotal,
+            receivedTotal,
+            subtotal,
+            totalPrice,
+            JSON.stringify(itemCalculations),
+            totalDiff,
+            percentDiff,
+            'Product prices changed after cart loaded'
+          ]);
+        }
+      }
 
       // Insert order items — include pricing_type snapshot
       for (const item of items) {
@@ -351,6 +464,9 @@ router.post('/', authenticateToken, checkoutLimiter, async (req, res) => {
           );
         } catch (e) {
           if (e.code !== '42P01') throw e;
+          // FIX #16: Warn when idempotency table is missing — idempotency is disabled
+          logApiError(req, 'order_idempotency_table_missing', e);
+          console.warn('[ORDER_IDEMPOTENCY] order_idempotency table not found — idempotency protection is DISABLED. Run migrations.');
         }
       }
 
@@ -411,7 +527,7 @@ router.post('/', authenticateToken, checkoutLimiter, async (req, res) => {
 });
 
 // @route   POST /api/orders/:id/cancel
-// @desc    Cancel an order
+// @desc    Cancel an order — FIX #14: SELECT FOR UPDATE prevents concurrent cancel race
 // @access  Private
 router.post('/:id/cancel', authenticateToken, async (req, res) => {
   try {
@@ -419,31 +535,31 @@ router.post('/:id/cancel', authenticateToken, async (req, res) => {
     const customerReasonInput = String(req.body?.reason || '').trim();
     const customerReason = customerReasonInput || 'Order cancelled by customer.';
 
-    // Check if order exists and belongs to user
-    const order = await query(
-      'SELECT * FROM orders WHERE id = $1 AND user_id = $2',
-      [id, req.user.id],
-    );
-
-    if (order.rows.length === 0) {
-      return res.status(404).json({ message: 'Order not found' });
-    }
-
-    // Check if order can be cancelled
-    if (order.rows[0].status === 'cancelled') {
-      return res.status(400).json({ message: 'Order is already cancelled' });
-    }
-
-    if (order.rows[0].status === 'delivered') {
-      return res.status(400).json({ message: 'Cannot cancel delivered order' });
-    }
-
-    // Start transaction
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
 
-      // Update order status
+      // FIX #14: Lock the order row so concurrent cancel requests don't both succeed
+      const order = await client.query(
+        'SELECT * FROM orders WHERE id = $1 AND user_id = $2 FOR UPDATE',
+        [id, req.user.id],
+      );
+
+      if (order.rows.length === 0) {
+        await client.query('ROLLBACK');
+        return res.status(404).json({ message: 'Order not found' });
+      }
+
+      if (order.rows[0].status === 'cancelled') {
+        await client.query('ROLLBACK');
+        return res.status(400).json({ message: 'Order is already cancelled' });
+      }
+
+      if (order.rows[0].status === 'delivered') {
+        await client.query('ROLLBACK');
+        return res.status(400).json({ message: 'Cannot cancel delivered order' });
+      }
+
       await client.query(
         `UPDATE orders
          SET status = $1,
@@ -460,7 +576,6 @@ router.post('/:id/cancel', authenticateToken, async (req, res) => {
         'SELECT product_id, quantity_kg FROM order_items WHERE order_id = $1',
         [id],
       );
-
       for (const item of orderItems.rows) {
         await client.query(
           'UPDATE products SET quantity_available = quantity_available + $1 WHERE id = $2',
@@ -469,16 +584,13 @@ router.post('/:id/cancel', authenticateToken, async (req, res) => {
       }
 
       await client.query('COMMIT');
-
       res.json({ success: true, data: { message: 'Order cancelled successfully' } });
-
     } catch (error) {
       await client.query('ROLLBACK');
       throw error;
     } finally {
       client.release();
     }
-
   } catch (error) {
     logApiError(req, 'order_cancel_failed', error);
     return jsonClientError(res, req, 500, {
@@ -489,34 +601,77 @@ router.post('/:id/cancel', authenticateToken, async (req, res) => {
 });
 
 // @route   PUT /api/orders/:id
-// @desc    Update order status (admin only)
+// @desc    Update order status (admin only) — FIX #4: whitelist status values
 // @access  Private (Admin)
 router.put('/:id', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
-    const { status, notes } = req.body;
+    const { status } = req.body;
+
+    // FIX #4: Whitelist allowed status values
+    const VALID_STATUSES = ['pending', 'confirmed', 'delivered', 'cancelled'];
+    if (!status || !VALID_STATUSES.includes(status)) {
+      return res.status(400).json({
+        success: false,
+        error: { code: 'VALIDATION_ERROR', message: `Invalid status. Must be one of: ${VALID_STATUSES.join(', ')}` },
+      });
+    }
 
     // Check if user is admin
-    const user = await query(
-      'SELECT is_admin FROM users WHERE id = $1',
-      [req.user.id],
-    );
-
+    const user = await query('SELECT is_admin FROM users WHERE id = $1', [req.user.id]);
     if (!user.rows[0]?.is_admin) {
       return res.status(403).json({ message: 'Access denied' });
     }
 
-    // Update order
-    const result = await query(
-      'UPDATE orders SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 RETURNING *',
-      [status, id],
-    );
-
-    if (result.rows.length === 0) {
-      return res.status(404).json({ message: 'Order not found' });
+    // FIX #18/#20: Restore stock when admin cancels an order
+    if (status === 'cancelled') {
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        const existingOrder = await client.query(
+          'SELECT status FROM orders WHERE id = $1 FOR UPDATE',
+          [id],
+        );
+        if (existingOrder.rows.length === 0) {
+          await client.query('ROLLBACK');
+          return res.status(404).json({ message: 'Order not found' });
+        }
+        const prevStatus = existingOrder.rows[0].status;
+        await client.query(
+          `UPDATE orders SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2`,
+          [status, id],
+        );
+        // Only restore stock if order was not already cancelled/delivered
+        if (prevStatus !== 'cancelled' && prevStatus !== 'delivered') {
+          const orderItems = await client.query(
+            'SELECT product_id, quantity_kg FROM order_items WHERE order_id = $1',
+            [id],
+          );
+          for (const item of orderItems.rows) {
+            await client.query(
+              'UPDATE products SET quantity_available = quantity_available + $1 WHERE id = $2',
+              [item.quantity_kg, item.product_id],
+            );
+          }
+        }
+        await client.query('COMMIT');
+      } catch (err) {
+        await client.query('ROLLBACK');
+        throw err;
+      } finally {
+        client.release();
+      }
+    } else {
+      const result = await query(
+        'UPDATE orders SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 RETURNING *',
+        [status, id],
+      );
+      if (result.rows.length === 0) {
+        return res.status(404).json({ message: 'Order not found' });
+      }
     }
 
-    res.json({ success: true, data: { order: result.rows[0] } });
+    res.json({ success: true, data: { message: 'Order status updated' } });
 
   } catch (error) {
     logApiError(req, 'order_admin_update_failed', error);
