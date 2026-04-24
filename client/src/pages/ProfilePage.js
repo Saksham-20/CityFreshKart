@@ -304,10 +304,15 @@ const ProfilePage = () => {
     }
   };
 
-  const handleLogout = () => {
-    logout();
-    navigate('/');
-    toast.success('Logged out successfully');
+  const handleLogout = async () => {
+    try {
+      await logout();
+      navigate('/');
+    } catch (error) {
+      console.error('Logout error:', error);
+      // Still navigate even if logout fails
+      navigate('/');
+    }
   };
 
   const handleGoogleLinkAction = async () => {

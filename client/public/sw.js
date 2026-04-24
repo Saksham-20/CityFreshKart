@@ -1,10 +1,26 @@
-/* PWA service worker — install scope + Web Push display */
+/* PWA service worker — install scope + Web Push display + logout cache clear */
 self.addEventListener('install', (event) => {
   self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(self.clients.claim());
+});
+
+// Message handler for logout cache clearing
+self.addEventListener('message', async (event) => {
+  if (event.data?.type === 'CLEAR_CACHE_ON_LOGOUT') {
+    try {
+      // Clear all caches when user logs out
+      const cacheNames = await caches.keys();
+      await Promise.all(
+        cacheNames.map((cacheName) => caches.delete(cacheName))
+      );
+      console.log('[ServiceWorker] Cleared all caches on logout');
+    } catch (error) {
+      console.warn('[ServiceWorker] Failed to clear caches:', error);
+    }
+  }
 });
 
 self.addEventListener('push', (event) => {

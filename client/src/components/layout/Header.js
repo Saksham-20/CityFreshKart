@@ -270,9 +270,15 @@ const Header = () => {
     return () => window.clearTimeout(t);
   }, [showMobileSearch]);
 
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
+  const handleLogout = async () => {
+    try {
+      await logout();
+      navigate('/login');
+    } catch (error) {
+      console.error('Logout error:', error);
+      // Still navigate even if logout fails
+      navigate('/login');
+    }
   };
 
   const cartItemCount = cartItems?.length || 0;

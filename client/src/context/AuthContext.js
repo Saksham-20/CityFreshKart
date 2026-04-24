@@ -209,7 +209,25 @@ export const AuthProvider = ({ children }) => {
     } catch (error) {
       console.log('Logout API call failed, but continuing with local logout');
     } finally {
+      // Clear localStorage
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      localStorage.removeItem('authToken');
+      
+      // Dispatch logout action
       dispatch({ type: AUTH_ACTIONS.LOGOUT });
+      
+      // Notify service worker to clear caches (PWA support)
+      if ('serviceWorker' in navigator) {
+        try {
+          navigator.serviceWorker.controller?.postMessage({
+            type: 'CLEAR_CACHE_ON_LOGOUT',
+          });
+        } catch (err) {
+          console.warn('Failed to notify service worker:', err?.message);
+        }
+      }
+      
       toast.success('Logged out successfully');
     }
   };
@@ -266,11 +284,14 @@ export const AuthProvider = ({ children }) => {
     try {
       const response = await api.post('/auth/refresh', {});
 
-      if (response.data) {
-        // Cookie is automatically refreshed by server
+      if (response.data?.success && response.data?.data?.token) {
+        const newToken = response.data.data.token;
+        // Update localStorage with new token
+        localStorage.setItem('token', newToken);
+        // Update state with new token
         dispatch({
           type: AUTH_ACTIONS.REFRESH_TOKEN,
-          payload: { token: 'authenticated_via_cookie' }
+          payload: { token: newToken }
         });
         return { success: true };
       } else {

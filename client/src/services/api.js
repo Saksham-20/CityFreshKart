@@ -13,6 +13,10 @@ const apiClient = axios.create({
   withCredentials: true, // Send httpOnly cookies automatically
 });
 
+// Prevent refresh token loop: track if we're already refreshing
+let isRefreshing = false;
+let refreshPromise = null;
+
 // Request interceptor — attach token from localStorage if available
 apiClient.interceptors.request.use((config) => {
   // Let the browser/axios set multipart boundaries for FormData requests.
@@ -29,14 +33,93 @@ apiClient.interceptors.request.use((config) => {
   return config;
 });
 
-// Response interceptor — handle 401 globally
+// Response interceptor — handle 401 with automatic token refresh
 apiClient.interceptors.response.use(
   (response) => response,
-  (error) => {
-    if (error.response?.status === 401) {
-      useAuthStore.getState().logout();
-      return Promise.reject(error);
+  async (error) => {
+    const originalRequest = error.config;
+
+    // Handle 401 responses with automatic token refresh
+    if (error.response?.status === 401 && originalRequest) {
+      // Prevent refresh loop: don't try to refresh if we're already refreshing the /refresh endpoint
+      if (originalRequest.url.includes('/auth/refresh') || originalRequest.url.includes('/auth/logout')) {
+        useAuthStore.getState().logout();
+        return Promise.reject(error);
+      }
+
+      // If we're already refreshing, wait for the refresh to complete, then retry
+      if (isRefreshing) {
+        return refreshPromise.then(
+          (newToken) => {
+            // Update the original request with new token
+            if (newToken) {
+              originalRequest.headers.Authorization = `Bearer ${newToken}`;
+            }
+            return apiClient(originalRequest);
+          },
+          () => {
+            // Refresh failed, reject original request
+            useAuthStore.getState().logout();
+            return Promise.reject(error);
+          },
+        );
+      }
+
+      // Mark that we're refreshing and create refresh promise
+      isRefreshing = true;
+      refreshPromise = new Promise(async (resolve, reject) => {
+        try {
+          // Attempt to refresh token
+          const refreshResponse = await axios.post(
+            `${API_BASE_URL}/auth/refresh`,
+            {},
+            {
+              withCredentials: true, // Send httpOnly cookies
+              timeout: apiTimeoutMs,
+            },
+          );
+
+          if (refreshResponse.data?.success && refreshResponse.data?.data?.token) {
+            const newToken = refreshResponse.data.data.token;
+            // Update localStorage with new token
+            localStorage.setItem('token', newToken);
+            // Update Zustand store
+            useAuthStore.setState({ token: newToken });
+            // Resolve with new token
+            resolve(newToken);
+          } else {
+            reject(new Error('Invalid refresh response'));
+          }
+        } catch (refreshError) {
+          // Refresh failed, logout user
+          try {
+            await useAuthStore.getState().logout();
+          } catch (logoutError) {
+            console.warn('Logout during refresh error failed:', logoutError?.message);
+          }
+          reject(refreshError);
+        } finally {
+          // Reset refresh state
+          isRefreshing = false;
+          refreshPromise = null;
+        }
+      });
+
+      return refreshPromise.then(
+        (newToken) => {
+          // Update original request with new token and retry
+          if (newToken) {
+            originalRequest.headers.Authorization = `Bearer ${newToken}`;
+          }
+          return apiClient(originalRequest);
+        },
+        () => {
+          // Refresh failed, reject original request
+          return Promise.reject(error);
+        },
+      );
     }
+
     return Promise.reject(error);
   },
 );

@@ -275,16 +275,54 @@ const useAuthStore = create((set, get) => ({
     }
   },
 
-  // Logout
-  logout: () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    set({
-      user: null,
-      token: null,
-      isAuthenticated: false,
-      error: null,
-    });
+  // Logout — call server endpoint and clear all auth state
+  logout: async () => {
+    try {
+      // Call logout endpoint for server-side cleanup (best effort, don't fail if endpoint unreachable)
+      try {
+        await api.post('/auth/logout');
+      } catch (err) {
+        // Log error but continue with client-side cleanup
+        console.warn('Logout endpoint call failed:', err?.message);
+      }
+
+      // Clear all auth-related localStorage items
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      localStorage.removeItem('authToken');
+
+      // Update Zustand state
+      set({
+        user: null,
+        token: null,
+        isAuthenticated: false,
+        error: null,
+      });
+
+      // Notify service worker to clear caches (PWA support)
+      if ('serviceWorker' in navigator) {
+        try {
+          navigator.serviceWorker.controller?.postMessage({
+            type: 'CLEAR_CACHE_ON_LOGOUT',
+          });
+        } catch (err) {
+          console.warn('Failed to notify service worker:', err?.message);
+        }
+      }
+
+      return { success: true };
+    } catch (error) {
+      // Even if something fails, ensure state is cleared
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      set({
+        user: null,
+        token: null,
+        isAuthenticated: false,
+        error: null,
+      });
+      return { success: false, message: error?.message };
+    }
   },
 
   // Update user profile

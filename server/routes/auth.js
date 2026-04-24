@@ -644,4 +644,137 @@ router.put('/phone', authenticateToken, async (req, res) => {
   }
 });
 
+// Logout endpoint — clear httpOnly cookie and optionally revoke session
+router.post('/logout', authenticateToken, async (req, res) => {
+  try {
+    // Clear the httpOnly cookie by setting maxAge to 0
+    res.clearCookie('authToken', {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      path: '/',
+    });
+
+    res.json({
+      success: true,
+      message: 'Logged out successfully',
+    });
+  } catch (error) {
+    logApiError(req, 'auth_logout_failed', error);
+    return jsonClientError(res, req, 500, {
+      message: 'Server error during logout',
+      errorCode: 'AUTH_LOGOUT_FAILED',
+    });
+  }
+});
+
+// Token refresh endpoint — issue new token with fresh expiration
+router.post('/refresh', async (req, res) => {
+  try {
+    let token = null;
+
+    // Try to get token from Authorization header first
+    const authHeader = req.headers['authorization'];
+    if (authHeader && authHeader.split(' ')[1]) {
+      token = authHeader.split(' ')[1];
+    }
+
+    // Fall back to httpOnly cookie if no Authorization header
+    if (!token) {
+      token = req.cookies?.authToken;
+    }
+
+    if (!token) {
+      return res.status(401).json({
+        success: false,
+        message: 'Token required for refresh',
+      });
+    }
+
+    // Verify token signature (allows expired tokens)
+    let decoded;
+    try {
+      decoded = jwt.verify(token, getJwtSecret());
+    } catch (error) {
+      // For expired tokens, we can still use jwt.decode to get the payload
+      if (error.name === 'TokenExpiredError') {
+        decoded = jwt.decode(token);
+      } else {
+        return res.status(401).json({
+          success: false,
+          message: 'Invalid token',
+        });
+      }
+    }
+
+    if (!decoded || !decoded.id) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid token payload',
+      });
+    }
+
+    // Fetch fresh user data and verify token_version (allows session revocation)
+    const userResult = await dbQuery(
+      'SELECT id, phone, name, is_admin, token_version FROM users WHERE id = $1',
+      [decoded.id],
+    );
+
+    if (userResult.rows.length === 0) {
+      res.clearCookie('authToken', {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        path: '/',
+      });
+      return res.status(401).json({
+        success: false,
+        message: 'User not found',
+      });
+    }
+
+    const user = userResult.rows[0];
+    const tokenVersion = Number.isFinite(decoded.token_version) ? decoded.token_version : 0;
+    const currentTokenVersion = Number.isFinite(user.token_version) ? user.token_version : 0;
+
+    // If token_version doesn't match, session was revoked
+    if (tokenVersion !== currentTokenVersion) {
+      res.clearCookie('authToken', {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        path: '/',
+      });
+      return res.status(401).json({
+        success: false,
+        message: 'Session expired. Please login again.',
+      });
+    }
+
+    // Issue new token
+    const newToken = issueAuthToken(user);
+    setAuthCookie(res, newToken);
+
+    res.json({
+      success: true,
+      message: 'Token refreshed successfully',
+      data: {
+        token: newToken,
+        user: {
+          id: user.id,
+          phone: user.phone,
+          name: user.name,
+          is_admin: user.is_admin,
+        },
+      },
+    });
+  } catch (error) {
+    logApiError(req, 'auth_refresh_failed', error);
+    return jsonClientError(res, req, 500, {
+      message: 'Server error during token refresh',
+      errorCode: 'AUTH_REFRESH_FAILED',
+    });
+  }
+});
+
 module.exports = router;
