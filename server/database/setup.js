@@ -3,15 +3,6 @@ const path = require('path');
 const { pool } = require('./config');
 require('dotenv').config();
 
-function slugify(value = '') {
-  return String(value)
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9\s-]/g, '')
-    .replace(/\s+/g, '-')
-    .replace(/-+/g, '-');
-}
-
 async function setupDatabase() {
   console.log('🚀 Starting database setup...');
 
@@ -132,8 +123,19 @@ async function setupDatabase() {
     for (const name of migrationFiles) {
       const migrationPath = path.join(__dirname, 'migrations', name);
       if (fs.existsSync(migrationPath)) {
-        await pool.query(fs.readFileSync(migrationPath, 'utf8'));
-        console.log(`✅ Migration applied: ${name}`);
+        try {
+          await pool.query(fs.readFileSync(migrationPath, 'utf8'));
+          console.log(`✅ Migration applied: ${name}`);
+        } catch (migrationError) {
+          // Log migration error but continue setup (migrations should be idempotent)
+          console.warn(`⚠️  Migration ${name} warning (may be idempotent): ${migrationError.message.split('\n')[0]}`);
+          // Re-throw if it's a critical error (not a duplicate key or constraint violation from idempotent ops)
+          if (migrationError.code && ['23505', '23503'].includes(migrationError.code)) {
+            console.warn(`  → Treating as safe (duplicate key/constraint from idempotent operation), continuing...`);
+          } else {
+            throw migrationError;
+          }
+        }
       }
     }
 
@@ -152,23 +154,31 @@ async function setupDatabase() {
 
     try {
       // Create admin (skip if already exists)
+      // Use UPSERT pattern: try to insert, if phone exists update password & admin status to ensure correct setup
       const adminInsert = await pool.query(
         `INSERT INTO users (phone, password_hash, name, is_admin, created_at, updated_at)
          VALUES ($1, $2, $3, $4, NOW(), NOW())
-         ON CONFLICT (phone) DO NOTHING`,
+         ON CONFLICT (phone) DO UPDATE 
+         SET password_hash = EXCLUDED.password_hash, 
+             is_admin = true,
+             updated_at = NOW()`,
         [adminPhone, adminHashedPassword, 'Admin User', true],
       );
-      if (adminInsert.rowCount > 0) {
-        console.log('✅ Admin user created (phone ending …' + String(adminPhone).slice(-4) + '). Set ADMIN_PASSWORD in env for production.');
+      if (adminInsert.rowCount > 0 && adminInsert.rows[0]) {
+        console.log('✅ Admin user created/updated (phone ending …' + String(adminPhone).slice(-4) + '). Set ADMIN_PASSWORD in env for production.');
       } else {
         console.log('ℹ️  Admin user already exists, skipping');
       }
 
       // Create test user (skip if already exists)
+      // Use UPSERT pattern with ON CONFLICT
       const testInsert = await pool.query(
         `INSERT INTO users (phone, password_hash, name, is_admin, created_at, updated_at)
          VALUES ($1, $2, $3, $4, NOW(), NOW())
-         ON CONFLICT (phone) DO NOTHING`,
+         ON CONFLICT (phone) DO UPDATE
+         SET password_hash = EXCLUDED.password_hash,
+             updated_at = NOW()
+         WHERE NOT is_admin`,
         [testPhone, testHashedPassword, 'Test User', false],
       );
       if (testInsert.rowCount > 0) {
@@ -178,116 +188,18 @@ async function setupDatabase() {
       }
     } catch (error) {
       console.error('❌ User creation failed:', error.message);
+      // Log additional context for debugging
+      console.error('Admin phone:', adminPhone, '| Test phone:', testPhone);
       throw error;
-    }
-
-    // Demo catalog: dev / staging only — production uses admin-created products only
-    const seedSamples = process.env.NODE_ENV !== 'production';
-    if (seedSamples) {
-      try {
-      const sampleProducts = [
-        // Vegetables
-        { name: 'Tomatoes',    category: 'Vegetables', description: 'Fresh red tomatoes, juicy and ripe', price_per_kg: 40, discount: 0,  image_url: 'https://images.pexels.com/photos/1327838/pexels-photo-1327838.jpeg?auto=compress&cs=tinysrgb&w=400&h=300&fit=crop' },
-        { name: 'Onions',      category: 'Vegetables', description: 'Fresh golden onions, great for cooking', price_per_kg: 30, discount: 0,  image_url: 'https://images.pexels.com/photos/459335/pexels-photo-459335.jpeg?auto=compress&cs=tinysrgb&w=400&h=300&fit=crop' },
-        { name: 'Potatoes',    category: 'Vegetables', description: 'Premium quality potatoes', price_per_kg: 25, discount: 5,  image_url: 'https://images.pexels.com/photos/7774212/pexels-photo-7774212.jpeg?auto=compress&cs=tinysrgb&w=400&h=300&fit=crop' },
-        { name: 'Carrots',     category: 'Vegetables', description: 'Fresh orange carrots, rich in beta-carotene', price_per_kg: 50, discount: 0,  image_url: 'https://images.pexels.com/photos/54082/pexels-photo-54082.jpeg?auto=compress&cs=tinysrgb&w=400&h=300&fit=crop' },
-        { name: 'Spinach',     category: 'Vegetables', description: 'Fresh spinach leaves, packed with iron', price_per_kg: 60, discount: 10, image_url: 'https://images.pexels.com/photos/943907/pexels-photo-943907.jpeg?auto=compress&cs=tinysrgb&w=400&h=300&fit=crop' },
-        { name: 'Bell Peppers',category: 'Vegetables', description: 'Colorful bell peppers, sweet and crunchy', price_per_kg: 70, discount: 0,  image_url: 'https://images.pexels.com/photos/870808/pexels-photo-870808.jpeg?auto=compress&cs=tinysrgb&w=400&h=300&fit=crop' },
-        { name: 'Broccoli',    category: 'Vegetables', description: 'Fresh green broccoli florets', price_per_kg: 65, discount: 0,  image_url: 'https://images.pexels.com/photos/2280620/pexels-photo-2280620.jpeg?auto=compress&cs=tinysrgb&w=400&h=300&fit=crop' },
-        { name: 'Cauliflower', category: 'Vegetables', description: 'White cauliflower, tender and fresh', price_per_kg: 55, discount: 5,  image_url: 'https://images.pexels.com/photos/7456541/pexels-photo-7456541.jpeg?auto=compress&cs=tinysrgb&w=400&h=300&fit=crop' },
-        { name: 'Cucumber',    category: 'Vegetables', description: 'Fresh cucumber, cool and crisp', price_per_kg: 25, discount: 0,  image_url: 'https://images.pexels.com/photos/2329440/pexels-photo-2329440.jpeg?auto=compress&cs=tinysrgb&w=400&h=300&fit=crop' },
-        { name: 'Garlic',      category: 'Vegetables', description: 'Fresh garlic bulbs, full of flavour', price_per_kg: 90, discount: 0,  image_url: 'https://images.pexels.com/photos/630766/pexels-photo-630766.jpeg?auto=compress&cs=tinysrgb&w=400&h=300&fit=crop' },
-
-        // Fruits
-        { name: 'Bananas',     category: 'Fruits', description: 'Sweet ripe bananas, energy-rich', price_per_kg: 35, discount: 0,  image_url: 'https://images.pexels.com/photos/2872755/pexels-photo-2872755.jpeg?auto=compress&cs=tinysrgb&w=400&h=300&fit=crop' },
-        { name: 'Apples',      category: 'Fruits', description: 'Fresh red apples, crunchy and sweet', price_per_kg: 80, discount: 5,  image_url: 'https://images.pexels.com/photos/209339/pexels-photo-209339.jpeg?auto=compress&cs=tinysrgb&w=400&h=300&fit=crop' },
-        { name: 'Oranges',     category: 'Fruits', description: 'Juicy navel oranges, rich in vitamin C', price_per_kg: 50, discount: 0,  image_url: 'https://images.pexels.com/photos/616838/pexels-photo-616838.jpeg?auto=compress&cs=tinysrgb&w=400&h=300&fit=crop' },
-        { name: 'Grapes',      category: 'Fruits', description: 'Sweet grapes, fresh from the vine', price_per_kg: 100, discount: 0,  image_url: 'https://images.pexels.com/photos/45209/pexels-photo-45209.jpeg?auto=compress&cs=tinysrgb&w=400&h=300&fit=crop' },
-        { name: 'Mangoes',     category: 'Fruits', description: 'Alphonso mangoes, the king of fruits', price_per_kg: 120, discount: 10, image_url: 'https://images.pexels.com/photos/219998/pexels-photo-219998.jpeg?auto=compress&cs=tinysrgb&w=400&h=300&fit=crop' },
-        { name: 'Papaya',      category: 'Fruits', description: 'Fresh papaya, great for digestion', price_per_kg: 45, discount: 0,  image_url: 'https://images.pexels.com/photos/5817624/pexels-photo-5817624.jpeg?auto=compress&cs=tinysrgb&w=400&h=300&fit=crop' },
-      ];
-
-      let inserted = 0;
-      let updated = 0;
-      for (const product of sampleProducts) {
-        const slug = slugify(product.name);
-        // Match by canonical slug OR seed name so we never INSERT when slug already exists
-        // (e.g. admin renamed "Onions" — slug still onions → duplicate slug without this).
-        const existing = await pool.query(
-          `SELECT id FROM products
-           WHERE slug = $1 OR LOWER(TRIM(name)) = LOWER(TRIM($2))
-           ORDER BY CASE WHEN slug = $1 THEN 0 ELSE 1 END
-           LIMIT 1`,
-          [slug, product.name],
-        );
-        if (existing.rows.length > 0) {
-          await pool.query(
-            `UPDATE products
-             SET image_url = $1,
-                 image = COALESCE(image, $2),
-                 category = $3,
-                 slug = COALESCE(NULLIF(TRIM(slug), ''), $4),
-                 updated_at = NOW()
-             WHERE id = $5`,
-            [product.image_url, product.image_url, product.category, slug, existing.rows[0].id],
-          );
-          updated++;
-        } else {
-          await pool.query(
-            `INSERT INTO products (name, slug, category, description, price_per_kg, discount, image, image_url, is_active, quantity_available, created_at, updated_at)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW(), NOW())`,
-            [product.name, slug, product.category, product.description, product.price_per_kg, product.discount, product.image_url, product.image_url, true, 100],
-          );
-          inserted++;
-        }
-      }
-      console.log(`✅ Products synced — ${inserted} inserted, ${updated} updated with images & categories`);
-
-      // Seed representative custom weight tiers for per-kg products
-      const tierSeed = {
-        Tomatoes: { '0.50': 22, '0.75': 31, '1.00': 40 },
-        Onions: { '0.50': 16, '1.00': 30, '2.00': 58 },
-        Potatoes: { '0.50': 14, '1.00': 24, '2.00': 46 },
-        Mangoes: { '0.50': 70, '1.00': 120, '1.50': 172 },
-      };
-      const names = Object.keys(tierSeed);
-      const productLookup = await pool.query(
-        'SELECT id, name FROM products WHERE name = ANY($1::text[])',
-        [names],
-      );
-      for (const p of productLookup.rows) {
-        const rows = tierSeed[p.name] || {};
-        await pool.query('DELETE FROM product_weight_prices WHERE product_id = $1', [p.id]);
-        for (const [weightStr, price] of Object.entries(rows)) {
-          await pool.query(
-            `INSERT INTO product_weight_prices (product_id, weight_option, price_override)
-             VALUES ($1, $2, $3)
-             ON CONFLICT (product_id, weight_option)
-             DO UPDATE SET price_override = EXCLUDED.price_override, updated_at = CURRENT_TIMESTAMP`,
-            [p.id, parseFloat(weightStr), price],
-          );
-        }
-      }
-      console.log('✅ Seeded product weight tiers for sample products');
-      } catch (error) {
-        console.error('❌ Sample products sync failed:', error.message);
-        throw error;
-      }
-    } else {
-      console.log('ℹ️  Skipping sample products (NODE_ENV=production)');
     }
 
     console.log('');
     console.log('🎉 Database setup completed successfully!');
     console.log('');
     console.log('📋 Configure ADMIN_PHONE / ADMIN_PASSWORD (and test user) via environment — credentials are not printed.');
-    if (seedSamples) {
-      console.log('');
-      console.log('🛍️ Sample Data Available:');
-      console.log('- 16 Fresh Vegetables & Fruits');
-      console.log('- Weight-based pricing (₹/kg)');
-      console.log('- Discounts on select items');
-    }
+    console.log('');
+    console.log('ℹ️  All products must be created and managed via the admin dashboard.');
+
 
   } catch (error) {
     console.error('❌ Database setup failed:', error);

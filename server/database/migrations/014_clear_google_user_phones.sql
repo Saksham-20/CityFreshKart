@@ -5,16 +5,39 @@
 
 BEGIN;
 
--- Update all Google-authenticated users to have a unique placeholder phone
 -- Generates unique sequential placeholders: 0000000001, 0000000002, etc.
--- Only updates if not already a placeholder (idempotent - safe to run multiple times)
+-- Uses ROW_NUMBER() to ensure uniqueness
+-- Idempotent: only updates Google users without placeholder phones
+-- Offset by existing highest placeholder to avoid conflicts
+
+-- Find the max existing placeholder number
+WITH placeholder_stats AS (
+  SELECT COALESCE(
+    MAX(
+      CASE 
+        WHEN phone ~ '^0{0,9}\d{1,10}$' AND phone LIKE '0000000%'
+        THEN CAST(LPAD(phone, 10, '0') AS BIGINT)
+        ELSE 0
+      END
+    ), 
+    0
+  ) as max_num
+  FROM users
+  WHERE phone LIKE '0000000%'
+),
+-- Get Google users that need placeholder phones
+users_to_update AS (
+  SELECT 
+    id,
+    ROW_NUMBER() OVER (ORDER BY id) + (SELECT max_num FROM placeholder_stats) as seq_num
+  FROM users
+  WHERE google_uid IS NOT NULL
+    AND (phone IS NULL OR (phone NOT LIKE '0000000%'))
+)
 UPDATE users u
-SET phone = LPAD((
-  SELECT COUNT(*) FROM users WHERE google_uid IS NOT NULL AND id <= u.id
-)::text, 10, '0'),
+SET phone = LPAD(utu.seq_num::text, 10, '0'),
     updated_at = CURRENT_TIMESTAMP
-WHERE google_uid IS NOT NULL
-  AND phone IS NOT NULL
-  AND phone NOT LIKE '0000000%';
+FROM users_to_update utu
+WHERE u.id = utu.id;
 
 COMMIT;
