@@ -139,64 +139,10 @@ async function setupDatabase() {
       }
     }
 
-    // Create users
-    const bcrypt = require('bcryptjs');
-    
-    // Admin user
-    const adminPhone = process.env.ADMIN_PHONE || '9999999999';
-    const adminPassword = process.env.ADMIN_PASSWORD || 'admin123';
-    const adminHashedPassword = await bcrypt.hash(adminPassword, 10);
-    
-    // Test user (for Playwright tests)
-    const testPhone = '9876543210';
-    const testPassword = 'password123';
-    const testHashedPassword = await bcrypt.hash(testPassword, 10);
-
-    try {
-      // Create admin (skip if already exists)
-      // Use UPSERT pattern: try to insert, if phone exists update password & admin status to ensure correct setup
-      const adminInsert = await pool.query(
-        `INSERT INTO users (phone, password_hash, name, is_admin, created_at, updated_at)
-         VALUES ($1, $2, $3, $4, NOW(), NOW())
-         ON CONFLICT (phone) DO UPDATE 
-         SET password_hash = EXCLUDED.password_hash, 
-             is_admin = true,
-             updated_at = NOW()`,
-        [adminPhone, adminHashedPassword, 'Admin User', true],
-      );
-      if (adminInsert.rowCount > 0 && adminInsert.rows[0]) {
-        console.log('✅ Admin user created/updated (phone ending …' + String(adminPhone).slice(-4) + '). Set ADMIN_PASSWORD in env for production.');
-      } else {
-        console.log('ℹ️  Admin user already exists, skipping');
-      }
-
-      // Create test user (skip if already exists)
-      // Use UPSERT pattern with ON CONFLICT
-      const testInsert = await pool.query(
-        `INSERT INTO users (phone, password_hash, name, is_admin, created_at, updated_at)
-         VALUES ($1, $2, $3, $4, NOW(), NOW())
-         ON CONFLICT (phone) DO UPDATE
-         SET password_hash = EXCLUDED.password_hash,
-             updated_at = NOW()
-         WHERE NOT is_admin`,
-        [testPhone, testHashedPassword, 'Test User', false],
-      );
-      if (testInsert.rowCount > 0) {
-        console.log('✅ Test user created for Playwright (phone …' + String(testPhone).slice(-4) + '). Use TEST_PASSWORD from env in CI if set.');
-      } else {
-        console.log('ℹ️  Test user already exists, skipping');
-      }
-    } catch (error) {
-      console.error('❌ User creation failed:', error.message);
-      // Log additional context for debugging
-      console.error('Admin phone:', adminPhone, '| Test phone:', testPhone);
-      throw error;
-    }
-
     console.log('');
     console.log('🎉 Database setup completed successfully!');
     console.log('');
-    console.log('📋 Configure ADMIN_PHONE / ADMIN_PASSWORD (and test user) via environment — credentials are not printed.');
+    console.log('📋 User accounts are managed manually via admin tooling/database scripts.');
     console.log('');
     console.log('ℹ️  All products must be created and managed via the admin dashboard.');
 
