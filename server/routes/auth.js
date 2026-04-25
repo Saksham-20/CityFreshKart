@@ -25,14 +25,28 @@ const dbQuery = async (text, params) => {
   return pool.query(text, params);
 };
 
-const setAuthCookie = (res, token) => {
-  res.cookie('authToken', token, {
+const getAuthCookieOptions = (maxAge) => {
+  const options = {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'strict',
-    maxAge: 7 * 24 * 60 * 60 * 1000,
     path: '/',
-  });
+  };
+
+  const configuredDomain = process.env.AUTH_COOKIE_DOMAIN && process.env.AUTH_COOKIE_DOMAIN.trim();
+  if (configuredDomain && process.env.NODE_ENV === 'production') {
+    options.domain = configuredDomain.startsWith('.') ? configuredDomain : `.${configuredDomain}`;
+  }
+
+  if (Number.isFinite(maxAge)) {
+    options.maxAge = maxAge;
+  }
+
+  return options;
+};
+
+const setAuthCookie = (res, token) => {
+  res.cookie('authToken', token, getAuthCookieOptions(7 * 24 * 60 * 60 * 1000));
 };
 
 const issueAuthToken = (user) => jwt.sign(
@@ -648,12 +662,7 @@ router.put('/phone', authenticateToken, async (req, res) => {
 router.post('/logout', authenticateToken, async (req, res) => {
   try {
     // Clear the httpOnly cookie by setting maxAge to 0
-    res.clearCookie('authToken', {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      path: '/',
-    });
+    res.clearCookie('authToken', getAuthCookieOptions());
 
     res.json({
       success: true,
@@ -721,12 +730,7 @@ router.post('/refresh', async (req, res) => {
     );
 
     if (userResult.rows.length === 0) {
-      res.clearCookie('authToken', {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict',
-        path: '/',
-      });
+      res.clearCookie('authToken', getAuthCookieOptions());
       return res.status(401).json({
         success: false,
         message: 'User not found',
@@ -739,12 +743,7 @@ router.post('/refresh', async (req, res) => {
 
     // If token_version doesn't match, session was revoked
     if (tokenVersion !== currentTokenVersion) {
-      res.clearCookie('authToken', {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict',
-        path: '/',
-      });
+      res.clearCookie('authToken', getAuthCookieOptions());
       return res.status(401).json({
         success: false,
         message: 'Session expired. Please login again.',
