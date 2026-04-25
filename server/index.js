@@ -61,12 +61,36 @@ if (process.env.NODE_ENV === 'production') {
 // Middleware - order matters! CORS should be first
 app.use(compression());
 
+function getOriginVariants(originUrl) {
+  if (!originUrl) return [];
+
+  try {
+    const parsed = new URL(originUrl);
+    const variants = new Set();
+    const makeOrigin = (host) => `${parsed.protocol}//${host}${parsed.port ? `:${parsed.port}` : ''}`;
+
+    variants.add(makeOrigin(parsed.hostname));
+    if (parsed.hostname.startsWith('www.')) {
+      variants.add(makeOrigin(parsed.hostname.slice(4)));
+    } else {
+      variants.add(makeOrigin(`www.${parsed.hostname}`));
+    }
+
+    return [...variants];
+  } catch {
+    // Keep original value if parsing fails (e.g. malformed env value)
+    return [originUrl];
+  }
+}
+
+const productionAllowedOrigins = process.env.NODE_ENV === 'production'
+  ? [...new Set([process.env.CLIENT_URL, process.env.CORS_ORIGIN].flatMap(getOriginVariants).filter(Boolean))]
+  : ['*'];
+
 // CORS configuration
 const corsOptions = {
   origin: (origin, callback) => {
-    const allowedOrigins = process.env.NODE_ENV === 'production'
-      ? [process.env.CLIENT_URL, process.env.CORS_ORIGIN].filter(Boolean)
-      : ['*'];
+    const allowedOrigins = productionAllowedOrigins;
     
     // Allow requests with no origin (same-origin) or from allowed origins
     // Important: Android browsers may send requests without origin header
