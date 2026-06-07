@@ -170,7 +170,7 @@ const CartPage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-surface pt-14 pb-[12rem] sm:pb-36">
+    <div className="min-h-screen bg-surface pt-14 pb-[15rem] md:pb-36">
       <div className="max-w-lg mx-auto px-0 sm:px-4 py-3 sm:py-4">
 
         {/* Delivery info banner */}
@@ -263,7 +263,7 @@ const CartPage = () => {
                         <button
                           type="button"
                           onClick={() => handleDecreaseGroup(group)}
-                          className="w-7 h-6 flex items-center justify-center text-on-primary text-sm font-bold hover:opacity-90 transition-opacity"
+                          className="w-9 h-8 flex items-center justify-center text-on-primary text-base font-bold hover:opacity-90 transition-opacity"
                           aria-label="Decrease quantity"
                         >
                           −
@@ -274,7 +274,7 @@ const CartPage = () => {
                         <button
                           type="button"
                           onClick={() => handleIncreaseGroup(group)}
-                          className="w-7 h-6 flex items-center justify-center text-on-primary text-sm font-bold hover:opacity-90 transition-opacity"
+                          className="w-9 h-8 flex items-center justify-center text-on-primary text-base font-bold hover:opacity-90 transition-opacity"
                           aria-label="Increase quantity"
                         >
                           +
@@ -305,10 +305,9 @@ const CartPage = () => {
         </div>
       </div>
 
-      {/* Sticky bottom checkout bar */}
+      {/* Sticky bottom checkout bar — sits above the mobile bottom nav (nav is md:hidden) */}
       <div
-        className="fixed bottom-0 left-0 right-0 glass-header border-t border-outline-variant/10 px-4 pt-3 pb-5 z-50 shadow-editorial"
-        style={{ paddingBottom: 'calc(1.25rem + env(safe-area-inset-bottom))' }}
+        className="fixed bottom-[4.5rem] md:bottom-0 left-0 right-0 glass-header border-t border-outline-variant/10 px-4 pt-3 pb-5 md:pb-[calc(1.25rem+env(safe-area-inset-bottom))] z-50 shadow-editorial"
       >
         {/* Price summary */}
         <div className="flex items-center justify-between mb-3 text-sm">

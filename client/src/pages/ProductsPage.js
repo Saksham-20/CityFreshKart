@@ -337,7 +337,7 @@ const ProductsPage = () => {
                 key={opt.value}
                 type="button"
                 onClick={() => setSortBy(opt.value)}
-                className={`text-xs px-2.5 py-1.5 rounded-lg font-medium transition-colors ${
+                className={`text-xs px-3.5 py-2 min-h-[36px] rounded-lg font-medium transition-colors ${
                   sortBy === opt.value
                     ? 'bg-inverse-surface text-inverse-on-surface'
                     : 'text-on-surface-variant bg-surface-container-low hover:bg-surface-container'

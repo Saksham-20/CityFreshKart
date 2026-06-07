@@ -183,8 +183,8 @@ const OrderDetailPage = () => {
       <div className="min-h-screen bg-surface pt-20 flex items-center justify-center px-4">
         <div className="text-center">
           <div className="text-5xl mb-4">😕</div>
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">Order Not Found</h3>
-          <p className="text-sm text-gray-500 mb-6">{error || 'The order you are looking for does not exist.'}</p>
+          <h3 className="text-lg font-semibold text-on-surface mb-2">Order Not Found</h3>
+          <p className="text-sm text-on-surface-variant mb-6">{error || 'The order you are looking for does not exist.'}</p>
           <button onClick={() => navigate('/orders')}
             className="px-6 py-2 bg-gradient-to-r from-primary to-primary-container text-on-primary rounded-full font-semibold hover:opacity-95 transition-opacity shadow-primary-glow">
             Back to Orders
@@ -209,8 +209,8 @@ const OrderDetailPage = () => {
           </svg>
         </button>
         <div className="flex-1">
-          <h1 className="text-base font-bold text-gray-900">Order #{order.order_number || order.id?.slice(0, 8)}</h1>
-          <p className="text-xs text-gray-500">
+          <h1 className="text-base font-bold text-on-surface">Order #{order.order_number || order.id?.slice(0, 8)}</h1>
+          <p className="text-xs text-on-surface-variant">
             {new Date(order.created_at || order.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
           </p>
         </div>
@@ -222,7 +222,7 @@ const OrderDetailPage = () => {
       {/* Print header — only visible when printing */}
       <div className="hidden print:block px-2 pt-2 pb-2 border-b border-gray-300">
         <h1 className="text-2xl font-bold">CityFreshKart</h1>
-        <p className="text-sm text-gray-600">Order Bill / Receipt</p>
+        <p className="text-sm text-on-surface-variant">Order Bill / Receipt</p>
         <p className="text-sm mt-1"><strong>Order:</strong> #{order.order_number}</p>
         <p className="text-sm"><strong>Date:</strong> {new Date(order.created_at || order.createdAt).toLocaleString('en-IN')}</p>
         <p className="text-sm"><strong>Status:</strong> {STATUS_LABELS[status] || status}</p>
@@ -239,7 +239,7 @@ const OrderDetailPage = () => {
         {/* Items */}
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
           <div className="px-4 py-3 border-b border-gray-100">
-            <h3 className="font-semibold text-gray-900 text-sm">Items ({(order.items || []).length})</h3>
+            <h3 className="font-semibold text-on-surface text-sm">Items ({(order.items || []).length})</h3>
           </div>
           <div className="divide-y divide-gray-100">
             {(order.items || []).map((item, idx) => (
@@ -262,7 +262,7 @@ const OrderDetailPage = () => {
                     {formatOrderLineQuantity(item)} × ₹{(item.price_per_kg || 0).toLocaleString('en-IN')}{unitLabel(item)}
                   </p>
                 </div>
-                <p className="font-semibold text-gray-900 text-sm">
+                <p className="font-semibold text-on-surface text-sm">
                   ₹{(item.total_price || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                 </p>
               </div>
@@ -275,7 +275,7 @@ const OrderDetailPage = () => {
               <span>Subtotal</span>
               <span>₹{(order.subtotal || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
             </div>
-            <div className="flex justify-between text-sm text-gray-600">
+            <div className="flex justify-between text-sm text-on-surface-variant">
               <span>Delivery</span>
               <span className={(order.delivery_fee || 0) === 0 ? 'text-primary font-medium' : ''}>
                 {(order.delivery_fee || 0) === 0 ? 'Free' : `₹${order.delivery_fee}`}
@@ -302,8 +302,8 @@ const OrderDetailPage = () => {
             )}
             <div className="flex gap-6">
               <div>
-                <p className="text-xs font-semibold text-gray-500 uppercase mb-1">Payment</p>
-                <p className="text-sm text-gray-800 capitalize">{order.payment_method || 'N/A'}</p>
+                <p className="text-xs font-semibold text-on-surface-variant uppercase mb-1">Payment</p>
+                <p className="text-sm text-on-surface capitalize">{order.payment_method || 'N/A'}</p>
               </div>
               {order.phone && (
                 <div>
@@ -335,7 +335,7 @@ const OrderDetailPage = () => {
         {/* Actions — hidden on print */}
         <div className="flex flex-wrap gap-3 pb-4 print:hidden">
           <button onClick={handleReorder}
-            className="flex-1 py-3 bg-green-600 text-white font-semibold rounded-xl hover:bg-green-700 transition-colors text-sm">
+            className="flex-1 py-3 bg-primary text-white font-semibold rounded-xl hover:opacity-90 transition-colors text-sm">
             Re-order
           </button>
           <button onClick={handlePrint}

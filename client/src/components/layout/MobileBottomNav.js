@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { FiHome, FiShoppingBag, FiList, FiUser } from 'react-icons/fi';
+import { FiHome, FiShoppingBag, FiList, FiUser, FiUserPlus } from 'react-icons/fi';
 import useAuth from '../../hooks/useAuth';
 import useCart from '../../hooks/useCart';
 
@@ -17,11 +17,9 @@ const MobileBottomNav = () => {
   const isActive = (path) =>
     location.pathname === path || location.pathname.startsWith(path + '/');
 
-  // Don't show on admin or auth pages
+  // Hide only on admin + the focused checkout flow. Stays present everywhere else.
   if (
     location.pathname.startsWith('/admin') ||
-    location.pathname === '/login' ||
-    location.pathname === '/cart' ||
     location.pathname === '/checkout'
   ) {
     return null;
@@ -67,31 +65,47 @@ const MobileBottomNav = () => {
           <span className="text-xs mt-0.5 font-medium">Cart</span>
         </Link>
 
-        {/* Orders */}
-        <Link
-          to="/orders"
-          className={`flex flex-col items-center py-2 px-3 rounded-xl transition-all duration-200 ${
-            isActive('/orders')
-              ? 'text-primary bg-secondary-container/35'
-              : 'text-on-surface-variant hover:text-primary hover:bg-secondary-container/20'
-          }`}
-        >
-          <FiList size={21} strokeWidth={isActive('/orders') ? 2.5 : 1.75} />
-          <span className="text-xs mt-0.5 font-medium">Orders</span>
-        </Link>
+        {/* Orders — logged in only */}
+        {isAuthenticated && (
+          <Link
+            to="/orders"
+            className={`flex flex-col items-center py-2 px-3 rounded-xl transition-all duration-200 ${
+              isActive('/orders')
+                ? 'text-primary bg-secondary-container/35'
+                : 'text-on-surface-variant hover:text-primary hover:bg-secondary-container/20'
+            }`}
+          >
+            <FiList size={21} strokeWidth={isActive('/orders') ? 2.5 : 1.75} />
+            <span className="text-xs mt-0.5 font-medium">Orders</span>
+          </Link>
+        )}
 
-        {/* Account / Profile */}
-        <Link
-          to={isAuthenticated ? '/profile' : '/login'}
-          className={`flex flex-col items-center py-2 px-3 rounded-xl transition-all duration-200 ${
-            isActive('/profile')
-              ? 'text-primary bg-secondary-container/35'
-              : 'text-on-surface-variant hover:text-primary hover:bg-secondary-container/20'
-          }`}
-        >
-          <FiUser size={21} strokeWidth={isActive('/profile') ? 2.5 : 1.75} />
-          <span className="text-xs mt-0.5 font-medium">{isAuthenticated ? 'Profile' : 'Login'}</span>
-        </Link>
+        {/* Account: Profile when logged in, Sign up when not */}
+        {isAuthenticated ? (
+          <Link
+            to="/profile"
+            className={`flex flex-col items-center py-2 px-3 rounded-xl transition-all duration-200 ${
+              isActive('/profile')
+                ? 'text-primary bg-secondary-container/35'
+                : 'text-on-surface-variant hover:text-primary hover:bg-secondary-container/20'
+            }`}
+          >
+            <FiUser size={21} strokeWidth={isActive('/profile') ? 2.5 : 1.75} />
+            <span className="text-xs mt-0.5 font-medium">Profile</span>
+          </Link>
+        ) : (
+          <Link
+            to="/login"
+            className={`flex flex-col items-center py-2 px-3 rounded-xl transition-all duration-200 ${
+              location.pathname === '/login'
+                ? 'text-primary bg-secondary-container/35'
+                : 'text-on-surface-variant hover:text-primary hover:bg-secondary-container/20'
+            }`}
+          >
+            <FiUserPlus size={21} strokeWidth={location.pathname === '/login' ? 2.5 : 1.75} />
+            <span className="text-xs mt-0.5 font-medium">Sign up</span>
+          </Link>
+        )}
       </div>
     </nav>
   );

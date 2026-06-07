@@ -172,7 +172,23 @@ function App() {
         </Routes>
       </Suspense>
       <FloatingOverlays />
-      <Toaster />
+      <Toaster
+        position="top-center"
+        toastOptions={{
+          duration: 3000,
+          style: {
+            background: '#ffffff',
+            color: '#191c1e',
+            borderRadius: '1rem',
+            boxShadow: '0 8px 32px -8px rgba(0,108,73,0.18)',
+            fontSize: '0.875rem',
+            fontWeight: 600,
+            padding: '0.75rem 1rem',
+          },
+          success: { iconTheme: { primary: '#006c49', secondary: '#ffffff' } },
+          error: { iconTheme: { primary: '#a43a3a', secondary: '#ffffff' } },
+        }}
+      />
     </Router>
   );
 }

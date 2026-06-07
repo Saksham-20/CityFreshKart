@@ -5,6 +5,7 @@ import Button from '../components/ui/Button';
 import Modal from '../components/ui/Modal';
 import Loading from '../components/ui/Loading';
 import Breadcrumb from '../components/common/Breadcrumb';
+import BackButton from '../components/common/BackButton';
 import api from '../services/api';
 import toast from 'react-hot-toast';
 import { addressService } from '../services/addressService';
@@ -442,7 +443,10 @@ const ProfilePage = () => {
 
       <div className="min-h-screen bg-surface pt-14 pb-24 md:pb-8">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
-          <Breadcrumb />
+          <div className="flex items-center gap-1 mb-1">
+            <BackButton to="/" label="Back to shopping" />
+            <Breadcrumb />
+          </div>
 
           {/* Page Header */}
           <div className="mb-8">

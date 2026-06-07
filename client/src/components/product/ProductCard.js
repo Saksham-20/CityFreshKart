@@ -12,7 +12,7 @@ import {
 const KG_OPTIONS = [0.5, 1];
 const PIECE_OPTIONS = [1, 2, 3, 4];
 
-const ProductCard = React.memo(({ product, className = '', highlightFlash = false }) => {
+const ProductCard = React.memo(({ product, className = '', highlightFlash = false, priority = false }) => {
   const { addToCart, removeFromCart, items: cartItems, updateItemQuantity, adjustPackCount } = useCart();
 
   const isPerPiece = product.pricing_type === 'per_piece';
@@ -164,7 +164,8 @@ const ProductCard = React.memo(({ product, className = '', highlightFlash = fals
           width={IMAGE_DIMS.productSquare.width}
           height={IMAGE_DIMS.productSquare.height}
           className="w-full h-full object-cover product-image-offset group-hover:scale-105 transition-transform duration-300"
-          loading="lazy"
+          loading={priority ? 'eager' : 'lazy'}
+          fetchpriority={priority ? 'high' : 'auto'}
           decoding="async"
           sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
           onError={(e) => {

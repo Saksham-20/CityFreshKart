@@ -11,6 +11,8 @@ const LazyImage = ({
     alt,
     className = '',
     placeholderColor = '#f0fdf4',
+    width = IMAGE_DIMS.productSquare.width,
+    height = IMAGE_DIMS.productSquare.height,
     ...props
 }) => {
     const [isLoaded, setIsLoaded] = useState(false);

@@ -4,6 +4,7 @@ import { orderService } from '../services/orderService';
 import Button from '../components/ui/Button';
 import Loading from '../components/ui/Loading';
 import Breadcrumb from '../components/common/Breadcrumb';
+import BackButton from '../components/common/BackButton';
 import { formatCurrency as formatPrice } from '../utils/formatters';
 
 const OrdersPage = () => {
@@ -87,7 +88,10 @@ const OrdersPage = () => {
     <>
       <div className="min-h-screen bg-surface pt-14 pb-24 md:pb-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
-          <Breadcrumb />
+          <div className="flex items-center gap-1 mb-1">
+            <BackButton to="/" label="Back to shopping" />
+            <Breadcrumb />
+          </div>
         
         {/* Page Header */}
         <div className="mb-6">
@@ -142,7 +146,7 @@ const OrdersPage = () => {
                       <h3 className="text-lg font-headline font-semibold text-on-surface">
                         Order #{order.order_number || order.id}
                       </h3>
-                      <p className="text-sm text-gray-500 mt-1">
+                      <p className="text-sm text-on-surface-variant mt-1">
                         {new Date(order.created_at || order.createdAt).toLocaleDateString('en-IN', {
                           day: 'numeric',
                           month: 'short',
@@ -171,8 +175,8 @@ const OrdersPage = () => {
                       </p>
                     </div>
                     <div>
-                      <p className="text-xs text-gray-500 uppercase font-semibold">Payment</p>
-                      <p className="text-sm font-medium text-gray-900 mt-1">
+                      <p className="text-xs text-on-surface-variant uppercase font-semibold">Payment</p>
+                      <p className="text-sm font-medium text-on-surface mt-1">
                         {order.payment_method || 'Unknown'}
                       </p>
                     </div>
@@ -254,7 +258,7 @@ const OrdersPage = () => {
             <button
               onClick={() => setPage(Math.max(1, page - 1))}
               disabled={page === 1}
-              className="px-4 py-2 rounded-lg border border-gray-200 text-gray-700 font-medium hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-4 py-2 rounded-lg border border-gray-200 text-on-surface font-medium hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Previous
             </button>

@@ -5,6 +5,7 @@ import { Navigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../store/useAuthStore';
 import { getSafeReturnPath } from '../utils/safeReturnPath';
 import { FiCheckCircle, FiClock, FiTruck } from 'react-icons/fi';
+import BackButton from '../components/common/BackButton';
 
 const TRUST_FEATURES = [
   { icon: FiCheckCircle, title: 'Farm-to-Door Freshness', desc: 'Sourced directly from local farms every morning' },
@@ -76,7 +77,10 @@ const LoginPage = () => {
       </div>
 
       {/* Right Form Panel */}
-      <div className="flex-1 flex flex-col justify-center items-center bg-surface px-6 py-12 sm:px-12">
+      <div className="relative flex-1 flex flex-col justify-center items-center bg-surface px-6 py-12 sm:px-12">
+        {/* Close — return to browsing so users aren't trapped on the auth screen */}
+        <BackButton variant="close" to="/" label="Back to shopping" className="absolute top-4 left-4 sm:top-6 sm:left-6 z-10" />
+
         {/* Mobile brand header */}
         <div className="flex lg:hidden flex-col items-center mb-8">
           <img src="/CityFreshKart.png" alt="CityFreshKart" className="h-20 w-auto object-contain mb-3" />
