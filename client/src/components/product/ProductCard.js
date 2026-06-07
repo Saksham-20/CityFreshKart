@@ -1,6 +1,7 @@
 import React, { useMemo, useCallback, useState, useEffect } from 'react';
 import useCart from '../../hooks/useCart';
 import { getImageUrl, IMAGE_DIMS } from '../../utils/imageUtils';
+import { isOutOfStock } from '../../utils/stock';
 import {
   formatWeightDisplay,
   formatCartQuantityLabel,
@@ -68,8 +69,7 @@ const ProductCard = React.memo(({ product, className = '', highlightFlash = fals
   }, 0);
 
   const cartQty = mergedQty;
-  const outOfStock = (product.quantity_available !== undefined && parseFloat(product.quantity_available) <= 0) ||
-                     (product.stock_quantity !== undefined && product.stock_quantity <= 0);
+  const outOfStock = isOutOfStock(product);
 
   const handleAddToCart = useCallback(() => {
     addToCart({
@@ -153,7 +153,7 @@ const ProductCard = React.memo(({ product, className = '', highlightFlash = fals
   return (
     <div
       id={productId ? `product-${productId}` : undefined}
-      className={`group bg-surface-container-lowest rounded-3xl outline outline-1 outline-outline-variant/10 hover:shadow-editorial hover:-translate-y-0.5 transition-all duration-200 overflow-visible flex flex-col shadow-[0_4px_24px_-8px_rgba(0,0,0,0.05)] ${highlightFlash ? 'ring-2 ring-primary ring-offset-2 ring-offset-surface z-[1]' : ''} ${className}`}
+      className={`group bg-surface-container-lowest rounded-3xl outline outline-1 outline-outline-variant/10 hover:shadow-editorial hover:-translate-y-0.5 transition-all duration-200 overflow-visible flex flex-col shadow-[0_4px_24px_-8px_rgba(0,0,0,0.05)] ${outOfStock ? 'opacity-70 saturate-[0.85]' : ''} ${highlightFlash ? 'ring-2 ring-primary ring-offset-2 ring-offset-surface z-[1]' : ''} ${className}`}
     >
 
       {/* Image */}
@@ -229,18 +229,18 @@ const ProductCard = React.memo(({ product, className = '', highlightFlash = fals
               <button
                 type="button"
                 onClick={handleAddToCart}
-                className="w-full flex items-center justify-center gap-1.5 bg-gradient-to-r from-primary to-primary-container hover:opacity-95 active:scale-[0.97] text-on-primary text-xs font-bold py-2.5 rounded-2xl transition-all duration-150 shadow-primary-glow"
+                className="w-full flex items-center justify-center gap-1.5 bg-gradient-to-r from-primary to-primary-container hover:opacity-95 active:scale-[0.97] text-on-primary text-xs font-bold py-3 rounded-2xl transition-all duration-150 shadow-primary-glow min-h-[44px]"
               >
                 <span className="material-symbols-outlined text-[18px]">add_shopping_cart</span>
                 Add to Cart
               </button>
             ) : (
               <div className="flex items-center justify-between bg-gradient-to-r from-primary to-primary-container rounded-2xl overflow-hidden shadow-primary-glow">
-                <button onClick={handleDecrease}
-                  className="w-10 h-9 flex items-center justify-center text-white hover:bg-black/10 active:bg-black/20 transition-colors text-lg font-bold">−</button>
-                <span className="text-white text-xs font-extrabold flex-1 text-center tracking-wide">{cartQtyLabel}</span>
-                <button onClick={handleIncrease}
-                  className="w-10 h-9 flex items-center justify-center text-white hover:bg-black/10 active:bg-black/20 transition-colors text-lg font-bold">+</button>
+                <button onClick={handleDecrease} aria-label="Decrease quantity"
+                  className="w-11 h-11 flex items-center justify-center text-on-primary hover:bg-black/10 active:bg-black/20 transition-colors text-lg font-bold">−</button>
+                <span className="text-on-primary text-xs font-extrabold flex-1 text-center tracking-wide">{cartQtyLabel}</span>
+                <button onClick={handleIncrease} aria-label="Increase quantity"
+                  className="w-11 h-11 flex items-center justify-center text-on-primary hover:bg-black/10 active:bg-black/20 transition-colors text-lg font-bold">+</button>
               </div>
             )}
           </div>

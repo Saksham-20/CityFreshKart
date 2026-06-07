@@ -6,6 +6,7 @@ import PromoCarousel from '../components/product/PromoCarousel';
 import OffersCarousel from '../components/product/OffersCarousel';
 import api from '../services/api';
 import { useCartStore } from '../store/useCartStore';
+import { isOutOfStock } from '../utils/stock';
 
 const DEFAULT_CATEGORY_NAMES = ['Vegetables', 'Fruits', 'Dairy', 'Bakery', 'Grains', 'Herbs & Spices', 'Other'];
 const getCategoryEmoji = (name) => {
@@ -208,7 +209,11 @@ const ProductsPage = () => {
         break;
     }
 
-    setFilteredProducts(filtered);
+    // Push out-of-stock products to the bottom, keeping the chosen sort order within each group.
+    const inStock = filtered.filter((p) => !isOutOfStock(p));
+    const outOfStock = filtered.filter(isOutOfStock);
+
+    setFilteredProducts([...inStock, ...outOfStock]);
   };
 
   return (

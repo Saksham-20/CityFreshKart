@@ -74,7 +74,7 @@ const FloatingOverlays = () => {
 };
 
 function App() {
-  const { isAuthenticated, bootstrapping } = useAuth();
+  const { bootstrapping } = useAuth();
   const initialize = useAuthStore(state => state.initialize);
 
   // Initialize auth and store settings on app load
@@ -159,21 +159,16 @@ function App() {
             )}
           />
 
-          <Route
-            path="/"
-            element={isAuthenticated ? (
-              <MainLayout><ProductsPage /></MainLayout>
-            ) : <Navigate to="/login" replace />}
-          />
+          <Route path="/" element={<MainLayout><ProductsPage /></MainLayout>} />
           <Route path="/products" element={<RedirectPreserveSearch to="/" />} />
-          <Route path="/cart" element={isAuthenticated ? <MainLayout><CartPage /></MainLayout> : <Navigate to="/login" replace />} />
+          <Route path="/cart" element={<MainLayout><CartPage /></MainLayout>} />
           <Route path="/checkout" element={<ProtectedRoute><MainLayout><CheckoutPage /></MainLayout></ProtectedRoute>} />
           <Route path="/payment-confirmation/:orderId" element={<ProtectedRoute><MainLayout><PaymentConfirmationPage /></MainLayout></ProtectedRoute>} />
           <Route path="/orders" element={<ProtectedRoute><MainLayout><OrdersPage /></MainLayout></ProtectedRoute>} />
           <Route path="/orders/:orderId/confirmation" element={<ProtectedRoute><MainLayout><OrderConfirmationPage /></MainLayout></ProtectedRoute>} />
           <Route path="/orders/:orderId" element={<ProtectedRoute><MainLayout><OrderDetailPage /></MainLayout></ProtectedRoute>} />
           <Route path="/profile" element={<ProtectedRoute><MainLayout><ProfilePage /></MainLayout></ProtectedRoute>} />
-          <Route path="*" element={isAuthenticated ? <Navigate to="/" replace /> : <Navigate to="/login" replace />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Suspense>
       <FloatingOverlays />

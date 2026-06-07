@@ -239,7 +239,7 @@ const RegisterForm = ({ onSwitchToLogin }) => {
         <button
           type="submit"
           disabled={isLoading}
-          className="w-full bg-gradient-to-r from-green-600 to-emerald-500 hover:from-green-700 hover:to-emerald-600 active:scale-[0.98] text-white font-bold py-3 rounded-xl text-sm transition-all duration-200 shadow-md hover:shadow-lg mt-2 disabled:opacity-60 disabled:cursor-not-allowed"
+          className="w-full bg-gradient-to-r from-primary to-primary-container hover:opacity-95 active:scale-[0.98] text-on-primary font-bold py-3 rounded-full text-sm transition-all duration-200 shadow-primary-glow mt-2 disabled:opacity-60 disabled:cursor-not-allowed"
         >
           {isLoading ? (
             <span className="flex items-center justify-center gap-2">

@@ -365,7 +365,7 @@ const LoginForm = ({ onSwitchToRegister }) => {
             </div>
             {errors.phone && <p className="text-error text-xs mt-1.5">{errors.phone}</p>}
           </div>
-          <button type="submit" disabled={isLoading} className="w-full bg-gradient-to-r from-primary to-primary-container text-on-primary font-bold py-3 rounded-full text-sm">
+          <button type="submit" disabled={isLoading} className="w-full bg-gradient-to-r from-primary to-primary-container hover:opacity-95 active:scale-[0.98] text-on-primary font-bold py-3 rounded-full text-sm transition-all duration-200 shadow-primary-glow disabled:opacity-60 disabled:cursor-not-allowed">
             {isLoading ? 'Verifying phone...' : 'Continue'}
           </button>
           <button type="button" onClick={() => setAuthMode('login')} className="w-full text-sm text-primary font-semibold hover:underline">
@@ -402,7 +402,7 @@ const LoginForm = ({ onSwitchToRegister }) => {
             </div>
             {errors.email && <p className="text-error text-xs mt-1.5">{errors.email}</p>}
           </div>
-          <button type="submit" disabled={isLoading} className="w-full bg-gradient-to-r from-primary to-primary-container text-on-primary font-bold py-3 rounded-full text-sm">
+          <button type="submit" disabled={isLoading} className="w-full bg-gradient-to-r from-primary to-primary-container hover:opacity-95 active:scale-[0.98] text-on-primary font-bold py-3 rounded-full text-sm transition-all duration-200 shadow-primary-glow disabled:opacity-60 disabled:cursor-not-allowed">
             {isLoading ? 'Sending OTP...' : 'Send OTP'}
           </button>
           <button type="button" onClick={() => setAuthMode('forgotPhone')} className="w-full text-sm text-primary font-semibold hover:underline">
@@ -432,7 +432,7 @@ const LoginForm = ({ onSwitchToRegister }) => {
             />
             {errors.otp && <p className="text-error text-xs mt-1.5">{errors.otp}</p>}
           </div>
-          <button type="submit" disabled={isLoading} className="w-full bg-gradient-to-r from-primary to-primary-container text-on-primary font-bold py-3 rounded-full text-sm">
+          <button type="submit" disabled={isLoading} className="w-full bg-gradient-to-r from-primary to-primary-container hover:opacity-95 active:scale-[0.98] text-on-primary font-bold py-3 rounded-full text-sm transition-all duration-200 shadow-primary-glow disabled:opacity-60 disabled:cursor-not-allowed">
             {isLoading ? 'Verifying...' : 'Verify OTP'}
           </button>
           <button type="button" onClick={() => setAuthMode('forgotEmail')} className="w-full text-sm text-primary font-semibold hover:underline">
@@ -490,7 +490,7 @@ const LoginForm = ({ onSwitchToRegister }) => {
             </div>
             {errors.confirmPassword && <p className="text-error text-xs mt-1.5">{errors.confirmPassword}</p>}
           </div>
-          <button type="submit" disabled={isLoading} className="w-full bg-gradient-to-r from-primary to-primary-container text-on-primary font-bold py-3 rounded-full text-sm">
+          <button type="submit" disabled={isLoading} className="w-full bg-gradient-to-r from-primary to-primary-container hover:opacity-95 active:scale-[0.98] text-on-primary font-bold py-3 rounded-full text-sm transition-all duration-200 shadow-primary-glow disabled:opacity-60 disabled:cursor-not-allowed">
             {isLoading ? 'Resetting...' : 'Reset Password'}
           </button>
           <button type="button" onClick={() => setAuthMode('login')} className="w-full text-sm text-primary font-semibold hover:underline">

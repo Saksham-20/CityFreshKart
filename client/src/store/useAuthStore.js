@@ -10,30 +10,71 @@ const useAuthStore = create((set, get) => ({
   bootstrapping: true,
   error: null,
 
-  // Initialize auth from localStorage
+  // Initialize auth on app boot — hydrate from localStorage, validate, and
+  // fall back to the httpOnly cookie if localStorage has no session.
   initialize: async () => {
     set({ bootstrapping: true });
     try {
       const token = localStorage.getItem('token');
-      const user = localStorage.getItem('user');
-
-      if (token && user) {
+      const storedUser = localStorage.getItem('user');
+      let parsedUser = null;
+      if (storedUser) {
         try {
-          set({ token, user: JSON.parse(user), isAuthenticated: true });
+          parsedUser = JSON.parse(storedUser);
+        } catch {
+          // Corrupted localStorage entry (manual tamper / partial write) — clear it so
+          // the app self-heals on this load instead of throwing the same error forever.
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+        }
+      }
+
+      if (token && parsedUser) {
+        // Trust the stored session optimistically — Android PWA cold starts can hit a
+        // transient network error on the very first request, and a blip here must not
+        // throw away an otherwise-valid 7-day session (this was the "logged out on
+        // reopen" bug).
+        set({ token, user: parsedUser, isAuthenticated: true });
+        try {
           const response = await api.get('/auth/me', {
             headers: { Authorization: `Bearer ${token}` }
           });
           const meUser = response.data?.data?.user;
-          if (!meUser) {
-            throw new Error('Invalid token');
+          if (meUser) {
+            localStorage.setItem('user', JSON.stringify(meUser));
+            set({ user: meUser, token, isAuthenticated: true });
+          } else {
+            // Server responded but the token doesn't resolve to a user — genuinely invalid.
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            set({ token: null, user: null, isAuthenticated: false });
           }
-          localStorage.setItem('user', JSON.stringify(meUser));
-          set({ user: meUser, token, isAuthenticated: true });
         } catch (error) {
-          localStorage.removeItem('token');
-          localStorage.removeItem('user');
-          set({ token: null, user: null, isAuthenticated: false });
+          const status = error?.response?.status;
+          if (status === 401 || status === 403) {
+            // Real auth rejection — token is invalid/expired/revoked. Log out.
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            set({ token: null, user: null, isAuthenticated: false });
+          }
+          // Network error / timeout / 5xx: keep the optimistic session from localStorage.
+          // We'll re-validate on the next request via the response interceptor's refresh flow.
         }
+        return;
+      }
+
+      // No localStorage session — try recovering via the httpOnly cookie alone
+      // (e.g. localStorage was cleared but a valid authToken cookie remains).
+      try {
+        const response = await api.get('/auth/me');
+        const meUser = response.data?.data?.user;
+        if (meUser) {
+          localStorage.setItem('token', 'authenticated_via_cookie');
+          localStorage.setItem('user', JSON.stringify(meUser));
+          set({ token: 'authenticated_via_cookie', user: meUser, isAuthenticated: true });
+        }
+      } catch (_) {
+        // No cookie session either — proceed as a guest. Not an error.
       }
     } finally {
       set({ bootstrapping: false });

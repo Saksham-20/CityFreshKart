@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import useCart from '../hooks/useCart';
+import useAuth from '../hooks/useAuth';
 import { getImageUrl, getPlaceholderImage, IMAGE_DIMS } from '../utils/imageUtils';
 import {
   formatCartQuantityLabel,
@@ -16,6 +17,7 @@ const PIECE_STEP = 1;
 const CartPage = () => {
   const navigate = useNavigate();
   const { items, removeFromCart, removeProductFromCart, updateItemQuantity, adjustPackCount, calculateSummary } = useCart();
+  const { user } = useAuth();
   const [settingsLoaded, setSettingsLoaded] = useState(false);
   
   // Subscribe to cart store to get fresh settings values
@@ -319,12 +321,17 @@ const CartPage = () => {
             <span className="text-base font-extrabold text-on-surface">₹{total.toFixed(2)}</span>
           </div>
         </div>
+        {!user && (
+          <p className="text-center text-xs text-on-surface-variant mb-2">
+            You&apos;ll need to sign in to place your order — your cart stays right here.
+          </p>
+        )}
         <button
           type="button"
           onClick={() => navigate('/checkout')}
           className="w-full bg-gradient-to-r from-primary to-primary-container hover:opacity-95 text-on-primary font-bold py-3.5 rounded-full text-base transition-opacity shadow-primary-glow"
         >
-          Proceed to Checkout →
+          {user ? 'Proceed to Checkout →' : 'Sign In to Checkout →'}
         </button>
       </div>
     </div>

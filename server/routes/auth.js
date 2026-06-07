@@ -29,7 +29,11 @@ const getAuthCookieOptions = (maxAge) => {
   const options = {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
-    sameSite: 'strict',
+    // 'lax' (not 'strict'): the cookie must survive top-level GET navigations back into
+    // the app — PWA launch from the home-screen icon, and redirect returns from Razorpay —
+    // while still blocking cross-site POST/PUT/DELETE (CSRF). 'strict' dropped the cookie
+    // on those re-entries, contributing to the Android "logged out on reopen" bug.
+    sameSite: 'lax',
     path: '/',
   };
 
