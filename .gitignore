@@ -138,3 +138,4 @@ client/playwright.config.ts
 # Misc
 *.tgz
 *.tar.gz
+.gstack/

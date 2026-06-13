@@ -295,10 +295,10 @@ const Header = () => {
             <Link to="/" className="flex-shrink-0 flex items-center gap-1 max-w-[8rem] sm:max-w-[9.5rem] sm:max-w-none">
               {/* Mobile logo - shown only on small screens with white background */}
               <div className="sm:hidden bg-white rounded-lg p-1">
-                <img src="/logo-mobile.png" alt="CityFreshKart" className="h-8 w-auto object-contain" />
+                <img src="/logo-mobile.png" alt="CityFreshKart" className="h-9 w-auto object-contain" />
               </div>
               {/* Desktop logo - shown on sm and larger */}
-              <img src="/CityFreshKart.png" alt="CityFreshKart" className="hidden sm:block h-8 sm:h-9 w-auto object-contain" />
+              <img src="/CityFreshKart.png" alt="CityFreshKart" className="hidden sm:block h-9 sm:h-10 w-auto object-contain" />
             </Link>
 
             <button
