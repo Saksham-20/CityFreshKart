@@ -290,8 +290,8 @@ const Header = () => {
       }`}
     >
       <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6">
-        <div className="flex flex-col gap-2 md:gap-0 md:flex-row md:items-center md:h-[3.75rem] py-2 md:py-0">
-          <div className="flex items-center gap-2 sm:gap-3 min-h-[3.25rem] md:min-h-0 md:flex-1 md:min-w-0">
+        <div className="flex flex-col gap-2 md:gap-0 md:flex-row md:items-center md:h-[3.75rem] py-1.5 md:py-0">
+          <div className="flex items-center gap-2 sm:gap-3 min-h-[2.75rem] md:min-h-0 md:flex-1 md:min-w-0">
             <Link to="/" className="flex-shrink-0 flex items-center gap-1 max-w-[8rem] sm:max-w-[9.5rem] sm:max-w-none">
               {/* Mobile logo - shown only on small screens with white background */}
               <div className="sm:hidden bg-white rounded-lg p-1">
