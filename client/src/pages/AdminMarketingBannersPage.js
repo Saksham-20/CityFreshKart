@@ -254,7 +254,7 @@ const AdminMarketingBannersPage = () => {
           <div className="flex gap-3">
             <div className="text-blue-600 text-lg mt-0.5">ℹ️</div>
             <div>
-              <h3 className="font-semibold text-blue-900 mb-2">Recommended banner dimensions</h3>
+              <h3 className="text-sm font-semibold text-blue-900 mb-2">Recommended banner dimensions</h3>
               <div className="grid grid-cols-2 gap-4 text-sm text-blue-800">
                 <div>
                   <p className="font-medium">Full banner</p>
