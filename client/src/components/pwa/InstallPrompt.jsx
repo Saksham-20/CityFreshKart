@@ -80,7 +80,7 @@ const InstallPrompt = () => {
       <div
         id="install-banner"
         className={cn(
-          'fixed left-3 right-3 sm:left-auto sm:right-6 sm:w-[22rem]',
+          'fixed left-3 right-20 sm:left-auto sm:right-20 sm:w-[22rem]',
           'bg-gradient-to-r from-primary to-primary-container text-on-primary rounded-2xl shadow-primary-glow',
           'p-3 pt-2 sm:p-4 sm:pt-3 flex flex-col gap-2.5 sm:gap-3 z-[60]',
           'max-h-[calc(100vh-7rem)] overflow-y-auto',
