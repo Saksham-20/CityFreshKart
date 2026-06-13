@@ -101,7 +101,7 @@ const OffersCarousel = () => {
 
       <div className="-mx-4 px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
       <div
-        className="relative w-full aspect-[2/1] rounded-3xl overflow-hidden shadow-editorial outline outline-1 outline-outline-variant/15 group/carousel"
+        className="relative w-full aspect-[2/1] rounded-3xl overflow-hidden outline outline-1 outline-outline-variant/15 group/carousel"
         onTouchStart={(e) => {
           const x0 = e.touches[0].clientX;
           const onEnd = (ev) => {

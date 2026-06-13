@@ -39,6 +39,24 @@ server/
 
 Path aliases configured in `client/tsconfig.json`: `@components`, `@pages`, `@utils`, `@hooks`, `@context`, `@services`, `@store`.
 
+## Routing & UI shell
+
+- Routes live in `client/src/App.js` (React Router 6, lazy-loaded pages + `Suspense` `PageLoader`). Two shells:
+  - `MainLayout` (Header + `<main>` + desktop-only Footer + `MobileBottomNav`) wraps all shopper routes.
+  - `AdminLayout` (own sidebar) wraps `/admin/*` — fully separate from the shopper Header/Footer.
+- Client routes: `/` = `ProductsPage` (the storefront grid), `/cart`, `/checkout`, `/orders`, `/orders/:orderId`, `/profile`, `/login`, `/admin/*`. `/products` redirects to `/` preserving search. Unknown → `/`.
+- **There is no client product-detail route.** Products render only as cards in a grid (`ProductsPage` → `ProductGrid` → `ProductCard`). `pages/ProductDetailPage.js` + `components/product/ProductDetail.js` are **dead code** (no route, nothing links to them) — don't assume a detail page exists. (The server `GET /products/:id` endpoint still exists but the client never navigates to a detail screen.)
+- **`MobileBottomNav`** (`components/layout/MobileBottomNav.js`, `md:hidden`) is auth-aware: logged out → Shop · Cart · Sign up; logged in → Shop · Cart · Orders · Profile. Hidden only on `/checkout` and `/admin/*`. On `/cart` the sticky "Proceed to checkout" bar is offset (`bottom-[4.5rem] md:bottom-0`) to stack above the nav — keep that offset in sync with nav height (`4.5rem`).
+- Header (`components/layout/Header.js`) shows Sign in + Cart when logged out; user menu (Profile/Orders/Admin/Logout) only when `user` exists. No order/account actions leak to logged-out users.
+- Toasts: `react-hot-toast`, single `<Toaster>` configured in `App.js` (top-center, MD3-themed). Use `toast.success/error`.
+- Shared `components/common/BackButton.js` — chevron (`variant="back"`) or X (`variant="close"`); defaults to `navigate(-1)`, or pass `to`.
+
+## Images
+
+- `client/src/utils/imageUtils.js`: `getImageUrl()` resolves product/banner image paths (full URLs pass through; bare/relative → `${API origin}/uploads/...`). `getPlaceholderImage()` is an inline SVG fallback. `IMAGE_DIMS` holds intrinsic w/h per slot — always pass these to `<img width/height>` to avoid CLS.
+- `ProductCard` accepts `priority` (first ~4 cards in `ProductGrid` get `fetchpriority=high` + eager load); rest are `loading="lazy"`. `components/common/LazyImage.js` is an IntersectionObserver fade-in wrapper (used sparingly).
+- Uploaded images are served raw from the server `/uploads` static dir (multer disk storage, `server/middleware/upload.js`, `maxAge 7d`). **No server-side compression/resize/WebP currently** (`sharp` is a dependency but unused). External product images (Unsplash/Pexels) already carry `?w=&q=` params.
+
 ## Auth model (read before touching login/session code)
 
 - Login is **phone + password** (10-digit phone, bcrypt hash) — not email/OTP for sign-in. OTP is only used for the forgot-password flow (phone → email → OTP → reset).
@@ -67,3 +85,23 @@ Path aliases configured in `client/tsconfig.json`: `@components`, `@pages`, `@ut
 - `client/public/sw.js` only handles Web Push display + a `CLEAR_CACHE_ON_LOGOUT` message — it has **no fetch handler**, so it does not cache API responses or pages. Don't blame it for stale-data bugs.
 - CORS (`server/index.js`) deliberately allows requests with no `Origin` header and logs-but-allows mismatches — Android browsers/PWAs often omit `Origin`.
 - `localStorage` keys in play: `token`, `user`, `cart`; `authToken` is cleared on logout but is actually an httpOnly-cookie name (not a JS-writable key) — don't be confused by it appearing in `removeItem` calls.
+- Local `npm run lint` currently **fails to parse every client file** (`Parsing error: Cannot find module '@babel/plugin-proposal-class-properties'`) — environment/config issue, not your code. To validate client changes, run `CI=false npm run build` instead. Server `.js` files lint/`node --check` fine.
+
+## Skill routing
+
+When the user's request matches an available skill, invoke it via the Skill tool. When in doubt, invoke the skill.
+
+Key routing rules:
+- Product ideas/brainstorming → invoke /office-hours
+- Strategy/scope → invoke /plan-ceo-review
+- Architecture → invoke /plan-eng-review
+- Design system/plan review → invoke /design-consultation or /plan-design-review
+- Full review pipeline → invoke /autoplan
+- Bugs/errors → invoke /investigate
+- QA/testing site behavior → invoke /qa or /qa-only
+- Code review/diff check → invoke /review
+- Visual polish → invoke /design-review
+- Ship/deploy/PR → invoke /ship or /land-and-deploy
+- Save progress → invoke /context-save
+- Resume context → invoke /context-restore
+- Author a backlog-ready spec/issue → invoke /spec

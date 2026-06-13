@@ -812,28 +812,42 @@ router.get('/orders', async (req, res) => {
     const offset = (pageNum - 1) * limitNum;
 
     let query = `
-      SELECT 
+      WITH merged_items AS (
+        SELECT
+          (array_agg(id))[1] as id,
+          order_id,
+          product_id,
+          product_name,
+          price_per_kg,
+          pricing_type,
+          COALESCE(weight_display_unit, 'kg') as weight_display_unit,
+          SUM(quantity_kg) as quantity_kg,
+          SUM(total_price) as total_price
+        FROM order_items
+        GROUP BY order_id, product_id, product_name, price_per_kg, pricing_type, weight_display_unit
+      )
+      SELECT
         o.*,
         COALESCE(u.name, 'Walk-in Customer') AS name,
         COALESCE(o.phone, u.phone) AS phone,
-        COUNT(oi.id) as item_count,
+        COUNT(mi.id) as item_count,
         COALESCE(
           JSON_AGG(
             JSON_BUILD_OBJECT(
-              'id', oi.id,
-              'product_name', oi.product_name,
-              'quantity_kg', oi.quantity_kg,
-              'price_per_kg', oi.price_per_kg,
-              'total_price', oi.total_price,
-              'pricing_type', oi.pricing_type,
-              'weight_display_unit', COALESCE(oi.weight_display_unit, 'kg')
+              'id', mi.id,
+              'product_name', mi.product_name,
+              'quantity_kg', mi.quantity_kg,
+              'price_per_kg', mi.price_per_kg,
+              'total_price', mi.total_price,
+              'pricing_type', mi.pricing_type,
+              'weight_display_unit', mi.weight_display_unit
             )
-          ) FILTER (WHERE oi.id IS NOT NULL), 
+          ) FILTER (WHERE mi.id IS NOT NULL),
           '[]'::json
         ) as items
       FROM orders o
       LEFT JOIN users u ON o.user_id = u.id
-      LEFT JOIN order_items oi ON o.id = oi.order_id
+      LEFT JOIN merged_items mi ON o.id = mi.order_id
       WHERE 1=1
     `;
 

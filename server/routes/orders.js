@@ -50,11 +50,17 @@ router.get('/', authenticateToken, async (req, res) => {
     const offset = (page - 1) * limit;
 
     const orders = await query(`
-      SELECT 
+      WITH merged_items AS (
+        SELECT order_id, product_id, product_name, price_per_kg, pricing_type,
+               COALESCE(weight_display_unit, 'kg') as weight_display_unit
+        FROM order_items
+        GROUP BY order_id, product_id, product_name, price_per_kg, pricing_type, weight_display_unit
+      )
+      SELECT
         o.*,
-        COUNT(oi.id) as item_count
+        COUNT(mi.order_id) as item_count
       FROM orders o
-      LEFT JOIN order_items oi ON o.id = oi.order_id
+      LEFT JOIN merged_items mi ON o.id = mi.order_id
       WHERE o.user_id = $1
       GROUP BY o.id
       ORDER BY o.created_at DESC
@@ -113,14 +119,25 @@ router.get('/:id', authenticateToken, async (req, res) => {
       });
     }
 
-    // Get order items
+    // Get order items — merge duplicate rows (same product + price + tier) into
+    // one combined line, so orders placed before the checkout dedup fix still
+    // display correctly.
     const orderItems = await query(`
       SELECT
-        oi.*,
+        (array_agg(oi.id))[1] as id,
+        oi.order_id,
+        oi.product_id,
+        oi.product_name,
+        oi.price_per_kg,
+        oi.pricing_type,
+        COALESCE(oi.weight_display_unit, 'kg') as weight_display_unit,
+        SUM(oi.quantity_kg) as quantity_kg,
+        SUM(oi.total_price) as total_price,
         p.image_url as product_image
       FROM order_items oi
       LEFT JOIN products p ON oi.product_id = p.id
       WHERE oi.order_id = $1
+      GROUP BY oi.order_id, oi.product_id, oi.product_name, oi.price_per_kg, oi.pricing_type, oi.weight_display_unit, p.image_url
     `, [id]);
 
     const order = orderResult.rows[0];
@@ -414,7 +431,12 @@ router.post('/', authenticateToken, checkoutLimiter, async (req, res) => {
         }
       }
 
-      // Insert order items — include pricing_type snapshot
+      // Checkout sends one array entry per pack (so each entry's quantity_kg
+      // matches a valid weight tier for server-side validation). Merge entries
+      // for the same product + quantity tier into a single order_items row so
+      // the bill/admin/order-detail views show one combined line per item.
+      const mergedItems = new Map();
+
       for (const item of items) {
         const product = productsById.get(item.product_id);
         const pricePerKg = parseFloat(product.price_per_kg || 0);
@@ -429,21 +451,24 @@ router.post('/', authenticateToken, checkoutLimiter, async (req, res) => {
           ? 'kg'
           : (product.weight_display_unit === 'g' ? 'g' : 'kg');
 
-        await client.query(`
-          INSERT INTO order_items (order_id, product_id, product_name, quantity_kg, price_per_kg, total_price, pricing_type, weight_display_unit)
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-        `, [
-          order.id,
-          item.product_id,
-          product.name || '',
-          quantityKg,
-          linePricePerKg,
-          itemTotal,
-          pricingType,
-          weightDisplayUnit,
-        ]);
+        const mergeKey = `${item.product_id}:${quantityKg.toFixed(2)}`;
+        const existing = mergedItems.get(mergeKey);
+        if (existing) {
+          existing.quantityKg += quantityKg;
+          existing.itemTotal = parseFloat((existing.itemTotal + itemTotal).toFixed(2));
+        } else {
+          mergedItems.set(mergeKey, {
+            productId: item.product_id,
+            productName: product.name || '',
+            quantityKg,
+            linePricePerKg,
+            itemTotal,
+            pricingType,
+            weightDisplayUnit,
+          });
+        }
 
-        // Decrement available stock
+        // Decrement available stock per pack/line as submitted
         const stockUpdate = await client.query(
           'UPDATE products SET quantity_available = quantity_available - $1 WHERE id = $2 AND quantity_available >= $1',
           [quantityKg, item.product_id],
@@ -451,6 +476,23 @@ router.post('/', authenticateToken, checkoutLimiter, async (req, res) => {
         if (stockUpdate.rowCount !== 1) {
           throw new Error(`Insufficient stock for product ${item.product_id}`);
         }
+      }
+
+      // Insert order items — include pricing_type snapshot
+      for (const m of mergedItems.values()) {
+        await client.query(`
+          INSERT INTO order_items (order_id, product_id, product_name, quantity_kg, price_per_kg, total_price, pricing_type, weight_display_unit)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        `, [
+          order.id,
+          m.productId,
+          m.productName,
+          m.quantityKg,
+          m.linePricePerKg,
+          m.itemTotal,
+          m.pricingType,
+          m.weightDisplayUnit,
+        ]);
       }
 
       // Clear user's cart
