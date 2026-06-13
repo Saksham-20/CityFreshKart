@@ -43,7 +43,13 @@ apiClient.interceptors.response.use(
     if (error.response?.status === 401 && originalRequest) {
       // Prevent refresh loop: don't try to refresh if we're already refreshing the /refresh endpoint
       if (originalRequest.url.includes('/auth/refresh') || originalRequest.url.includes('/auth/logout')) {
-        useAuthStore.getState().logout();
+        // Clear local auth state directly — do NOT call logout(), which POSTs
+        // /auth/logout. That request would 401 here too, re-entering this
+        // branch and looping forever (every anonymous page load hit this).
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        localStorage.removeItem('authToken');
+        useAuthStore.setState({ user: null, token: null, isAuthenticated: false, error: null });
         return Promise.reject(error);
       }
 
